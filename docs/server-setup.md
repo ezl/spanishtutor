@@ -1,28 +1,21 @@
 # Server Setup — Spanish Tutor
 
-This is the project-specific setup guide. For the full generalized reference (any repo, any restart scenario), see [remote-claude-setup.md](remote-claude-setup.md).
+The remote Claude agent infrastructure lives in a **separate repo**: [discord-claude-agent](https://github.com/ezl/discord-claude-agent). That repo contains the bot, setup scripts, and full setup guide.
+
+This doc covers project-specific server configuration only.
 
 ---
 
-## Quick Setup (Fresh Server)
-
-```bash
-./setup.sh
-```
-
-The interactive wizard covers everything. Resume at any point — it saves progress.
-
----
-
-## Project-Specific Details
+## Server Details
 
 | Setting | Value |
 |---|---|
 | Server | Hetzner CPX11, us-west (Hillsboro OR) |
 | Server IP | 5.78.211.212 |
 | OS user for Claude | `claude` |
-| Repo path on server | `/home/claude/spanishtutor` |
-| systemd service | `spanishtutor-agent` |
+| App repo path | `/home/claude/spanishtutor` |
+| Agent repo path | `/home/claude/discord-claude-agent` |
+| systemd service | `discord-claude-agent` |
 | tmux session | `claude-agent` |
 | Discord learning server | Spanish Tutor (learning bot) |
 | Discord dev server | Spanish Tutor Dev (agent bot) |
@@ -39,10 +32,10 @@ ssh -i ~/.ssh/id_ed25519 root@5.78.211.212 "su - claude -c 'tmux list-sessions'"
 ssh -i ~/.ssh/id_ed25519 root@5.78.211.212 "su - claude -c 'tmux new-session -d -s claude-agent -c /home/claude/spanishtutor && tmux send-keys -t claude-agent \"claude --dangerously-skip-permissions\" Enter'"
 
 # Check bot service
-mise run status
+mise run agent-status
 
 # If bot is down:
-mise run restart
+mise run agent-restart
 ```
 
 ---
@@ -50,17 +43,19 @@ mise run restart
 ## Common Commands
 
 ```bash
-mise run claude       # Attach to Claude tmux session on server
-mise run logs         # Tail agent logs
-mise run status       # Check if agent service is running
-mise run restart      # Restart agent service
-mise run update       # git pull + restart
-mise run secrets      # Edit .env on server
-mise run secrets-show # List secret keys (no values)
+mise run claude          # Attach to Claude tmux session on server
+mise run agent-logs      # Tail agent bot logs
+mise run agent-status    # Check if agent service is running
+mise run agent-restart   # Restart agent service
+mise run secrets         # Edit app .env on server
+mise run secrets-show    # List app secret keys (no values)
 ```
 
 ---
 
-## Secrets Location
+## Secrets
 
-All secrets live in `/home/claude/spanishtutor/.env` on the server. See `.env.example` for the full list and where to get each value.
+App secrets live in `/home/claude/spanishtutor/.env`.
+Agent secrets live in `/home/claude/discord-claude-agent/.env`.
+
+See `.env.example` in each repo for the full list and where to get each value.

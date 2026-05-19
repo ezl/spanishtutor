@@ -1,46 +1,26 @@
 [env]
 _.file = ".env"
 
-[tasks.install]
-description = "Install all dependencies"
-run = "pip3 install -r requirements.txt"
-
-[tasks.start]
-description = "Start the Discord agent bot"
-run = "python3 agent/bot.py"
-
-[tasks.restart]
-description = "Restart the agent service"
-run = "systemctl restart spanishtutor-agent"
-
-[tasks.logs]
-description = "Tail agent logs"
-run = "journalctl -u spanishtutor-agent -f"
-
-[tasks.status]
-description = "Check agent service status"
-run = "systemctl status spanishtutor-agent"
-
-[tasks.pull]
-description = "Pull latest code from GitHub"
-run = "git pull origin main"
-
-[tasks.update]
-description = "Pull latest code and restart agent"
-run = ["git pull origin main", "systemctl restart spanishtutor-agent"]
-
 [tasks.claude]
 description = "Attach to the persistent Claude Code tmux session on the server"
-run = "ssh -i ~/.ssh/id_ed25519 root@5.78.211.212 -t 'tmux attach -t claude-agent || tmux new-session -s claude-agent -c /root/spanishtutor'"
+run = "TERM=xterm-256color ssh -i ~/.ssh/id_ed25519 root@5.78.211.212 -t \"su - claude -c 'tmux attach -t claude-agent'\""
+
+[tasks.agent-logs]
+description = "Tail agent bot logs"
+run = "ssh -i ~/.ssh/id_ed25519 root@5.78.211.212 'journalctl -u discord-claude-agent -f'"
+
+[tasks.agent-status]
+description = "Check agent service status"
+run = "ssh -i ~/.ssh/id_ed25519 root@5.78.211.212 'systemctl status discord-claude-agent --no-pager'"
+
+[tasks.agent-restart]
+description = "Restart agent service"
+run = "ssh -i ~/.ssh/id_ed25519 root@5.78.211.212 'systemctl restart discord-claude-agent'"
 
 [tasks.secrets]
-description = "Edit secrets (.env) on the server"
-run = "ssh -i ~/.ssh/id_ed25519 root@5.78.211.212 'nano /root/spanishtutor/.env'"
+description = "Edit app secrets (.env) on the server"
+run = "ssh -i ~/.ssh/id_ed25519 root@5.78.211.212 'nano /home/claude/spanishtutor/.env'"
 
 [tasks.secrets-show]
-description = "Print current secret keys (no values)"
-run = "ssh -i ~/.ssh/id_ed25519 root@5.78.211.212 \"grep -o '^[^=]*' /root/spanishtutor/.env\""
-
-[tasks.secrets-sync]
-description = "Push local .env to server"
-run = "scp -i ~/.ssh/id_ed25519 .env root@5.78.211.212:/root/spanishtutor/.env"
+description = "Print app secret keys (no values)"
+run = "ssh -i ~/.ssh/id_ed25519 root@5.78.211.212 \"grep -o '^[^=]*' /home/claude/spanishtutor/.env\""
