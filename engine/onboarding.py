@@ -1,175 +1,212 @@
 """
-Onboarding flow: new user → 3 questions → adaptive quiz → freeform response → CEFR estimate.
-State is tracked via user fields (native_language set = Q1 done, etc.)
+Onboarding: new user → 10-15 question adaptive placement quiz → skill grid + CEFR estimate.
+
+Quiz has two phases:
+  Q1-5:  Binary search for CEFR level (multiple choice, starts A1)
+  Q6-15: Boundary probing — find where confident→developing on specific subskills
+
+Two strands woven together: grammar and vocabulary.
 """
 from asgiref.sync import sync_to_async
+from django.utils import timezone
 from .core import call_llm
 
 FIRST_MESSAGE = """Hola! Soy Luz Angela, tu profesora de español!
 Hi! I'm Luz Angela, your Spanish teacher!
 
-I'm excited to start our Spanish language journey. I'll ask you a few questions and chat with you to get a sense of your current level.
+I'll ask you 10-15 quick questions to figure out your level. If something stumps you, just say "I don't know" — that's more useful than a guess.
 
 *(Send `!reset` anytime to start over.)*"""
 
+# Sentinel used by bot/client.py to fire Q1 immediately on join
+QUIZ_START_SENTINEL = "\x00__quiz_start__\x00"
+
+QUIZ_PROMPT = """You are Luz Angela running an adaptive Spanish placement quiz.
+
+RULES:
+- Never penalize missing accents (ó, é, etc) — typing limitation, not a knowledge gap
+- "I don't know" / "no idea" / "not sure" / "idk" = unanswered, mark unknown, move on without judgment
+- Never reveal what skill you're measuring mid-quiz
+- Escalate question format as level becomes clear:
+    A1-A2: multiple choice (label options a/b/c/d)
+    A2-B1: fill-in-the-blank (show the sentence, no options)
+    B1-B2: short free production ("how do you say X?" or "translate this")
+    B2+:   natural Spanish conversation ("¿Qué hiciste ayer?", describe plans, etc.)
+
+TWO STRANDS — weave both through the quiz:
+  Grammar:    ser_estar, preterite, preterite_vs_imperfect, reflexive_verbs, conditional_subjunctive
+  Vocabulary: vocab_concrete_nouns, vocab_body_parts, vocab_descriptive, vocab_register
+
+QUIZ HISTORY ({quiz_count} questions answered so far):
+{history}
+
+LATEST INPUT: {latest}
+
+PHASE INSTRUCTIONS:
+{phase}
+
+SKILL GRID — score each skill based on all evidence so far:
+  unknown | shaky | developing | confident | mastered
+
+OUTPUT FORMAT — use exactly one of these two blocks:
+
+If continuing:
+CONTINUE
+SKILL_UPDATES: skill:score,skill:score  (or "none" if no new info)
+NEXT_QUESTION: <full question text, including options if multiple choice>
+
+If concluding (10+ questions answered, OR level and key gaps are clearly established):
+CONCLUDE
+CEFR_LEVEL: A1|A2|B1|B2|C1|C2
+SKILL_UPDATES: skill:score for every skill you have signal on
+ASSESSMENT: <share with student — their level, what they know well, specific gaps, what first sessions will focus on. Warm and direct. 4-6 sentences in English.>"""
+
+PHASE_BINARY_SEARCH = "Q1-5: Binary search for CEFR. Start A1. Harder if correct, easier if wrong."
+PHASE_BOUNDARY_PROBE = "Q6+: Working CEFR estimate established. Now probe subskill boundaries. Find where confident→developing. Alternate grammar and vocabulary strands. Target specific gaps."
+PHASE_FIRST_QUESTION = "This is Q1. Ignore the input — ask the very first question. Start A1 (e.g. 'what does \"gracias\" mean?'). Use multiple choice."
+
+
+def _parse_quiz_response(text: str) -> dict:
+    """Parse LLM quiz response into a dict. Handles multi-line NEXT_QUESTION/ASSESSMENT."""
+    result = {}
+    lines = text.strip().split('\n')
+    result['action'] = lines[0].strip()
+
+    current_key = None
+    current_lines = []
+    keys = {'SKILL_UPDATES', 'NEXT_QUESTION', 'CEFR_LEVEL', 'ASSESSMENT'}
+
+    for line in lines[1:]:
+        matched_key = None
+        for key in keys:
+            if line.startswith(key + ':'):
+                matched_key = key
+                break
+        if matched_key:
+            if current_key:
+                result[current_key] = '\n'.join(current_lines).strip()
+            current_key = matched_key
+            current_lines = [line[len(matched_key) + 1:].strip()]
+        elif current_key:
+            current_lines.append(line)
+
+    if current_key:
+        result[current_key] = '\n'.join(current_lines).strip()
+
+    return result
+
+
+async def _save_skill_updates(user, updates_str: str):
+    """Parse and save SKILL_UPDATES string to SkillScore rows."""
+    if not updates_str or updates_str.lower() == 'none':
+        return
+    from learner.models import SkillScore
+    score_map = {'shaky': 1, 'developing': 2, 'confident': 3, 'mastered': 4}
+    for pair in updates_str.split(','):
+        pair = pair.strip()
+        if ':' not in pair:
+            continue
+        skill_id, _, score_str = pair.partition(':')
+        score = score_map.get(score_str.strip())
+        if score:
+            await sync_to_async(SkillScore.objects.update_or_create)(
+                user=user,
+                skill_id=skill_id.strip(),
+                mode='writing',
+                defaults={'score': score},
+            )
+
 
 async def handle_onboarding(user, text: str, attachments: list = None) -> dict:
-    if not user.estimated_cefr_level:
-        return await _step_adaptive_quiz(user, text)
-    else:
-        return await _step_freeform(user, text)
-
-
-async def _step_interests(user, text: str) -> dict:
-    await sync_to_async(user.__class__.objects.filter(pk=user.pk).update)(interests=text)
-    await sync_to_async(user.refresh_from_db)()
-
-    prompt = f'The student said their interests are: "{text}". Respond in English. React briefly (1 sentence), then ask ONE question about where or how they want to use their Spanish (travel, work, family, etc).'
-    response = await call_llm([{"role": "user", "content": prompt}], user=user)
-    return {"text": response, "audio_url": None, "session_ended": False}
-
-
-async def _step_target_use(user, text: str) -> dict:
-    await sync_to_async(user.__class__.objects.filter(pk=user.pk).update)(target_use=text)
-    await sync_to_async(user.refresh_from_db)()
-
-    prompt = f'The student said they want to use Spanish for: "{text}". Respond in English. Acknowledge in 1 sentence, then tell them you\'ll ask a couple quick questions to see where they\'re starting from, and ask the first one: what does "hola" mean? Give 4 options. Keep it casual.'
-    response = await call_llm([{"role": "user", "content": prompt}], user=user)
-    return {"text": response, "audio_url": None, "session_ended": False}
+    return await _step_adaptive_quiz(user, text)
 
 
 async def _step_adaptive_quiz(user, text: str) -> dict:
-    """
-    Adaptive quiz. Uses LLM to evaluate answer, determine next question difficulty,
-    and eventually estimate CEFR level.
-    """
-    from learner.models import Session, SessionEvent
+    from learner.models import Session, SessionEvent, EvaluationProgress
 
-    # Get current session for this quiz
+    is_first = text == QUIZ_START_SENTINEL
+
+    # Get or create quiz session
     session = await sync_to_async(
-        lambda: Session.objects.filter(user=user, session_type='onboarding', ended_at__isnull=True).first()
+        lambda: Session.objects.filter(
+            user=user, session_type='onboarding', ended_at__isnull=True
+        ).first()
     )()
     if not session:
         session = await sync_to_async(Session.objects.create)(
             user=user, session_type='onboarding'
         )
 
-    # Count quiz events so far
-    quiz_count = await sync_to_async(
-        lambda: session.events.filter(event_type='quiz').count()
-    )()
-
-    # Get conversation history
     events = await sync_to_async(
         lambda: list(session.events.filter(event_type='quiz').order_by('timestamp'))
     )()
+    quiz_count = len(events)
 
-    history = []
-    for e in events:
-        history.append({"role": "assistant", "content": e.content})
-        if e.user_response:
-            history.append({"role": "user", "content": e.user_response})
+    # Log user's answer onto the last unanswered event
+    if not is_first and events:
+        last = events[-1]
+        if not last.user_response:
+            await sync_to_async(
+                lambda: SessionEvent.objects.filter(pk=last.pk).update(user_response=text)
+            )()
+            # Refresh local copy
+            last.user_response = text
 
-    # Ask LLM to evaluate and continue or conclude
-    is_first_question = quiz_count == 0
-    eval_prompt = f"""You are running an adaptive Spanish placement quiz. Assume the student is a beginner (A1) unless their answers show otherwise. Start easy and only go harder if they're clearly correct. The quiz runs in English. Max 5 questions.
+    history_text = '\n'.join(
+        f"Q{i+1}: {e.content}\nA: {e.user_response or '(unanswered)'}"
+        for i, e in enumerate(events)
+    ) or '(none yet)'
 
-Previous Q&A:
-{chr(10).join(f"Q: {e.content} | A: {e.user_response}" for e in events)}
+    if is_first:
+        phase = PHASE_FIRST_QUESTION
+        latest = '(quiz start)'
+    elif quiz_count < 5:
+        phase = PHASE_BINARY_SEARCH
+        latest = f'"{text}"'
+    else:
+        phase = PHASE_BOUNDARY_PROBE
+        latest = f'"{text}"'
 
-{"This is the first question — the student just said: " + repr(text) + ". Ignore their message and ask the first placement question." if is_first_question else f'Latest answer: "{text}"'}
-
-{"Ask the first question now. Start easy (A1 level)." if is_first_question else "Based on all answers so far: 1. Evaluate correctness 2. Decide: continue (if fewer than 5 questions and level not clear) OR conclude"}
-
-If continuing: next question slightly harder if correct, easier if wrong. Questions in English with Spanish words to translate/identify. Format:
-CONTINUE
-FEEDBACK: <1 sentence in English, skip if first question>
-NEXT_QUESTION: <question in English>
-
-If concluding (at least 3 questions answered):
-CONCLUDE
-CEFR_LEVEL: <A1|A2|B1|B2|C1|C2>
-FEEDBACK: <1 encouraging sentence in English telling them their level>
-TRANSITION: <1 sentence in English transitioning to a short freeform exercise>"""
-
-    eval_response = await call_llm(
-        [{"role": "user", "content": eval_prompt}],
-        user=None,
-        max_tokens=512,
+    prompt = QUIZ_PROMPT.format(
+        quiz_count=quiz_count,
+        history=history_text,
+        latest=latest,
+        phase=phase,
     )
 
-    # Log the user's answer to the last quiz event
-    if events:
-        last_event = events[-1]
-        await sync_to_async(
-            lambda: SessionEvent.objects.filter(pk=last_event.pk).update(user_response=text)
-        )()
+    llm_response = await call_llm(
+        [{"role": "user", "content": prompt}],
+        user=None,
+        max_tokens=600,
+    )
 
-    if eval_response.startswith('CONCLUDE'):
-        lines = {l.split(':', 1)[0].strip(): l.split(':', 1)[1].strip()
-                 for l in eval_response.split('\n') if ':' in l}
-        cefr = lines.get('CEFR_LEVEL', 'A2')
-        feedback = lines.get('FEEDBACK', '')
-        transition = lines.get('TRANSITION', '')
+    parsed = _parse_quiz_response(llm_response)
+    await _save_skill_updates(user, parsed.get('SKILL_UPDATES', ''))
+
+    if parsed['action'] == 'CONCLUDE':
+        cefr = parsed.get('CEFR_LEVEL', 'A2')
+        assessment = parsed.get('ASSESSMENT', f"You're at {cefr} level. Let's get started!")
 
         await sync_to_async(user.__class__.objects.filter(pk=user.pk).update)(
-            estimated_cefr_level=cefr
+            estimated_cefr_level=cefr,
+            onboarding_complete=True,
         )
-        await sync_to_async(user.refresh_from_db)()
-
-        freeform_prompt = f"\n\n{transition}\n\nTry writing 1-2 sentences about yourself in Spanish — anything at all. Don't worry about mistakes."
-        return {"text": f"{feedback}{freeform_prompt}", "audio_url": None, "session_ended": False}
-
-    else:
-        lines = {l.split(':', 1)[0].strip(): l.split(':', 1)[1].strip()
-                 for l in eval_response.split('\n') if ':' in l}
-        feedback = lines.get('FEEDBACK', '')
-        next_q = lines.get('NEXT_QUESTION', '')
-
-        await sync_to_async(SessionEvent.objects.create)(
-            session=session,
-            event_type='quiz',
-            dimension='writing',
-            content=next_q,
-            user_response='',
+        await sync_to_async(EvaluationProgress.objects.get_or_create)(
+            user=user, phase='session1'
         )
+        await sync_to_async(
+            lambda: Session.objects.filter(pk=session.pk).update(ended_at=timezone.now())
+        )()
 
-        return {"text": f"{feedback}\n\n{next_q}", "audio_url": None, "session_ended": False}
+        return {"text": assessment, "audio_url": None, "session_ended": False}
 
-
-async def _step_freeform(user, text: str) -> dict:
-    """Evaluate freeform Spanish, finalize onboarding."""
-    from learner.models import EvaluationProgress
-
-    eval_prompt = f"""The student (estimated level: {user.estimated_cefr_level}) wrote this freeform Spanish:
-"{text}"
-
-Evaluate their actual production ability. Does the CEFR estimate seem right, too high, or too low?
-Respond with:
-ADJUSTED_LEVEL: <A1|A2|B1|B2|C1|C2>
-NOTES: <brief internal notes on what you observed>"""
-
-    eval_response = await call_llm(
-        [{"role": "user", "content": eval_prompt}],
-        user=None,
-        max_tokens=256,
+    # CONTINUE — log next question and return it
+    next_q = parsed.get('NEXT_QUESTION', '')
+    await sync_to_async(SessionEvent.objects.create)(
+        session=session,
+        event_type='quiz',
+        dimension='writing',
+        content=next_q,
+        user_response='',
     )
-
-    adjusted_level = user.estimated_cefr_level
-    for line in eval_response.split('\n'):
-        if line.startswith('ADJUSTED_LEVEL:'):
-            adjusted_level = line.split(':', 1)[1].strip()
-
-    await sync_to_async(user.__class__.objects.filter(pk=user.pk).update)(
-        estimated_cefr_level=adjusted_level,
-        onboarding_complete=True,
-    )
-    await sync_to_async(EvaluationProgress.objects.get_or_create)(
-        user=user, phase='session1'
-    )
-    await sync_to_async(user.refresh_from_db)()
-
-    closing_prompt = f'The student (level: {adjusted_level}) just finished their placement. In English, give a warm 2-sentence closing: tell them their level and that you\'re ready to start teaching. Keep it encouraging and casual.'
-    closing = await call_llm([{"role": "user", "content": closing_prompt}], user=user)
-
-    return {"text": closing, "audio_url": None, "session_ended": True}
+    return {"text": next_q, "audio_url": None, "session_ended": False}
