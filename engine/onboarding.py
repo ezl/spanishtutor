@@ -7,16 +7,13 @@ from .core import call_llm
 
 FIRST_MESSAGE = """Hey! I'm Luz Angela, your Spanish tutor.
 
-Quick question to get started — why are you learning Spanish?
+What are your interests — hobbies, sports, music, whatever. I'll use them to make the lessons actually interesting.
 
-*(Tip: send `!reset` anytime to start over.)*"""
+*(Send `!reset` anytime to start over.)*"""
 
 
 async def handle_onboarding(user, text: str, attachments: list = None) -> dict:
-    # Determine which onboarding step we're on based on what's already saved
-    if not user.native_language:
-        return await _step_native_language(user, text)
-    elif not user.interests:
+    if not user.interests:
         return await _step_interests(user, text)
     elif not user.target_use:
         return await _step_target_use(user, text)
@@ -24,49 +21,6 @@ async def handle_onboarding(user, text: str, attachments: list = None) -> dict:
         return await _step_adaptive_quiz(user, text)
     else:
         return await _step_freeform(user, text)
-
-
-async def _step_native_language(user, text: str) -> dict:
-    # First real response after FIRST_MESSAGE — extract native language and why learning
-    messages = [
-        {"role": "user", "content": text},
-        {"role": "assistant", "content": ""},
-    ]
-    # Parse their answer to extract native language
-    parse_prompt = f"""The student responded to "what is your native language and why are you learning Spanish?" with:
-"{text}"
-
-Extract:
-1. native_language: their native language (just the language name, e.g. "English")
-2. why_learning: their reason for learning Spanish (brief, their words)
-
-Respond in this exact format:
-NATIVE_LANGUAGE: <language>
-WHY_LEARNING: <reason>"""
-
-    client_response = await call_llm(
-        [{"role": "user", "content": parse_prompt}],
-        user=None,
-    )
-
-    native_language = "English"
-    why_learning = text
-    for line in client_response.split('\n'):
-        if line.startswith('NATIVE_LANGUAGE:'):
-            native_language = line.split(':', 1)[1].strip()
-        elif line.startswith('WHY_LEARNING:'):
-            why_learning = line.split(':', 1)[1].strip()
-
-    await sync_to_async(user.__class__.objects.filter(pk=user.pk).update)(
-        native_language=native_language,
-        why_learning=why_learning,
-    )
-    await sync_to_async(user.refresh_from_db)()
-
-    prompt = f'The student said: "{text}". Respond in English. Briefly acknowledge (1 sentence), then ask ONE question about their hobbies or interests.'
-    response = await call_llm([{"role": "user", "content": prompt}], user=user)
-
-    return {"text": response, "audio_url": None, "session_ended": False}
 
 
 async def _step_interests(user, text: str) -> dict:

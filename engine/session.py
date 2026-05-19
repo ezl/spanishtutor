@@ -35,7 +35,7 @@ async def _open_session(user, text: str) -> dict:
     from learner.models import Session, SkillScore
 
     # Create the session now so subsequent messages route to _continue_session
-    session = await sync_to_async(Session.objects.create)(user=user, session_type='practice')
+    session = await sync_to_async(Session.objects.create)(user=user, session_type='user_directed')
 
     # Find most recent completed session for recap
     last_session = await sync_to_async(
