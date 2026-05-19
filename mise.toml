@@ -29,6 +29,10 @@ run = "git pull origin main"
 description = "Pull latest code and restart agent"
 run = ["git pull origin main", "systemctl restart spanishtutor-agent"]
 
+[tasks.claude]
+description = "Attach to the persistent Claude Code tmux session on the server"
+run = "ssh -i ~/.ssh/id_ed25519 root@5.78.211.212 -t 'tmux attach -t claude-agent || tmux new-session -s claude-agent -c /root/spanishtutor'"
+
 [tasks.secrets]
 description = "Edit secrets (.env) on the server"
 run = "ssh -i ~/.ssh/id_ed25519 root@5.78.211.212 'nano /root/spanishtutor/.env'"
