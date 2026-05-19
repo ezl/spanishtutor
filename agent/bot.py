@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '..', '.env'))
 
 TOKEN = os.getenv("DISCORD_DEV_BOT_TOKEN")
-REPO_PATH = os.getenv("REPO_PATH", "/root/spanishtutor")
+REPO_PATH = os.getenv("REPO_PATH", "/home/claude/spanishtutor")
 TMUX_SESSION = "claude-agent"
 
 ACTION_CHANNELS = {
