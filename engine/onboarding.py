@@ -5,13 +5,11 @@ State is tracked via user fields (native_language set = Q1 done, etc.)
 from asgiref.sync import sync_to_async
 from .core import call_llm
 
-FIRST_MESSAGE = """¡Hola! Soy Luz Angela, tu profesora de español. 🌟
+FIRST_MESSAGE = """Hey! I'm Luz Angela, your Spanish tutor.
 
-Vamos a empezar con una evaluación rápida para entender dónde estás — no te preocupes, no es un examen formal. Solo quiero conocer tu español.
+Quick question to get started — why are you learning Spanish?
 
-Primero: ¿cuál es tu lengua nativa, y por qué estás aprendiendo español?
-
-*(If you ever want instructions in English, just say "English please" — I've got you.)*"""
+*(Tip: send `!reset` anytime to start over.)*"""
 
 
 async def handle_onboarding(user, text: str, attachments: list = None) -> dict:
@@ -65,7 +63,7 @@ WHY_LEARNING: <reason>"""
     )
     await sync_to_async(user.refresh_from_db)()
 
-    prompt = f'The student said: "{text}". Briefly acknowledge (1 sentence), then ask ONE question about their hobbies or interests.'
+    prompt = f'The student said: "{text}". Respond in English. Briefly acknowledge (1 sentence), then ask ONE question about their hobbies or interests.'
     response = await call_llm([{"role": "user", "content": prompt}], user=user)
 
     return {"text": response, "audio_url": None, "session_ended": False}
@@ -75,7 +73,7 @@ async def _step_interests(user, text: str) -> dict:
     await sync_to_async(user.__class__.objects.filter(pk=user.pk).update)(interests=text)
     await sync_to_async(user.refresh_from_db)()
 
-    prompt = f'The student said their interests are: "{text}". React briefly (1 sentence), then ask ONE question about where or how they want to use their Spanish (travel, work, family, etc).'
+    prompt = f'The student said their interests are: "{text}". Respond in English. React briefly (1 sentence), then ask ONE question about where or how they want to use their Spanish (travel, work, family, etc).'
     response = await call_llm([{"role": "user", "content": prompt}], user=user)
     return {"text": response, "audio_url": None, "session_ended": False}
 
@@ -84,7 +82,7 @@ async def _step_target_use(user, text: str) -> dict:
     await sync_to_async(user.__class__.objects.filter(pk=user.pk).update)(target_use=text)
     await sync_to_async(user.refresh_from_db)()
 
-    prompt = f'The student said they want to use Spanish for: "{text}". Acknowledge in 1 sentence, then say you\'re going to ask a few quick questions to gauge their level, and ask the first one: ¿Qué significa "mañana"? (give 4 options: Yesterday / Tomorrow / Morning / Night). Keep it casual, no long intros.'
+    prompt = f'The student said they want to use Spanish for: "{text}". Respond in English. Acknowledge in 1 sentence, then tell them you\'ll ask a couple quick questions to see where they\'re starting from, and ask the first one: what does "hola" mean? Give 4 options. Keep it casual.'
     response = await call_llm([{"role": "user", "content": prompt}], user=user)
     return {"text": response, "audio_url": None, "session_ended": False}
 
@@ -122,7 +120,7 @@ async def _step_adaptive_quiz(user, text: str) -> dict:
             history.append({"role": "user", "content": e.user_response})
 
     # Ask LLM to evaluate and continue or conclude
-    eval_prompt = f"""You are running an adaptive Spanish placement quiz. The student has answered {quiz_count} questions.
+    eval_prompt = f"""You are running an adaptive Spanish placement quiz. Assume the student is a beginner (A1) unless their answers show otherwise. Start easy and only go harder if they're clearly correct. The quiz runs in English. Max 5 questions.
 
 Previous Q&A:
 {chr(10).join(f"Q: {e.content} | A: {e.user_response}" for e in events)}
@@ -130,19 +128,19 @@ Previous Q&A:
 Latest answer: "{text}"
 
 Based on all answers so far:
-1. Evaluate correctness of the latest answer
-2. Decide: continue quiz (if fewer than 7 questions and level not yet clear) OR conclude with CEFR estimate
+1. Evaluate correctness
+2. Decide: continue (if fewer than 5 questions and level not clear) OR conclude
 
-If continuing: provide the next question (harder if correct, easier if wrong). Format:
+If continuing: next question should be slightly harder if correct, easier if wrong. Questions in English with Spanish words to translate/identify. Format:
 CONTINUE
-FEEDBACK: <brief feedback in Spanish>
-NEXT_QUESTION: <question in Spanish>
+FEEDBACK: <1 sentence in English>
+NEXT_QUESTION: <question in English>
 
-If concluding (at least 3 questions answered, level is clear):
+If concluding (at least 3 questions answered):
 CONCLUDE
 CEFR_LEVEL: <A1|A2|B1|B2|C1|C2>
-FEEDBACK: <brief encouraging feedback in Spanish>
-TRANSITION: <natural sentence in Spanish transitioning to freeform exercise>"""
+FEEDBACK: <1 encouraging sentence in English telling them their level>
+TRANSITION: <1 sentence in English transitioning to a short freeform exercise>"""
 
     eval_response = await call_llm(
         [{"role": "user", "content": eval_prompt}],
@@ -169,7 +167,7 @@ TRANSITION: <natural sentence in Spanish transitioning to freeform exercise>"""
         )
         await sync_to_async(user.refresh_from_db)()
 
-        freeform_prompt = f"\n\n{transition}\n\nCuéntame un poco sobre ti en español — lo que quieras. No hay respuesta correcta o incorrecta. 😊"
+        freeform_prompt = f"\n\n{transition}\n\nTry writing 1-2 sentences about yourself in Spanish — anything at all. Don't worry about mistakes."
         return {"text": f"{feedback}{freeform_prompt}", "audio_url": None, "session_ended": False}
 
     else:
@@ -221,9 +219,7 @@ NOTES: <brief internal notes on what you observed>"""
     )
     await sync_to_async(user.refresh_from_db)()
 
-    closing = await call_llm([
-        {"role": "user", "content": text},
-        {"role": "assistant", "content": f"[Internal: student level confirmed as {adjusted_level}. Onboarding complete. Give warm closing, tell them what level they're at, and that next session we start real lessons. Keep it short and encouraging.]"},
-    ], user=user)
+    closing_prompt = f'The student (level: {adjusted_level}) just finished their placement. In English, give a warm 2-sentence closing: tell them their level and that you\'re ready to start teaching. Keep it encouraging and casual.'
+    closing = await call_llm([{"role": "user", "content": closing_prompt}], user=user)
 
     return {"text": closing, "audio_url": None, "session_ended": True}
