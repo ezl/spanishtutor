@@ -1,0 +1,1 @@
+Interview me relentlessly about every aspect of this plan until we reach a shared understanding. Walk down each branch of the design tree resolving dependencies between decisions one by one. When you ask a question with an obviously good answer, recommend that answer. Once we've covered everything, provide a summary of what we've decided.
