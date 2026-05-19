@@ -36,6 +36,13 @@ async def on_message(message: discord.Message):
     text = message.content.strip()
     attachments = message.attachments
 
+    if text.lower() == '!reset':
+        from learner.models import User
+        await sync_to_async(User.objects.filter(discord_id=str(message.author.id)).delete)()
+        await message.channel.send('Reset done. Starting over...')
+        await message.channel.send(FIRST_MESSAGE)
+        return
+
     try:
         async with message.channel.typing():
             user, is_new = await get_or_create_user(message.author)
