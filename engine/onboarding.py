@@ -65,39 +65,28 @@ WHY_LEARNING: <reason>"""
     )
     await sync_to_async(user.refresh_from_db)()
 
-    response = await call_llm([
-        {"role": "user", "content": text},
-    ], user=user)
+    prompt = f'The student said: "{text}". Briefly acknowledge (1 sentence), then ask ONE question about their hobbies or interests.'
+    response = await call_llm([{"role": "user", "content": prompt}], user=user)
 
-    # Append our next question
-    next_q = "\n\n¿Y cuáles son tus intereses? Por ejemplo: deportes, música, tecnología, viajes, negocios... lo que sea. Esto me ayuda a hacer las clases más interesantes para ti. 😊"
-
-    return {"text": response + next_q, "audio_url": None, "session_ended": False}
+    return {"text": response, "audio_url": None, "session_ended": False}
 
 
 async def _step_interests(user, text: str) -> dict:
     await sync_to_async(user.__class__.objects.filter(pk=user.pk).update)(interests=text)
     await sync_to_async(user.refresh_from_db)()
 
-    next_q = await call_llm([
-        {"role": "user", "content": f"My interests are: {text}"},
-    ], user=user)
-
-    follow_up = "\n\n¿Y dónde quieres usar tu español? ¿Viajes, trabajo, conectar con familia, vivir en Latinoamérica...?"
-    return {"text": next_q + follow_up, "audio_url": None, "session_ended": False}
+    prompt = f'The student said their interests are: "{text}". React briefly (1 sentence), then ask ONE question about where or how they want to use their Spanish (travel, work, family, etc).'
+    response = await call_llm([{"role": "user", "content": prompt}], user=user)
+    return {"text": response, "audio_url": None, "session_ended": False}
 
 
 async def _step_target_use(user, text: str) -> dict:
     await sync_to_async(user.__class__.objects.filter(pk=user.pk).update)(target_use=text)
     await sync_to_async(user.refresh_from_db)()
 
-    transition = await call_llm([
-        {"role": "user", "content": text},
-    ], user=user)
-
-    quiz_intro = "\n\n¡Perfecto! Ahora vamos a hacer una pequeña evaluación para entender tu nivel. No te preocupes — no es un examen, solo quiero saber desde dónde empezamos. Te voy a hacer unas preguntas en español. Responde lo mejor que puedas.\n\n¿Listo/a? Empecemos:\n\n**¿Qué significa 'mañana'?**\na) Yesterday\nb) Tomorrow\nc) Morning\nd) Friend"
-
-    return {"text": transition + quiz_intro, "audio_url": None, "session_ended": False}
+    prompt = f'The student said they want to use Spanish for: "{text}". Acknowledge in 1 sentence, then say you\'re going to ask a few quick questions to gauge their level, and ask the first one: ¿Qué significa "mañana"? (give 4 options: Yesterday / Tomorrow / Morning / Night). Keep it casual, no long intros.'
+    response = await call_llm([{"role": "user", "content": prompt}], user=user)
+    return {"text": response, "audio_url": None, "session_ended": False}
 
 
 async def _step_adaptive_quiz(user, text: str) -> dict:
