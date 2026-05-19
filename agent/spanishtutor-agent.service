@@ -1,0 +1,14 @@
+[Unit]
+Description=Spanish Tutor Dev Agent Bot
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/spanishtutor
+ExecStart=/usr/bin/python3 /root/spanishtutor/agent/bot.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
