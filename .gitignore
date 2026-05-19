@@ -3,6 +3,11 @@ __pycache__/
 *.pyc
 *.pyo
 .venv/
+venv/
 node_modules/
 .DS_Store
 .setup-config
+db.sqlite3
+*.egg-info/
+dist/
+build/

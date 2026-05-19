@@ -1,0 +1,198 @@
+modes:
+  - listening
+  - reading
+  - spoken_interaction
+  - spoken_production
+  - writing
+
+skills:
+  # ─── A1 ───────────────────────────────────────────────
+  - id: a1_greetings
+    name: Greetings & basic expressions
+    cefr_level: A1
+    description: Hola, adiós, por favor, gracias, mucho gusto, ¿cómo estás?
+
+  - id: a1_numbers_dates
+    name: Numbers, dates, and time
+    cefr_level: A1
+    description: Cardinal numbers, days of the week, months, telling time
+
+  - id: a1_nouns_gender
+    name: Basic nouns and grammatical gender
+    cefr_level: A1
+    description: Masculine/feminine noun distinction, el/la/los/las
+
+  - id: a1_ser_estar_basic
+    name: Ser vs. estar (basics)
+    cefr_level: A1
+    description: Fundamental uses — identity/origin (ser) vs. state/location (estar)
+
+  - id: a1_present_regular
+    name: Present tense — regular verbs
+    cefr_level: A1
+    description: -ar, -er, -ir verb conjugations in present tense (hablar, comer, vivir)
+
+  - id: a1_basic_vocab
+    name: Core A1 vocabulary
+    cefr_level: A1
+    description: Family, colors, basic objects, food and drink, body parts
+
+  # ─── A2 ───────────────────────────────────────────────
+  - id: a2_present_irregular
+    name: Present tense — irregular verbs
+    cefr_level: A2
+    description: Stem-changing verbs (e→ie, o→ue, e→i), go-verbs (tener, venir, hacer, poner)
+
+  - id: a2_reflexive_verbs
+    name: Reflexive verbs
+    cefr_level: A2
+    description: Reflexive pronouns (me, te, se, nos), common reflexive verbs (levantarse, llamarse)
+
+  - id: a2_object_pronouns
+    name: Direct and indirect object pronouns
+    cefr_level: A2
+    description: lo/la/los/las, le/les, combined pronoun order, pronoun placement
+
+  - id: a2_preterite_regular
+    name: Preterite — regular verbs
+    cefr_level: A2
+    description: Regular preterite conjugation (-ar, -er, -ir), basic time markers (ayer, anoche)
+
+  - id: a2_adjective_agreement
+    name: Adjective agreement and placement
+    cefr_level: A2
+    description: Gender and number agreement, adjective position before/after noun
+
+  - id: a2_gustar_like_verbs
+    name: Gustar and similar verbs
+    cefr_level: A2
+    description: Gustar, encantar, molestar, interesar — reverse construction with indirect pronouns
+
+  - id: a2_vocab_domains
+    name: A2 vocabulary domains
+    cefr_level: A2
+    description: Travel, shopping, directions, home and furniture, health and body, weather
+
+  # ─── B1 ───────────────────────────────────────────────
+  - id: b1_preterite_irregular
+    name: Preterite — irregular verbs
+    cefr_level: B1
+    description: Irregular preterite stems (ser/ir→fui, tener→tuv, estar→estuv, hacer→hic)
+
+  - id: b1_imperfect
+    name: Imperfect tense
+    cefr_level: B1
+    description: Imperfect conjugation, habitual past, descriptions, background action
+
+  - id: b1_preterite_vs_imperfect
+    name: Preterite vs. imperfect
+    cefr_level: B1
+    description: Distinguishing completed actions (preterite) from ongoing/habitual (imperfect)
+
+  - id: b1_future
+    name: Future tense
+    cefr_level: B1
+    description: Simple future conjugation, ir + a + infinitive, future of probability
+
+  - id: b1_conditional
+    name: Conditional tense
+    cefr_level: B1
+    description: Conditional conjugation, hypothetical situations, polite requests
+
+  - id: b1_subjunctive_intro
+    name: Subjunctive — introduction
+    cefr_level: B1
+    description: Present subjunctive formation, triggers (querer que, esperar que, dudar que)
+
+  - id: b1_ser_estar_advanced
+    name: Ser vs. estar — advanced uses
+    cefr_level: B1
+    description: Adjectives that change meaning with ser/estar, passive voice with ser, progressive with estar
+
+  - id: b1_vocab_intermediate
+    name: B1 vocabulary
+    cefr_level: B1
+    description: Work and career, opinions and arguments, media and technology, emotions
+
+  # ─── B2 ───────────────────────────────────────────────
+  - id: b2_subjunctive_present
+    name: Subjunctive — present (full)
+    cefr_level: B2
+    description: All trigger categories — doubt, emotion, impersonal expressions, adjective clauses
+
+  - id: b2_subjunctive_past
+    name: Subjunctive — past (imperfect)
+    cefr_level: B2
+    description: Imperfect subjunctive formation and use, si clauses (si tuviera...)
+
+  - id: b2_passive_voice
+    name: Passive voice
+    cefr_level: B2
+    description: Ser + past participle, se pasiva, active-to-passive transformation
+
+  - id: b2_advanced_pronouns
+    name: Advanced pronouns
+    cefr_level: B2
+    description: Se as impersonal, leísmo, pronoun redundancy, complex pronoun stacking
+
+  - id: b2_reported_speech
+    name: Reported speech
+    cefr_level: B2
+    description: Indirect discourse, sequence of tenses, dijo que + subjunctive/indicative
+
+  - id: b2_discourse_markers
+    name: Complex connectors and discourse markers
+    cefr_level: B2
+    description: sin embargo, no obstante, a pesar de que, dado que, aunque + subjunctive/indicative
+
+  - id: b2_vocab_advanced
+    name: B2 vocabulary
+    cefr_level: B2
+    description: Abstract concepts, professional register, academic and formal language, collocations
+
+  # ─── C1 ───────────────────────────────────────────────
+  - id: c1_subjunctive_all
+    name: Subjunctive — all tenses and nuanced use
+    cefr_level: C1
+    description: Perfect subjunctive, pluperfect subjunctive, nuanced alternation with indicative
+
+  - id: c1_compound_tenses
+    name: Compound tenses
+    cefr_level: C1
+    description: Present perfect, past perfect (pluperfect), future perfect, conditional perfect
+
+  - id: c1_idiomatic_expressions
+    name: Idiomatic expressions and collocations
+    cefr_level: C1
+    description: Fixed expressions, phrasal verbs in Spanish, collocations that don't translate literally
+
+  - id: c1_register_shifts
+    name: Register shifts
+    cefr_level: C1
+    description: Navigating formal/informal/written registers appropriately in context
+
+  - id: c1_vocab_academic
+    name: C1 vocabulary
+    cefr_level: C1
+    description: Academic, literary, and professional vocabulary; false cognates; nuanced synonyms
+
+  # ─── C2 ───────────────────────────────────────────────
+  - id: c2_stylistic_control
+    name: Full stylistic control
+    cefr_level: C2
+    description: Precise word choice, rhetorical devices, writing style indistinguishable from educated native
+
+  - id: c2_dialectal_variation
+    name: Dialectal variation awareness
+    cefr_level: C2
+    description: Recognition and production across regional varieties; vos/tú/usted nuances by region
+
+  - id: c2_implication_subtext
+    name: Ambiguity, implication, and cultural subtext
+    cefr_level: C2
+    description: Irony, understatement, cultural references, reading between the lines
+
+  - id: c2_native_fluency
+    name: Near-native production fluency
+    cefr_level: C2
+    description: Real-time production without hesitation, self-correction, repair strategies
