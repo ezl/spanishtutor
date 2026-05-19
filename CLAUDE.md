@@ -81,6 +81,10 @@ The tutor persona. Mid-30s, from Laureles, Medellín. Warm, playful, direct. Spe
 
 Her persona is defined in `engine/persona.py` as a system prompt passed to every Anthropic API call. It must never be hardcoded in bot handlers.
 
+## Web Auth — Magic Links
+
+No passwords. Discord is the identity layer. When the bot sends a web link, it uses `django.core.signing` to generate a signed token containing `user_id` + expiry. The Django view validates the token and creates a session. Default expiry: 1 hour. Never build a traditional login form.
+
 ## Skill Grid
 
 - **Vertical**: A1→C2 skills defined in `curriculum/skills.yaml`

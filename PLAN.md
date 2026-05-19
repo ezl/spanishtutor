@@ -181,6 +181,26 @@ Readable on mobile. No wide tables.
 
 ---
 
+## Web UI Authentication — Magic Links
+
+The web UI requires no passwords or signup forms. Discord is the identity layer.
+
+**Flow:**
+1. User requests something in Discord that has a web view ("show my scorecard", "open settings")
+2. Bot generates a signed, time-limited URL using `django.core.signing`
+3. Bot sends the link in DM: *"Aquí está tu progreso → [ver mi scorecard](url) (válido por 1 hora)"*
+4. User clicks → Django validates signature and expiry → sets a session → shows the page
+
+**Implementation:**
+- Token encodes `user_id` + expiry timestamp, signed with Django's secret key
+- Default expiry: 1 hour (configurable)
+- On click: Django view validates token, creates a session, redirects to the requested page
+- No passwords, no email verification, no "forgot password" — ever
+
+This applies to: skill grid / scorecard, settings (reminder schedule, dialect preference), session history, progress charts.
+
+---
+
 ## Multi-User Design
 
 Multi-tenant from day one:
