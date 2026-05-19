@@ -1,15 +1,16 @@
 # Server Setup Guide
 
-Estimated time: 10 minutes. Covers provisioning a new Hetzner VPS and getting it fully configured for the Spanish Tutor agent.
+Estimated time: 10 minutes. For a completely fresh setup, just run `./setup.sh` — it walks through every step interactively. This doc is the manual reference for what that script does.
 
 ---
 
 ## Prerequisites
 
 - Hetzner account (hetzner.com → Cloud)
-- SSH key on your local machine (`~/.ssh/id_ed25519.pub`)
-- GitHub repo already exists
-- `.env` values ready to paste (see `.env.example`)
+- SSH key at `~/.ssh/id_ed25519` — if missing, run `ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519`
+- GitHub account
+- Discord account
+- Anthropic API key (console.anthropic.com)
 
 ---
 
@@ -19,53 +20,45 @@ Estimated time: 10 minutes. Covers provisioning a new Hetzner VPS and getting it
 2. Select project → **+ Create Server**
 3. Settings:
    - **Type**: Shared Resources → Regular Performance
-   - **Size**: CPX11 (2 vCPU, 2GB RAM) or CPX22 (2 vCPU, 4GB RAM) — CPX22 recommended
+   - **Size**: CPX11 (2 vCPU, 2GB RAM) or CPX22 (2 vCPU, 4GB RAM)
    - **Location**: us-west (Hillsboro, OR) — us-east often has availability issues for new accounts
    - **Image**: Ubuntu 26.04
    - **Networking**: Public IPv4 + IPv6, no private network
    - **SSH Key**: paste contents of `~/.ssh/id_ed25519.pub`
-   - **Volumes**: none
-   - **Firewalls**: none
-   - **Backups**: none
+   - **Volumes / Firewalls / Backups**: none
    - **Name**: `spanishtutor-agent`
 4. Click **Create & Buy Now**
 5. Copy the server IP from the dashboard
 
 ---
 
-## Step 2: Connect and Verify
+## Step 2: Bootstrap the Server
 
-```bash
-ssh -i ~/.ssh/id_ed25519 root@YOUR_SERVER_IP
-```
-
----
-
-## Step 3: Run Setup Script
-
-From your local machine, run the bootstrap script:
+From your local machine:
 
 ```bash
 ./scripts/bootstrap.sh YOUR_SERVER_IP
 ```
 
-This installs all dependencies, clones the repo, and configures the server in one step.
+This installs: Python 3, Node.js 20, git, curl, tmux, mise, Claude Code CLI. Verifies each at the end.
 
 ---
 
-## Step 4: Fill In Secrets
+## Step 3: Fill In Secrets
 
-SSH into the server and fill in the `.env` file:
+Use the mise command (runs nano on the server remotely):
 
 ```bash
-ssh -i ~/.ssh/id_ed25519 root@YOUR_SERVER_IP
-nano /root/spanishtutor/.env
+mise run secrets
 ```
 
-Required values — see `.env.example` for where to get each one:
+Required values — see `.env.example` for where to get each:
 - `DISCORD_DEV_BOT_TOKEN`
-- `DISCORD_TUTOR_BOT_TOKEN`
-- All 9 channel IDs
+- `DISCORD_DEV_FEATURES_CHANNEL_ID`
+- `DISCORD_DEV_CHANNEL_ID`
+- `DISCORD_DEV_DEPLOY_CHANNEL_ID`
+- `DISCORD_DEV_BUGS_CHANNEL_ID`
+- `DISCORD_DEV_LOGS_CHANNEL_ID`
 - `ANTHROPIC_API_KEY`
 - `DATABASE_URL`
 - `GITHUB_TOKEN`
@@ -73,26 +66,91 @@ Required values — see `.env.example` for where to get each one:
 
 ---
 
-## Step 5: Start the Agent
+## Step 4: Install Python Dependencies + Start Agent
 
 ```bash
-mise run start
+ssh -i ~/.ssh/id_ed25519 root@YOUR_SERVER_IP
+python3 -m venv /root/spanishtutor/venv
+/root/spanishtutor/venv/bin/pip install -r /root/spanishtutor/agent/requirements.txt
+cp /root/spanishtutor/agent/spanishtutor-agent.service /etc/systemd/system/
+systemctl daemon-reload
+systemctl enable spanishtutor-agent
+systemctl start spanishtutor-agent
 ```
 
-Verify it's running:
-
+Verify:
 ```bash
 mise run status
 ```
 
 ---
 
-## Common Commands (after setup)
+## Step 5: Authenticate Claude Code
+
+This is a one-time manual step. SSH into the server and attach to the tmux session:
 
 ```bash
-./scripts/server.sh ssh        # SSH into server
-./scripts/server.sh logs       # Tail agent logs
-./scripts/server.sh status     # Check if agent is running
-./scripts/server.sh restart    # Restart agent
-./scripts/server.sh update     # Pull latest code + restart
+# From your local machine (note: use TERM override for Ghostty users)
+TERM=xterm-256color ssh -i ~/.ssh/id_ed25519 root@YOUR_SERVER_IP
+```
+
+Once on the server:
+```bash
+tmux attach -t claude-agent
+# or if already in a tmux session:
+tmux switch-client -t claude-agent
+```
+
+Then start Claude Code with permissions bypassed (required for unattended operation):
+```bash
+claude --dangerously-skip-permissions
+```
+
+Complete the browser auth flow. Then detach from tmux with `Ctrl+B` then `D`.
+
+**Note:** Authenticating on the server does not affect your local Claude Code session — they use separate tokens.
+
+---
+
+## Step 6: Verify End-to-End
+
+Send a message in `#dev` on your Discord dev server. You should see:
+- ⏳ reaction appears on your message
+- Response posted as a reply
+- ✅ reaction replaces ⏳
+- Confirmation in `#logs`
+
+---
+
+## Common Commands
+
+```bash
+mise run claude       # Attach to Claude tmux session on server
+mise run logs         # Tail agent logs
+mise run status       # Check if agent is running
+mise run restart      # Restart agent
+mise run update       # Pull latest code + restart
+mise run secrets      # Edit .env on server
+mise run secrets-show # List secret keys (no values)
+```
+
+---
+
+## Troubleshooting
+
+**`command not found: claude` on server**
+```bash
+npm install -g @anthropic-ai/claude-code
+```
+
+**`missing or unsuitable terminal: xterm-ghostty`**
+Prefix your SSH command with `TERM=xterm-256color`
+
+**`sessions should be nested with care`**
+You're already in a tmux session. Use `tmux switch-client -t claude-agent` instead of attach.
+
+**Bot shows offline in Discord**
+```bash
+mise run status   # check if service is running
+mise run logs     # check for errors
 ```
