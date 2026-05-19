@@ -1,61 +1,75 @@
-# Product Roadmap
+# Roadmap
 
 ---
 
-## Phase 1 — V1: Foundation
-*Goal: working deploy loop + one complete learning session end-to-end*
+## V1 — Foundation (current)
 
-See tickets below.
+**Goal:** Luz Angela working end-to-end for a single user. Full evaluation, all 5 language modes including voice, skill grid populated progressively, daily reminders, progress view.
 
----
+See V1 tickets below.
 
-## Phase 2 — Content Expansion
-- User voice system (native language conversations to learn interests/tone)
-- Weekly progress reports
-- Freeform response quizzes (in addition to multiple choice / fill-in-the-blank)
-
----
-
-## Phase 3 — Learning Intelligence
-- Full CEFR A1→C2 skill taxonomy
-- Sophisticated SRS (SM-2 algorithm or equivalent)
-- Pattern detection on minor errors ("a common mistake you make is...")
-- Session timing analytics (time of day, duration patterns)
-- Evaluatory summaries on demand ("here are your current strengths/weaknesses")
-- Curriculum view in `#curriculum` channel
+**Explicitly out of V1:**
+- Other users / multi-user onboarding
+- Payment / Stripe
+- Public website / landing page
+- Web UI
+- Voice channels (DM voice messages only in V1)
 
 ---
 
-## Phase 4 — Personalization
-- Dialect/style selector (Medellín young professional, Castilian, Mexican, etc.) per user
-- Interest-based content (75% of content wrapped in user's personal interests)
-- Adaptive difficulty (pushes boundaries based on current level, not fixed curriculum)
-- Goal setting (travel, heritage, work) influencing content type and vocabulary
+## Phase 2 — Web UI
+
+- Web interface mirroring Discord experience
+- Same conversation engine, new delivery layer (DRF API + frontend)
+- Progress dashboard: skill grid, session history, score over time
+- Audio in browser (microphone input + audio playback)
 
 ---
 
-## Phase 5 — Audio
-- Text-to-speech for bot responses (hear native-dialect pronunciation)
-- Speech-to-text for user responses (speak instead of type)
-- Real listening comprehension (replaces timed-text approximation from v1)
-- Real spoken interaction and production (replaces text approximation from v1)
+## Phase 3 — Public Launch
+
+- Landing page + public signup
+- Discord join flow triggers bot DM automatically
+- Stripe integration: first 10 lessons free, then subscription or pay-per-lesson
+- Paywall enforcement in conversation engine
+- User authentication (Django auth)
+
+---
+
+## Phase 4 — Learning Intelligence
+
+- Full SM-2 spaced repetition algorithm (replacing simple decay)
+- Pattern detection on recurring minor errors ("a common mistake you make is...")
+- Session timing analytics (time of day, duration, retention correlation)
+- Evaluatory summaries on demand
+- Weekly progress reports via DM
+
+---
+
+## Phase 5 — Voice Channels
+
+- Real-time voice conversation (bot joins Discord voice channel)
+- Live STT streaming, real-time response
 - Pronunciation scoring
+- Replaces voice message approximation from V1
 
 ---
 
-## Phase 6 — Web Interface
-- Database already web-accessible by design
-- Web chat interface mirroring Discord experience
-- Progress dashboard (skill scores, session history, heatmap)
-- Curriculum management UI
+## Phase 6 — Personalization
+
+- Dialect/style selector per user (Medellín, Castilian, Mexican, etc.)
+- Interest-based content refinement (user voice system — periodic native language conversations to surface interests)
+- Adaptive difficulty beyond CEFR (pushes past current level based on performance patterns)
+- Goal setting (travel, heritage, work) influencing content type
 
 ---
 
-## Phase 7 — Multi-User / Public
-- Onboarding flow for new users (placement assessment, interest collection)
-- User authentication
-- Isolated learner profiles per user
-- Billing / subscription layer
+## Phase 7 — Multi-User / Scale
+
+- Full multi-user onboarding flow
+- Billing and subscription management
+- User dashboard (account, subscription, progress)
+- Admin tooling beyond Django admin
 
 ---
 
@@ -65,229 +79,193 @@ See tickets below.
 
 ---
 
-## INFRA-1: GitHub Repository + Railway Auto-Deploy
+## INFRA-1: Railway Deploy Pipeline
 
 **Description:**
-Set up the GitHub repository with a Railway project connected to it. Any push to `main` triggers an automatic redeploy of the learning bot.
+Connect GitHub repo to Railway. Any push to `main` triggers automatic redeploy of the learning bot.
 
 **Acceptance criteria:**
-- GitHub repo exists with a basic README and project structure
-- Railway project is connected to the GitHub repo
-- A push to `main` automatically triggers a redeploy within 3 minutes
-- Deploy success/failure is visible in Railway dashboard
-- Environment variables (DB connection, Discord token, Anthropic API key) are configured in Railway and not in code
+- Railway project connected to GitHub repo
+- Push to `main` redeploys within 3 minutes
+- Environment variables configured in Railway (not in code)
+- Deploy success/failure visible in Railway dashboard
 
 ---
 
-## INFRA-2: Postgres Database + Schema
+## INFRA-2: Postgres Schema
 
 **Description:**
-Provision a Postgres database and define the initial multi-tenant schema. This schema must support multiple users, skill × mode scoring, and session history without a rewrite.
+Define the initial multi-tenant schema. Must support skill × mode scoring, session history, evaluation phases, and reminder preferences without a rewrite.
 
 **Acceptance criteria:**
-- Postgres instance provisioned and accessible from Railway
-- Schema includes at minimum:
-  - `users` table (id, discord_id, native_language, created_at)
-  - `user_profiles` table (user_id, interests[], dialect_preference, estimated_level)
-  - `skill_scores` table (user_id, skill, mode, score, last_tested_at)
-  - `sessions` table (user_id, started_at, ended_at, session_type)
-  - `session_events` table (session_id, event_type, content, response, score, error_logged, timestamp)
-- All tables have user_id as a foreign key (multi-tenant from day one)
-- Migrations are version-controlled and repeatable
-- Local development can run against a local Postgres instance
+- Schema includes:
+  - `users` (id, discord_id, native_language, interests, why_learning, target_use, reminder_enabled, reminder_schedule, created_at)
+  - `skill_scores` (user_id, skill_id, mode, score 0–4, last_tested_at, next_review_at)
+  - `sessions` (user_id, started_at, ended_at, session_type, evaluation_phase)
+  - `session_events` (session_id, event_type, content, user_response, score, error_logged, dimension, timestamp)
+  - `evaluation_progress` (user_id, phase, completed_at) — tracks which eval phases are done
+- All tables scoped to user_id
+- Django migrations, version-controlled and repeatable
 
 ---
 
-## INFRA-3: VPS + Claude Code CLI Setup
+## INFRA-3: Skill Taxonomy YAML
 
 **Description:**
-Provision a VPS with Claude Code CLI installed and configured to listen for instructions from Discord. This is the coding agent that makes codebase changes on demand.
+Define the full A1→C2 skill taxonomy as a YAML config file. This is the vertical axis of the skill grid.
 
 **Acceptance criteria:**
-- VPS provisioned and running
-- Claude Code CLI installed and authenticated
-- GitHub repo cloned on the VPS
-- A script or service runs persistently and listens for messages from Discord dev server
-- A test message in `#dev` ("add a comment to README") results in Claude Code making the change, pushing to GitHub, and confirming in `#logs`
-- VPS auto-restarts the listener service on reboot
+- All skills defined in `curriculum/skills.yaml`
+- Each skill has: id, name, cefr_level, description
+- Covers A1 through C2
+- Loaded at runtime — new skills added by editing YAML and restarting, no schema change required
+- 5 language modes defined as constants: listening, reading, spoken_interaction, spoken_production, writing
 
 ---
 
-## INFRA-4: Discord Dev Server
+## APP-1: Bot Skeleton + Railway Deploy
 
 **Description:**
-Set up the developer Discord server with correct channels and a bot that routes messages to the Claude Code agent on the VPS.
+Discord bot running on Railway, connected to Postgres. Responds to DMs. Foundation for all app features.
 
 **Acceptance criteria:**
-- Discord server created with channels: `#features`, `#dev`, `#deploy`, `#bugs`, `#logs`
-- Bot is present in the server
-- Messages in `#dev` and `#deploy` and `#bugs` are forwarded to the VPS agent
-- Agent responses are posted back to the appropriate channel
-- `#logs` receives automatic posts from the agent (deploy confirmations, test results) without user prompting
-- Bot ignores messages from itself to prevent loops
+- Bot online, responds to DMs
+- Connected to Postgres on startup
+- Deployed via Railway, auto-restarts on crash
+- `manage.py run_bot` is the entry point
+- Django admin accessible
+- Push to `main` triggers redeploy
 
 ---
 
-## APP-1: Discord Learning Server + Bot Skeleton
+## APP-2: Luz Angela Persona + Conversation Engine
 
 **Description:**
-Set up the learning Discord server with the correct channels and a bot that responds to messages. No learning logic yet — just the skeleton.
+Interface-agnostic conversation engine. All message handling goes through `engine.handle_message(user_id, text, attachments)`. Luz Angela's persona lives here as a system prompt.
 
 **Acceptance criteria:**
-- Discord server created with channels: `#lessons`, `#progress`, `#feedback`, `#curriculum`
-- Bot is present and responds to a ping (`!ping` → "pong") in any channel
-- Bot behavior varies by channel (different response or acknowledgment per channel)
-- Bot is deployed via Railway and restarts automatically on crash
-- Bot connects to the Postgres database on startup
+- `engine.handle_message()` callable from Discord bot and future web API
+- Luz Angela system prompt defined (Medellín dialect, warm/direct/playful, Spanish-first, honest about being a bot)
+- "English please" triggers English mode for that response, then returns to Spanish
+- Response always calibrated to user's current estimated CEFR level
 
 ---
 
-## APP-2: User Onboarding
+## APP-3: Onboarding + Initial Evaluation
 
 **Description:**
-When a new user sends their first message in `#lessons`, the bot runs an onboarding flow to collect interests, set dialect preference, and estimate starting level.
+New user DMs the bot → Luz Angela runs onboarding + session 1 evaluation → initial skill grid populated.
 
 **Acceptance criteria:**
-- First message from a new user in `#lessons` triggers onboarding
-- Bot asks for: native language, interests (freeform), why learning Spanish
-- Bot asks for dialect preference with examples ("Medellín Colombia", "Madrid Spain", "Mexico City") — defaults to Colombian Spanish if skipped
-- Bot runs a two-part placement assessment to estimate starting CEFR level:
-  - **Part A — Adaptive quiz**: multiple choice questions that adjust difficulty based on answers. Correct → harder, incorrect → easier. Terminates early once level is estimated with confidence. Target: 10-15 questions max, ~5 minutes.
-  - **Part B — Conversational**: short freeform chat in Spanish (~10 min). LLM evaluates grammar, vocabulary, and production ability in real time. Surfaces mode gaps (e.g. recognizes grammar rules but struggles to produce). Bot tells user upfront: "I'm going to chat with you briefly to get a sense of your level."
-  - Part A runs first to establish a structural baseline. Part B refines it with production data.
-  - Combined estimate saved as initial CEFR level per skill × mode across all 5 dimensions (not a single overall score)
-  - Placement includes a timed reading passage (approximates listening), a freeform writing prompt (approximates spoken production), and a short conversation (spoken interaction) to seed all 5 dimensions from day one
-- All collected data saved to `users` and `user_profiles` tables
-- Returning users skip onboarding and go straight to session start
-- Onboarding can be re-triggered with `!onboard` command
+- First DM from new user triggers onboarding
+- Luz Angela asks: native language, interests, why learning / where they want to use it
+- Adaptive quiz bisects A1→C2 skill axis. User's self-report is starting difficulty only. Correct → harder, wrong → easier. Terminates when level estimated with confidence (~5–7 questions).
+- Freeform written response collected and evaluated
+- Initial CEFR estimate saved, skill grid seeded with estimates, untested cells marked ⬜
+- `evaluation_progress` records session 1 complete
+- Returning users skip onboarding entirely
 
 ---
 
-## APP-3: Session Start + Resume
+## APP-4: Voice Message Support (STT + TTS)
 
 **Description:**
-Every time a user messages in `#lessons`, the bot either resumes an incomplete session or starts a new one with a review/push-forward prompt.
+User sends voice messages → transcribed via Whisper → evaluated. Luz Angela responds with TTS audio for listening exercises.
 
 **Acceptance criteria:**
-- If a session was left incomplete (no explicit end), bot offers to resume: "Welcome back — want to pick up where we left off, or start something new?"
-- If starting fresh, bot asks: "Do you want to review recent material or push forward with something new?"
-- User response is stored as `session_type` (review / new / resume) in `sessions` table
-- Session start timestamp is recorded
-- Bot acknowledges and moves immediately into content — no further setup questions
+- Bot detects voice message attachments in DMs
+- Downloads audio, sends to Whisper STT, receives transcript
+- Transcript processed by conversation engine identically to text input
+- For listening exercises: Luz Angela generates TTS audio (OpenAI TTS or ElevenLabs), uploads as voice message
+- Error handling if audio is inaudible or transcription fails
 
 ---
 
-## APP-4: Skill Taxonomy (A1-B1 Subset)
+## APP-5: Progressive Evaluation Phases
 
 **Description:**
-Define the initial skill taxonomy covering A1-B1 grammar and vocabulary. This is the data that drives what the bot teaches and tests.
+Each session after session 1 adds one evaluation phase until the full grid is covered. Phases: listening, speaking, reading, translation, written production.
 
 **Acceptance criteria:**
-- Skill taxonomy defined in a YAML config file (not hardcoded)
-- Covers A1-B1 skills at minimum: present tense, preterite, ser/estar, gender/agreement, basic vocab domains, object pronouns
-- Each skill has: id, name, cefr_level, modes[] (comprehension / usage)
-- Taxonomy is loaded by the app at runtime (no redeploy needed to add a skill)
-- A new skill can be added by editing the YAML file and restarting — no schema change required
+- `evaluation_progress` tracks which phases are complete per user
+- At session start, if phases remain, Luz Angela runs the next one naturally within the session
+- Phases: listening (TTS + comprehension), speaking (voice message), reading (passage + questions), translation (EN→ES and ES→EN), written production (open prompt)
+- Each phase saves results to `skill_scores`
+- Once all phases complete, evaluation is done — future sessions are pure learning
 
 ---
 
-## APP-5: Content Generation — All 5 Skill Dimensions
+## APP-6: Session Flow (Open, Run, Close)
 
 **Description:**
-The bot generates content targeting all five CEFR skill dimensions. Each dimension has a distinct content format appropriate for text-based v1. All content is contextually tied to the user's interests.
-
-**The 5 dimensions and their v1 format:**
-
-**Listening** (approximated — real audio in Phase 5)
-- Bot presents a passage marked as a listening simulation, displayed for a time-limited window
-- Followed by comprehension questions (multiple choice or freeform)
-- Slot exists in learner model; real audio replaces timed text in Phase 5
-
-**Reading**
-- Bot generates a short article, story, or dialogue in the user's interest domain
-- Followed by comprehension questions: multiple choice and freeform response
-- Tests understanding, vocabulary in context, inference
-
-**Spoken interaction** (approximated via text chat)
-- Bot initiates a freeform conversation on a topic tied to user's interests
-- LLM evaluates grammar, vocabulary, fluency in real time
-- Error correction applies per APP-7 rules
-
-**Spoken production** (approximated via prompted freeform writing)
-- Bot gives a prompt: "Describe what you did last weekend" / "Tell me about your favorite sport"
-- User writes a freeform response; LLM evaluates structure, tense usage, vocabulary
-- Real spoken production (voice) added in Phase 5
-
-**Writing**
-- Multiple choice, fill-in-the-blank, and short freeform written responses
-- Targets specific grammar skill × writing mode
+Every post-onboarding session has a defined open, content loop, and close.
 
 **Acceptance criteria:**
-- All 5 dimension types can be generated and delivered in `#lessons`
-- Each content type is clearly labeled so the user knows what mode they're in
-- Content references the user's interests (pulled from user profile) for all types
-- Bot waits for user response before evaluating
-- All generated content and responses stored in `session_events` with dimension type recorded
-- No dimension type repeats more than twice in a single session
-- SRS engine can target any of the 5 dimensions independently
+- **Open**: Luz Angela recaps last session + recommends review vs. push forward based on SRS decay and current skill edge. One-question check-in: "¿Revisamos o seguimos?"
+- **Content**: bot-driven, SRS selects skill × mode targets, content generated per APP-7. No mode repeats more than twice per session.
+- **Close (explicit)**: user says "bye" or equivalent → immediate summary in Spanish
+- **Close (inactivity)**: after configurable timeout → Luz Angela sends summary unprompted
+- Summary format: worked on ___, reviewed ___, N skills improved, recommendation for next session
+- Session start/end timestamps recorded
 
 ---
 
-## APP-6: Quiz Evaluation + Scoring
+## APP-7: Content Generation
 
 **Description:**
-Bot evaluates user responses to quizzes, updates skill scores, and applies spaced repetition decay.
+LLM-generated content for all 5 language modes, personalized to user interests.
 
 **Acceptance criteria:**
-- Multiple choice: deterministic scoring (correct / incorrect)
-- Fill-in-the-blank: LLM evaluates response, allows for minor spelling variation if meaning is clear
-- Correct answer → skill score increases, next review interval extended
-- Incorrect answer → skill score decreases, item queued for sooner review
-- Score update written to `skill_scores` table immediately after evaluation
-- Bot confirms correct/incorrect and moves to next question without lengthy explanation unless user asks
-- Score delta is logged in `session_events`
-
----
-
-## APP-7: Inline Error Correction
-
-**Description:**
-During quizzes, significant errors trigger an inline correction with one reinforcement rep before moving on. Minor errors are silently logged.
-
-**Acceptance criteria:**
-- LLM classifies each error as significant or minor
-- Significant error triggers response in this format:
-  > "You said ___. This would be more natural: ___. Type it back once to reinforce, then we'll move on."
-- Bot waits for the user to type back the correction before continuing
-- Minor errors are logged to `session_events` with `error_logged: true` but produce no bot response
-- Correction format is consistent every time (not paraphrased)
-- User can type `!strict` or `!relax` to change correction sensitivity for the session
+- All 5 content types deliverable in DMs: quiz (MC + fill-in-blank), reading passage + questions, listening (TTS + questions), conversation (freeform exchange), written production (open prompt), voice (voice message prompt)
+- Each type clearly labeled so user knows which mode they're in
+- Content references user interests (from onboarding profile)
+- Content complexity calibrated to user's current CEFR estimate
+- All generated content and responses stored in `session_events` with mode recorded
+- Inline error correction: significant errors → "You said ___. More natural: ___. Type it back once." Minor errors → silently logged
+- `!strict` / `!relax` toggle per session
 
 ---
 
 ## APP-8: SRS Engine
 
 **Description:**
-Simple spaced repetition engine that determines what to review vs. introduce next based on skill scores and time since last tested.
+Spaced repetition engine determines what to review vs. introduce each session.
 
 **Acceptance criteria:**
-- For "review" sessions: selects skills with lowest scores or longest time since last tested
-- For "push forward" sessions: selects the next untested or lowest-scored skill at the boundary of the user's current level
-- SRS decisions are based on data in `skill_scores` table, not hardcoded
-- Engine returns a ranked list of `skill × mode` targets for the session
-- A skill not yet tested is treated as highest priority for introduction
-- Engine never returns the same skill × mode twice in a single session
+- For review sessions: selects skill × mode cells with lowest scores or most overdue for review
+- For push-forward sessions: selects next untested or lowest-scored skill at the edge of current level
+- Predicted decay calculated from last_tested_at and score
+- Never returns same skill × mode twice in one session
+- Untested cells treated as highest priority for introduction
+- Drives both session opening recommendation and content selection
 
 ---
 
-## APP-9: Basic Progress View
+## APP-9: Daily Reminders
 
 **Description:**
-User can ask for a progress summary in `#progress` and receive a snapshot of their current skill scores and recent session history.
+Cron job sends personalized daily reminders via DM based on user preferences.
 
 **Acceptance criteria:**
-- Any message in `#progress` triggers a summary response
-- Summary includes: estimated current CEFR level, top 3 strengths, top 3 weaknesses, number of sessions completed, last session date
-- Skill scores displayed as simple levels (beginner / developing / solid / strong) not raw numbers
-- Summary generated from live database data, not cached
-- Response is readable on mobile (no wide tables or complex formatting)
+- Default: daily at noon, all 7 days
+- Reminder content: which skills are decaying, how long a session would take to recover them
+- Configurable via natural language at any time ("remind me Tuesdays and Thursdays at 9am")
+- Natural language parsed and saved to `users.reminder_schedule`
+- Railway cron job runs daily, evaluates each user's schedule and last session, sends DMs
+- Users informed of default during onboarding and how to change it
+
+---
+
+## APP-10: Progress View
+
+**Description:**
+User requests progress summary → Luz Angela responds with skill grid snapshot and history.
+
+**Acceptance criteria:**
+- Triggered by user request in DM ("show my progress", "cómo voy", etc.)
+- Displays current skill grid as colored squares (⬜🟥🟨🟦🟩)
+- Shows top 3 strengths and top 3 weaknesses
+- Shows progress over any time horizon ("last month", "since I started")
+- Sessions completed, last session date
+- Readable on mobile — no wide tables
+- Generated from live DB data

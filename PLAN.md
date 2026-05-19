@@ -1,222 +1,205 @@
-# Spanish Tutor — Architecture Plan
+# Spanish Tutor — Product Plan
 
-## Core Requirement
+## What This Is
 
-A conversational, continuously adaptable Spanish learning system that:
-- Never requires touching a terminal to update or iterate
-- Uses chat as both the learning interface and the update mechanism
-- Evolves through usage — the final form is unknown, so adaptability is the top priority
+A personalized Spanish learning system delivered primarily through Discord. An AI tutor named Luz Angela teaches you Spanish through conversation, quizzes, voice messages, and adaptive content — all tied to your personal interests. The system tracks your ability across a full skill × mode grid and continuously pushes the boundary of what you know.
 
 ---
 
-## Session Experience
+## Luz Angela
 
-- User opens app → bot is immediately ready to start a lesson, no setup required
-- **Bot-driven**: it decides what to work on based on current learner state — user doesn't need to direct it
-- Every session balances three things:
-  1. **Spaced repetition** — re-test material on a decay schedule to lock in retention
-  2. **Boundary pushing** — introduce concepts just beyond current level
-  3. **Weakness targeting** — prioritize low-scoring skills/modes
-- Long-term arc: A1 → C2 absolute mastery, managed automatically
-- User can always override ("drill me on subjunctive", "let's do a story") but default is bot-driven
-- **Session continuity**: resumes where it left off by default; user can ask for something new
-- **Session prompt**: each session asks whether to review/reinforce recent material or push forward with new concepts — bot caters accordingly
-- **Session timing**: all sessions logged with timestamps, duration, time of day — used over time to learn patterns and personalize scheduling/content length
+The tutor persona. Mid-30s, from Laureles, Medellín. Warm, playful, direct, lightly flirty in the way Colombian women naturally are. Speaks Medellín Spanish. Not sycophantic — she tells you when your Spanish is wrong and makes you want to try harder anyway. If asked whether she's a bot, she says yes, straightforwardly.
 
-**Interface**: chat is primary. Web is a future option — database is web-accessible by design to support it without a rewrite.
+The persona guides tone, dialect, and style. There is no fictional backstory. She is an AI.
+
+Her first message to every new user:
+
+> *¡Hola! Soy Luz Angela, tu profesora de español. 🌟*
+>
+> *Vamos a empezar con una evaluación rápida para entender dónde estás — no te preocupes, no es un examen formal. Solo quiero conocer tu español.*
+>
+> *Primero: ¿cuál es tu lengua nativa, y por qué estás aprendiendo español?*
+>
+> *(If you ever want instructions in English, just say "English please" — I've got you.)*
 
 ---
 
-## End State Architecture
+## Interface
 
-### The Learner Model (most critical — hardest to change later)
+**Primary**: Discord DMs. User messages the bot directly. No shared channels, no per-user servers. Scales naturally and feels personal.
 
-Internal state representing the user across two dimensions:
+**Future**: Web UI with identical functionality. Both surfaces call the same conversation engine — Discord is a delivery layer, not where the logic lives.
 
-**Skill taxonomy — CEFR-derived (A1→C2):**
-- Grammar components per level: preterite, imperfect, future, subjunctive, object pronouns, reflexives, ser/estar, etc.
-- Vocabulary by domain and CEFR level
-- Each skill scored individually with decay over time
-- CEFR provides the skeleton; extended as gaps emerge through usage
+**Voice**: User sends voice messages (Discord voice note feature). Bot downloads, transcribes via Whisper STT, processes, responds with TTS audio. No voice channels — DM voice messages only.
 
-**Language modes — scored independently per skill:**
+**Language**: Spanish-first, calibrated to the user's current level. English escape hatch always available: user says "English please" and Luz Angela accommodates. Instructions in onboarding make this clear upfront.
 
-Based on CEFR's five canonical skill dimensions:
-- **Listening** (interpretive — audio/spoken input)
-- **Reading** (interpretive — written input)
-- **Spoken interaction** (real-time conversation)
-- **Spoken production** (monologue, narration)
-- **Writing** (constructed output)
+---
 
-Layered with cognitive depth levels (Bloom's applied to language):
-- **Recognition** — can identify correct form when shown options
-- **Recall** — can retrieve without prompts
-- **Comprehension** — understands meaning in context
-- **Production** — can construct correctly from scratch
-- **Interaction** — can use fluidly in real-time
+## Architecture
 
-Each skill × mode × cognitive level gets its own score. The SRS engine uses this to determine what to drill and at what depth.
+```
+Discord DM  ──┐
+              ├──▶  Conversation Engine (Django)  ──▶  Postgres
+Web UI      ──┘         (Luz Angela lives here)
+```
 
-**Skill matrix** — the atomic unit of tracking is `skill × mode`:
-- e.g. `preterite / comprehension`, `preterite / usage`, `future / comprehension`, `future / usage`
-- Not overly granular — just enough resolution to know what to work on
-- Each cell gets a simple score + last-tested timestamp for SRS decay
+The conversation engine is interface-agnostic. `engine.handle_message(user_id, text, attachments)` returns a response regardless of surface. Discord bot and web API both call this function. Luz Angela never knows which surface she's on.
 
-From this model, the system:
-- Runs a spaced repetition engine (SRS) — decides what to review vs. introduce based on scores + decay
-- Manages progression: re-testing known things while introducing new concepts at the boundary of current level
-- Recommends what to work on next
-- Generates an evaluatory summary on demand ("here are your strengths/weaknesses")
+**Stack:**
+| Layer | Choice |
+|---|---|
+| Framework | Django 5.x |
+| Discord | discord.py (Cogs) |
+| Bot entry point | Django management command (`manage.py run_bot`) |
+| Database | Postgres via Django ORM |
+| Migrations | Django built-in |
+| Admin | Django Admin |
+| LLM | Anthropic API (async) |
+| STT | OpenAI Whisper |
+| TTS | OpenAI TTS or ElevenLabs |
+| Curriculum config | YAML files (runtime reload, no redeploy) |
+| Hosting | Railway (bot + Postgres + cron jobs) |
+| Future web layer | Django views + Django REST Framework |
 
-### Content Generation Layer
+---
 
-LLM-generated content targeted at specific `skill × mode` cells, wrapped almost entirely in the user's personal interests and voice.
+## The Skill Grid
 
-**The 75% rule**: ~75% of all content is built around the user's actual interests, life, and topics — not arbitrary textbook sentences ("Roberto compró un carro"). The target language is the vehicle; the user's world is the content.
+The core data model. Every learner has a grid:
 
-**Content types:**
+**Vertical axis — skill taxonomy (A1→C2, defined in YAML):**
+Skills are CEFR-derived grammar and vocabulary components. Examples: present tense regular verbs, preterite irregular, subjunctive, ser/estar, object pronouns, idiomatic expressions. Full A1→C2 defined in `curriculum/skills.yaml`.
 
-**(A) Conversation practice**
-- Chat-based in v1
-- Audio (speech-to-text / text-to-speech) in final version
-- LLM evaluates freeform responses, maps to `skill × mode` scores
-- Tests: fluency, grammar in context, vocabulary recall, real-time production
+**Horizontal axis — the 5 CEFR language modes:**
+1. Listening
+2. Reading
+3. Spoken interaction
+4. Spoken production
+5. Writing
 
-**(B) Reading comprehension**
-- Generated articles, news, or stories in user's interest domains
-- Followed by quizzes: multiple choice AND freeform response
-- Tests: understanding, spelling, typing accuracy, grammatical awareness
-- LLM evaluates freeform; deterministic scoring for multiple choice
+**Each cell (skill × mode) has:**
+- Score (0–4)
+- Last tested timestamp
+- SRS decay curve
 
-**(C) Quizzes**
-- Multiple choice or fill-in-the-blank
-- Targeted at specific `skill × mode` cells
-- Deterministic scoring
+**4-point scoring:**
+| Score | Grid display | Luz Angela says |
+|---|---|---|
+| 0 | ⬜ untested | — |
+| 1 | 🟥 beginner | *Apenas empezando* |
+| 2 | 🟨 developing | *En camino* |
+| 3 | 🟦 confident | *Ya casi* |
+| 4 | 🟩 mastered | *¡Lo tienes!* |
 
-**User voice system** — the system continuously learns the user:
-- Periodically has conversations in the user's native language to surface interests, current topics, tone, knowledge domains
-- Extracts and stores: interest tags, current topics, communication style, vocabulary they use
-- This profile feeds directly into content generation — lessons feel personal, not generic
-- Starting in native language removes the language barrier from the interest-discovery process
-- Over time the system knows enough to generate content that sounds like it was written for this specific person
+---
 
-**Content generation inputs:**
+## Evaluation
+
+The grid is populated progressively — not in a single evaluation session.
+
+**Session 1 (onboarding + initial estimate):**
+1. Three onboarding questions: native language, interests, why learning Spanish / where they want to use it
+2. Adaptive quiz — bisects the A1→C2 skill axis. Correct → harder, wrong → easier. Converges on estimated CEFR level in 5–7 questions. User's self-reported level is just the starting point, not trusted.
+3. Freeform written response — "Tell me a little about yourself in Spanish." Reveals grammar in production, sentence complexity, tense usage, vocabulary in use.
+4. Initial grid populated with estimates. Untested cells remain ⬜.
+
+**Subsequent sessions:**
+Each session adds one additional evaluation phase until the full grid is covered. Phases: listening (TTS audio + comprehension), speaking (voice message response), reading comprehension, translation (EN→ES and ES→EN), written production. Luz Angela is transparent: she's still calibrating.
+
+**Binary search principle:** if a user aces B2, jump to C1. If they fail C1, probe B2 in depth. Converges without exhaustive questioning.
+
+---
+
+## Session Flow
+
+**Opening:**
+> *"Hola! Last time we worked on preterite tense — you're solid on recognition but production is your edge. It's been 4 days, so some of it may have decayed. I recommend reviewing before we push forward. ¿Revisamos o seguimos?"*
+
+Recommendation is calculated from: skill × mode scores, last tested timestamps, predicted SRS decay, current edge of ability. Not a guess.
+
+**During session:**
+- Bot-driven. Luz Angela decides what to work on. User can override ("drill me on subjunctive", "let's do a story").
+- Content tied to user's interests (~75% of content wrapped in personal context).
+- All 5 language modes covered across sessions. No mode repeats more than twice per session.
+- Error correction: significant errors get inline correction ("You said ___. More natural: ___. Type it back once."), then move on. Minor errors silently logged.
+- User can say `!strict` or `!relax` to adjust correction sensitivity.
+
+**Closing:**
+- Explicit: user says "bye" (or similar) → immediate summary in Spanish.
+- Inactivity: after timeout, Luz Angela sends the summary unprompted.
+
+Summary format (in Spanish, calibrated to user's level):
+> *¡Buena sesión, Eric! Hoy trabajamos en ____ y ____. Repasamos ____ y ____. Has aprendido ____ habilidades nuevas. Para la próxima sesión, te recomiendo ____. ¡Que tengas un buen día!*
+
+---
+
+## Reminders
+
+Default: daily at noon, all 7 days, via DM.
+
+Content is personalized — which skills are decaying, how long it'll take to recover. Not generic push notifications.
+
+Configurable via natural language at any time:
+- "Remind me daily at 2pm"
+- "Tuesdays and Thursdays at 9am and Saturday at 3pm"
+- "No reminders on weekends"
+
+Implemented as a Railway cron job: runs daily, checks each user's last session and reminder preferences, sends DMs accordingly.
+
+---
+
+## Content Generation
+
+All content LLM-generated. Inputs to every generation call:
 1. Target `skill × mode` from SRS engine
-2. User interest profile (pickleball, video games, current life topics)
-3. User's CEFR level (controls complexity, vocab range)
-4. Session context (review vs. push forward)
-5. Target dialect/style profile (see below)
+2. User interest profile (captured in onboarding, refined over time)
+3. User's current CEFR level
+4. Session type (review vs. push forward)
+5. Luz Angela's persona system prompt (Medellín dialect, tone, style)
 
-**Dialect and style targeting:**
-- User selects a target dialect, register, and demographic — e.g. "Medellín young professional" vs "Spain 60-year-old" vs "Mexican street slang"
-- Affects: vocabulary choices, idioms, formality (tuteo/voseo/usted), slang, pronunciation targets (for audio), cultural references
-- Stored as part of user profile, changeable at any time
-- Content generation and conversation evaluation both respect the selected style
-
-### Error Handling During Conversation
-
-- **Significant errors** → inline correction in a consistent format:
-  > "You said ___. This would be more natural: ___. Type it back once to reinforce, then we'll move on."
-  - One reinforcement rep, then conversation continues immediately
-- **Minor errors** (accents, minor agreement, small typos) → silently logged, never interrupt flow
-- **Pattern detection**: minor errors accumulate and surface in progress reports:
-  > "A common error you make is ___"
-- User can override strictness at any time ("be strict with me" / "just let me talk")
-
-### Interface Layer
-
-**Discord** (primary interface, multiple channels):
-- `#lessons` — active learning, quizzes, drills
-- `#curriculum` — current plan, what's queued, progression view
-- `#feedback` — instruct the bot to change behavior, curriculum, or config
-- `#progress` — stats, skill scores, history, evaluatory summaries
-- `#admin` — trigger deploys, update config, system changes
-
-Bot behavior varies by channel.
-
-### Update / Deploy Layer
-
-Goal: changes flow from phone → production with no terminal.
-
-```
-Phone (Discord/chat) → agent edits code or config → GitHub push → auto-deploy → bot updated
-```
-
-- **Config/curriculum changes** (no redeploy needed): vocab, skill weights, lesson emphasis, weak-area flags — all in editable YAML/JSON files loaded dynamically at runtime
-- **Code changes** (redeploy needed): new drill types, behavior changes, bug fixes — triggered via `#admin` channel, handled by a dev agent
+Content types:
+- **Quiz**: multiple choice, fill-in-the-blank, targeted at specific skill × mode cells
+- **Reading**: short passage in user's interest domain + comprehension questions
+- **Listening**: TTS audio clip + comprehension questions
+- **Conversation**: freeform exchange, LLM evaluates grammar/vocab/fluency in real time
+- **Written production**: open prompt ("describe your weekend"), LLM evaluates structure and tense
+- **Voice**: user sends voice message, Whisper transcribes, LLM evaluates spoken production
 
 ---
 
-## Open Questions
+## Progress View
 
-### Skill Taxonomy Source
-**Decided: CEFR-derived.** A1→C2 breakdown as the skeleton, extended as gaps emerge through usage. Each skill scored across 5 language modes × cognitive depth levels (recognition → interaction).
+User requests progress in `#progress` (or equivalent in web UI). Luz Angela responds with:
+- Current skill grid snapshot (colored squares)
+- Grid at any past timestamp for comparison
+- Top 3 strengths, top 3 weaknesses
+- Sessions completed, last session date
+- "In the past month, here's what moved" — cells that changed score
 
-### Update Mechanism
-What handles code edits and deploys from chat?
-- OpenClaw (discussed in planning docs as the operator layer)
-- Claude Code with remote access
-- Other agent tooling
-
-*Not yet decided.*
-
-### Hosting
-Where does the bot run?
-- Railway / Render (auto-deploy from GitHub push — likely choice)
-
-*Not yet decided.*
+Readable on mobile. No wide tables.
 
 ---
 
 ## Multi-User Design
 
-The system is multi-tenant from day one:
-- Every DB record scoped to a user ID
-- Postgres (not SQLite) to handle concurrent users
-- Stateless bot — no in-memory user state, everything read from DB per request
-- Each user gets their own learner profile, skill scores, session history, interests, and generated curriculum
-- The learning engine is identical per user — only the data differs
+Multi-tenant from day one:
+- Every DB record scoped to `user_id`
+- No in-memory user state — everything read from DB per request
+- Stateless conversation engine
+- Each user has isolated profile, skill grid, session history, interests
 
-Onboarding flow not yet defined, but architecture supports: placement assessment, interest collection, goal setting → initial learner profile creation.
-
----
-
-## Design Principles
-
-- **Data-driven over code-driven**: vocab, weights, curriculum, weak-area emphasis live in config files — not in code. Changes to these should never require a redeploy.
-- **Adaptability first**: v1 must not box in the learner model. The data schema is the one thing to get right early.
-- **No terminal ever**: the update loop (chat → change → deploy) is as important as the learning features.
+V1 is single-user (the developer). Other users, payment, and public signup are future phases.
 
 ---
 
-## V1 Strategy
+## What Requires Redeploy vs. What Doesn't
 
-Goal: smallest thing that gives a working feedback loop — learning features second, update loop first.
-
-**Must have in v1:**
-- Working Discord bot with at least `#lessons` and `#feedback` channels
-- Learner model schema that can grow without a rewrite
-- At least one content type (quiz or drill)
-- Config-driven curriculum (YAML) so iteration doesn't require redeploys
-- Chat → deploy pipeline working end to end
-
-**Explicitly not in v1:**
-- Full A1-C2 skill taxonomy
-- All content types (stories, conversations)
-- Polished spaced repetition algorithm
-- Multi-mode tracking
-
----
-
-## Tech Stack (Tentative)
-
-| Component | Choice |
+| Change | Approach |
 |---|---|
-| Learning interface | Discord bot |
-| Backend language | TBD |
-| Database | Postgres (multi-tenant from day one) |
-| LLM | Claude API |
-| Curriculum/config | YAML + JSON files |
-| Hosting | Railway or Render |
-| Source of truth | GitHub |
-| Dev/deploy agent | TBD (OpenClaw candidate) |
+| Add/edit skills in taxonomy | Edit `curriculum/skills.yaml`, restart |
+| Adjust SRS weights | Edit config file, restart |
+| Change Luz Angela's system prompt | Edit config file, restart |
+| Add a new content type | Code change → redeploy |
+| Bug fix | Code change → redeploy |
+| New Discord command | Code change → redeploy |

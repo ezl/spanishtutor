@@ -2,66 +2,88 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Project Status
-
-This repository is in the **planning/pre-implementation phase**. The two existing files (`claude_convo.md`, `foo.md`) contain architectural design discussions. No source code exists yet.
-
 ## What This Project Is
 
-A personalized Spanish language learning system with two distinct layers:
+A personalized Spanish learning system. An AI tutor named Luz Angela teaches Spanish through Discord DMs — conversation, quizzes, voice messages, and adaptive content tied to the user's personal interests. The system tracks ability across a skill × mode grid (A1→C2 skills × 5 CEFR language modes) and continuously pushes the boundary of what the user knows.
 
-1. **Learning Bot** — Discord-based tutor (quizzes, corrections, spaced repetition, progress tracking, vocab ingestion)
-2. **Dev/Admin Agent** — Chat-controlled operator that can modify codebase, update configs, and redeploy without the owner touching a terminal
+See `PLAN.md` for full product decisions and `ROADMAP.md` for V1 tickets.
 
-The core requirement is not just a Spanish app — it's a **chat-controlled development and deployment workflow** that allows continuous iteration from Discord/chat.
+## Tech Stack
 
-## Planned Architecture
-
-### Layer 1: Learning Runtime
-
-- **Interface**: Discord bot (primary)
-- **Database**: SQLite or Postgres (learner memory, progress, mistakes)
-- **LLM**: Claude/Anthropic APIs
-- **Curriculum**: YAML/Markdown files loaded dynamically at runtime
-- **Learner state**: JSON profiles
-
-Capabilities: quizzes, corrections, spaced repetition, weak-area tracking, adaptive difficulty, content ingestion, review scheduling.
-
-### Layer 2: Dev/Admin Agent (OpenClaw or equivalent)
-
-Handles code edits, prompt modifications, new drill types, test runs, deployments, and log inspection — all triggered from Discord without terminal access.
-
-## Critical Design Principle
-
-**Most learning adaptation must be data-driven, not code-driven.**
-
-- Vocab changes, lesson weighting, weak-area emphasis, drill frequency, curriculum tweaks → editable config files, no redeploy
-- Only true structural/behavioral changes → code edit + redeploy
-
-Example files to load dynamically at runtime:
-```
-curriculum.yaml       # lesson rules and sequencing
-skills.yaml           # skill definitions and weights
-mistake_patterns.json # tracked error patterns
-learner_profile.json  # user state and weak areas
-quiz_templates/       # quiz generation templates
-```
-
-The bot reloads these at runtime so curriculum evolution never requires a redeploy.
-
-## What Requires a Redeploy vs. What Doesn't
-
-| Change | Approach |
+| Layer | Choice |
 |---|---|
-| Vocab list update | Edit data file, no redeploy |
-| Adjust drill frequency | Edit learner profile/config |
-| Add weak-area emphasis | Edit learner profile/config |
-| New drill type (code logic) | Code edit → redeploy |
-| Bug fix | Code edit → redeploy |
-| New Discord command | Code edit → redeploy |
+| Framework | Django 5.x |
+| Discord | discord.py (Cogs) |
+| Bot entry point | `python manage.py run_bot` |
+| Database | Postgres via Django ORM |
+| Migrations | Django built-in (`manage.py migrate`) |
+| Admin | Django Admin |
+| LLM | Anthropic API (async) |
+| STT | OpenAI Whisper |
+| TTS | OpenAI TTS or ElevenLabs |
+| Curriculum config | YAML files in `curriculum/` (runtime reload) |
+| Hosting | Railway (bot + Postgres + cron jobs) |
 
-## Key Interaction Channels (Planned)
+## Architecture
 
-- Learning channel — quizzes, explanations, corrections
-- Feedback/admin channel — curriculum changes, system updates
-- Progress channel — review results, weak areas
+The conversation engine is interface-agnostic. All message handling goes through `engine.handle_message(user_id, text, attachments)`. The Discord bot and future web API both call this function — Luz Angela never knows which surface she's on.
+
+```
+Discord DM  ──┐
+              ├──▶  engine.handle_message()  ──▶  Postgres
+Web UI      ──┘         (Django)
+```
+
+## Project Structure (planned)
+
+```
+spanishtutor/          # Django project root
+  settings.py
+  urls.py
+bot/                   # Discord bot (Cogs)
+  management/
+    commands/
+      run_bot.py       # Entry point: manage.py run_bot
+  cogs/
+    lessons.py
+    progress.py
+    reminders.py
+engine/                # Interface-agnostic conversation engine
+  core.py              # handle_message()
+  evaluation.py        # Adaptive quiz, phase management
+  srs.py               # Spaced repetition engine
+  content.py           # LLM content generation
+  persona.py           # Luz Angela system prompt
+curriculum/
+  skills.yaml          # Full A1→C2 skill taxonomy
+  config.yaml          # SRS weights, timeouts, defaults
+```
+
+## Key Design Constraints
+
+- **Interface-agnostic engine**: never put conversation logic in the Discord bot layer. The bot only handles Discord I/O.
+- **Stateless per request**: no in-memory user state. Everything read from DB on each message.
+- **Multi-tenant from day one**: every DB query scoped to `user_id`.
+- **Config over code**: skill taxonomy, SRS weights, Luz Angela's system prompt — all in config files. Changes to these don't require a redeploy, just a restart.
+
+## Common Commands
+
+```bash
+python manage.py migrate          # Run migrations
+python manage.py run_bot          # Start Discord bot
+python manage.py createsuperuser  # Create Django admin user
+python manage.py shell            # Django shell
+```
+
+## Luz Angela
+
+The tutor persona. Mid-30s, from Laureles, Medellín. Warm, playful, direct. Speaks Colombian Spanish (Medellín dialect). Not sycophantic. Honest about being a bot if asked. Spanish-first, calibrated to user's CEFR level. English escape hatch: user says "English please."
+
+Her persona is defined in `engine/persona.py` as a system prompt passed to every Anthropic API call. It must never be hardcoded in bot handlers.
+
+## Skill Grid
+
+- **Vertical**: A1→C2 skills defined in `curriculum/skills.yaml`
+- **Horizontal**: 5 CEFR modes — listening, reading, spoken_interaction, spoken_production, writing
+- **Scores**: 0 (⬜ untested) → 1 (🟥) → 2 (🟨) → 3 (🟦) → 4 (🟩 mastered)
+- **Atomic unit**: `skill × mode` — each cell has a score + last_tested_at + next_review_at
