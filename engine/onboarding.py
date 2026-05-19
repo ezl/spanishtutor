@@ -5,19 +5,16 @@ State is tracked via user fields (native_language set = Q1 done, etc.)
 from asgiref.sync import sync_to_async
 from .core import call_llm
 
-FIRST_MESSAGE = """Hey! I'm Luz Angela, your Spanish tutor.
+FIRST_MESSAGE = """Hola! Soy Luz Angela, tu profesora de español!
+Hi! I'm Luz Angela, your Spanish teacher!
 
-What are your interests — hobbies, sports, music, whatever. I'll use them to make the lessons actually interesting.
+I'm excited to start our Spanish language journey. I'll ask you a few questions and chat with you to get a sense of your current level.
 
 *(Send `!reset` anytime to start over.)*"""
 
 
 async def handle_onboarding(user, text: str, attachments: list = None) -> dict:
-    if not user.interests:
-        return await _step_interests(user, text)
-    elif not user.target_use:
-        return await _step_target_use(user, text)
-    elif not user.estimated_cefr_level:
+    if not user.estimated_cefr_level:
         return await _step_adaptive_quiz(user, text)
     else:
         return await _step_freeform(user, text)
@@ -74,20 +71,19 @@ async def _step_adaptive_quiz(user, text: str) -> dict:
             history.append({"role": "user", "content": e.user_response})
 
     # Ask LLM to evaluate and continue or conclude
+    is_first_question = quiz_count == 0
     eval_prompt = f"""You are running an adaptive Spanish placement quiz. Assume the student is a beginner (A1) unless their answers show otherwise. Start easy and only go harder if they're clearly correct. The quiz runs in English. Max 5 questions.
 
 Previous Q&A:
 {chr(10).join(f"Q: {e.content} | A: {e.user_response}" for e in events)}
 
-Latest answer: "{text}"
+{"This is the first question — the student just said: " + repr(text) + ". Ignore their message and ask the first placement question." if is_first_question else f'Latest answer: "{text}"'}
 
-Based on all answers so far:
-1. Evaluate correctness
-2. Decide: continue (if fewer than 5 questions and level not clear) OR conclude
+{"Ask the first question now. Start easy (A1 level)." if is_first_question else "Based on all answers so far: 1. Evaluate correctness 2. Decide: continue (if fewer than 5 questions and level not clear) OR conclude"}
 
-If continuing: next question should be slightly harder if correct, easier if wrong. Questions in English with Spanish words to translate/identify. Format:
+If continuing: next question slightly harder if correct, easier if wrong. Questions in English with Spanish words to translate/identify. Format:
 CONTINUE
-FEEDBACK: <1 sentence in English>
+FEEDBACK: <1 sentence in English, skip if first question>
 NEXT_QUESTION: <question in English>
 
 If concluding (at least 3 questions answered):
