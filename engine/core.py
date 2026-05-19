@@ -12,7 +12,7 @@ async def call_llm(messages: list, user=None, max_tokens: int = 1024) -> str:
     client = get_anthropic_client()
     system = get_system_prompt(user)
     response = await sync_to_async(client.messages.create)(
-        model="claude-opus-4-7",
+        model="claude-sonnet-4-6",
         max_tokens=max_tokens,
         system=system,
         messages=messages,
