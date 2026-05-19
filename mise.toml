@@ -24,3 +24,29 @@ run = "ssh -i ~/.ssh/id_ed25519 root@5.78.211.212 'nano /home/claude/spanishtuto
 [tasks.secrets-show]
 description = "Print app secret keys (no values)"
 run = "ssh -i ~/.ssh/id_ed25519 root@5.78.211.212 \"grep -o '^[^=]*' /home/claude/spanishtutor/.env\""
+
+[tasks.shell]
+description = "Open Django shell against Railway Postgres"
+run = "railway run python manage.py shell"
+
+[tasks.db]
+description = "Open psql shell against Railway Postgres"
+run = "railway connect Postgres"
+
+[tasks.users]
+description = "List all learner users"
+run = "railway run python manage.py shell -c \"from learner.models import User; [print(u.discord_id, u.display_name, u.onboarding_complete) for u in User.objects.all()]\""
+
+[tasks.reset-user]
+description = "Reset a user by Discord ID (deletes all their data). Usage: mise run reset-user <discord_id>"
+run = """
+railway run python manage.py shell -c "
+from learner.models import User
+u = User.objects.filter(discord_id='$1').first()
+if u:
+    u.delete()
+    print(f'Deleted {u.display_name} ({u.discord_id})')
+else:
+    print('User not found. Run: mise run users')
+"
+"""
