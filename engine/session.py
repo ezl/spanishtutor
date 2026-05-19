@@ -34,10 +34,14 @@ async def handle_session(user, text: str, attachments: list = None) -> dict:
 async def _open_session(user, text: str) -> dict:
     from learner.models import Session, SkillScore
 
+    # Create the session now so subsequent messages route to _continue_session
+    session = await sync_to_async(Session.objects.create)(user=user, session_type='practice')
+
     # Find most recent completed session for recap
     last_session = await sync_to_async(
         lambda: Session.objects.filter(user=user, ended_at__isnull=False)
                                .exclude(session_type='onboarding')
+                               .exclude(pk=session.pk)
                                .order_by('-ended_at').first()
     )()
 
@@ -63,40 +67,54 @@ Keep it natural and brief — 3-4 sentences max."""
 
     opening = await call_llm([{"role": "user", "content": prompt}], user=user)
 
+    # Log opening as first event; user_response will be filled on the next turn
+    from learner.models import SessionEvent
+    await sync_to_async(SessionEvent.objects.create)(
+        session=session,
+        event_type='conversation',
+        content=opening,
+        user_response='',
+    )
+
     return {"text": opening, "audio_url": None, "session_ended": False}
 
 
 async def _continue_session(user, session, text: str, attachments: list = None) -> dict:
     from learner.models import SessionEvent
 
-    # Log user response
-    last_event = await sync_to_async(
-        lambda: session.events.order_by('-timestamp').first()
-    )()
-    if last_event and not last_event.user_response:
-        await sync_to_async(
-            lambda: SessionEvent.objects.filter(pk=last_event.pk).update(user_response=text)
-        )()
-
-    # Build conversation history
+    # Fetch completed exchange history (events where user_response is set)
     events = await sync_to_async(
         lambda: list(session.events.order_by('timestamp')[:20])
     )()
+
+    # Build history: each stored event = (user said user_response → assistant said content)
+    # Skip events with empty user_response (e.g. the opening message not yet replied to)
     history = []
     for e in events:
-        history.append({"role": "assistant", "content": e.content})
         if e.user_response:
             history.append({"role": "user", "content": e.user_response})
+            history.append({"role": "assistant", "content": e.content})
+
+    # Append current user message — history now ends with user (valid for Anthropic API)
     history.append({"role": "user", "content": text})
 
     response_text = await call_llm(history, user=user)
 
-    await sync_to_async(SessionEvent.objects.create)(
-        session=session,
-        event_type='conversation',
-        content=response_text,
-        user_response='',
-    )
+    # Store this exchange: record user_response on last pending event OR create new event
+    pending = next((e for e in reversed(events) if not e.user_response), None)
+    if pending:
+        await sync_to_async(
+            lambda: SessionEvent.objects.filter(pk=pending.pk).update(
+                user_response=text, content=response_text
+            )
+        )()
+    else:
+        await sync_to_async(SessionEvent.objects.create)(
+            session=session,
+            event_type='conversation',
+            content=response_text,
+            user_response=text,
+        )
 
     return {"text": response_text, "audio_url": None, "session_ended": False}
 
