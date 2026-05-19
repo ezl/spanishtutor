@@ -1,3 +1,4 @@
+import traceback
 import discord
 import django.conf
 from asgiref.sync import sync_to_async
@@ -17,9 +18,6 @@ async def get_or_create_user(discord_user: discord.User):
         discord_id=str(discord_user.id),
         defaults={'display_name': discord_user.display_name},
     )
-    if created:
-        # Update display name in case it changed
-        pass
     return user, created
 
 
@@ -30,7 +28,6 @@ async def on_ready():
 
 @client.event
 async def on_message(message: discord.Message):
-    # Only respond to DMs, never to ourselves
     if message.author == client.user:
         return
     if not isinstance(message.channel, discord.DMChannel):
@@ -39,22 +36,32 @@ async def on_message(message: discord.Message):
     text = message.content.strip()
     attachments = message.attachments
 
-    async with message.channel.typing():
-        user, is_new = await get_or_create_user(message.author)
+    try:
+        async with message.channel.typing():
+            user, is_new = await get_or_create_user(message.author)
 
-        if is_new:
-            await message.channel.send(FIRST_MESSAGE)
-            return
+            if is_new:
+                await message.channel.send(FIRST_MESSAGE)
+                return
 
-        from engine.core import handle_message
-        result = await handle_message(user, text, list(attachments))
+            from engine.core import handle_message
+            result = await handle_message(user, text, list(attachments))
 
-    if result.get('text'):
-        # Split long responses to stay under Discord's 2000 char limit
-        response = result['text']
-        while response:
-            await message.channel.send(response[:1990])
-            response = response[1990:]
+        if result.get('text'):
+            response = result['text']
+            while response:
+                await message.channel.send(response[:1990])
+                response = response[1990:]
+
+    except Exception as e:
+        tb = traceback.format_exc()
+        print(f'ERROR handling message from {message.author}: {e}\n{tb}')
+        try:
+            await message.channel.send(
+                f'Lo siento, algo salió mal. 😅 (Error: `{type(e).__name__}: {str(e)[:100]}`)'
+            )
+        except Exception:
+            pass
 
 
 async def run():
