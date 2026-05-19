@@ -2,8 +2,8 @@ import discord
 import asyncio
 import subprocess
 import os
+import re
 import time
-from pathlib import Path
 from dotenv import load_dotenv
 
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '..', '.env'))
@@ -11,7 +11,6 @@ load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '..', '.env'))
 TOKEN = os.getenv("DISCORD_DEV_BOT_TOKEN")
 REPO_PATH = os.getenv("REPO_PATH", "/root/spanishtutor")
 TMUX_SESSION = "claude-agent"
-LOG_FILE = "/tmp/claude-output.log"
 
 ACTION_CHANNELS = {
     int(os.getenv("DISCORD_DEV_CHANNEL_ID")): "dev",
@@ -24,79 +23,66 @@ LOGS_CHANNEL_ID = int(os.getenv("DISCORD_DEV_LOGS_CHANNEL_ID"))
 intents = discord.Intents.default()
 intents.message_content = True
 client = discord.Client(intents=intents)
-
-# Queue to serialize instructions — one at a time
 queue = asyncio.Queue()
-busy = False
 
 
-def tmux(cmd):
-    subprocess.run(["tmux"] + cmd, check=True)
+def strip_ansi(text: str) -> str:
+    return re.sub(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])', '', text)
 
 
-def capture_pane() -> str:
-    result = subprocess.run(
-        ["tmux", "capture-pane", "-t", TMUX_SESSION, "-p"],
-        capture_output=True, text=True
-    )
+def tmux_run(cmd: list) -> str:
+    result = subprocess.run(["tmux"] + cmd, capture_output=True, text=True)
     return result.stdout
 
 
+def capture_pane() -> str:
+    raw = tmux_run(["capture-pane", "-t", TMUX_SESSION, "-p", "-e"])
+    return strip_ansi(raw)
+
+
 def session_exists() -> bool:
-    result = subprocess.run(
-        ["tmux", "has-session", "-t", TMUX_SESSION],
-        capture_output=True
-    )
+    result = subprocess.run(["tmux", "has-session", "-t", TMUX_SESSION], capture_output=True)
     return result.returncode == 0
 
 
 def ensure_claude_session():
-    """Start Claude Code in a tmux session if not already running."""
     if session_exists():
         return
-    Path(LOG_FILE).write_text("")
-    tmux(["new-session", "-d", "-s", TMUX_SESSION, "-c", REPO_PATH])
-    # Pipe all output to log file
-    tmux(["pipe-pane", "-t", TMUX_SESSION, f"cat >> {LOG_FILE}"])
-    # Start Claude Code
-    tmux(["send-keys", "-t", TMUX_SESSION, "claude", "Enter"])
-    time.sleep(5)  # Wait for Claude to authenticate and show prompt
+    subprocess.run(["tmux", "new-session", "-d", "-s", TMUX_SESSION, "-c", REPO_PATH])
+    subprocess.run(["tmux", "send-keys", "-t", TMUX_SESSION,
+                    "claude --dangerously-skip-permissions", "Enter"])
+    time.sleep(5)
 
 
 async def send_to_claude(instruction: str, timeout: int = 300) -> str:
-    """Send instruction to persistent Claude session, wait for response."""
     ensure_claude_session()
 
-    # Snapshot current log size so we only capture new output
-    log_path = Path(LOG_FILE)
-    start_size = log_path.stat().st_size if log_path.exists() else 0
+    # Snapshot pane before sending
+    before = capture_pane()
 
     # Send instruction
-    tmux(["send-keys", "-t", TMUX_SESSION, instruction, "Enter"])
+    subprocess.run(["tmux", "send-keys", "-t", TMUX_SESSION, instruction, "Enter"])
 
-    # Wait for output to appear then stabilize
-    await asyncio.sleep(3)
+    # Wait for output to appear and stabilize
+    await asyncio.sleep(5)
     deadline = time.time() + timeout
-    last_size = start_size
-    stable_ticks = 0
+    last = capture_pane()
+    stable = 0
 
     while time.time() < deadline:
-        await asyncio.sleep(2)
-        current_size = log_path.stat().st_size if log_path.exists() else 0
-        if current_size == last_size:
-            stable_ticks += 1
-            if stable_ticks >= 4:  # 8 seconds of no new output = done
+        await asyncio.sleep(3)
+        current = capture_pane()
+        if current == last:
+            stable += 1
+            if stable >= 3:  # 9 seconds stable = done
                 break
         else:
-            stable_ticks = 0
-            last_size = current_size
+            stable = 0
+            last = current
 
-    # Return only new output since we sent the instruction
-    if log_path.exists():
-        content = log_path.read_text()
-        new_output = content[start_size:].strip()
-        return new_output or "Done (no output)."
-    return "Done."
+    # Return only what's new since we sent the instruction
+    new_content = last[len(before):].strip()
+    return new_content or last.strip() or "Done (no output)."
 
 
 def chunk(text: str, size: int = 1900):
@@ -104,14 +90,11 @@ def chunk(text: str, size: int = 1900):
 
 
 async def process_queue():
-    """Process instructions one at a time from the queue."""
     while True:
         message, instruction, channel_type = await queue.get()
         logs = client.get_channel(LOGS_CHANNEL_ID)
         try:
-            result = await asyncio.wait_for(
-                send_to_claude(instruction), timeout=300
-            )
+            result = await asyncio.wait_for(send_to_claude(instruction), timeout=300)
             await message.remove_reaction("⏳", client.user)
             await message.add_reaction("✅")
             for part in chunk(result):
@@ -150,17 +133,13 @@ async def on_message(message):
         return
     if message.channel.id not in ACTION_CHANNELS:
         return
-
     instruction = message.content.strip()
     if not instruction:
         return
-
     channel_type = ACTION_CHANNELS[message.channel.id]
     await message.add_reaction("⏳")
-
     if not queue.empty():
-        await message.reply("Queued — Claude is busy with a previous instruction.")
-
+        await message.reply("Queued — Claude is finishing a previous instruction.")
     await queue.put((message, instruction, channel_type))
 
 
