@@ -36,6 +36,11 @@ echo 'export PATH=/root/.local/bin:$PATH' >> ~/.bashrc
 # Claude Code CLI
 npm install -g @anthropic-ai/claude-code
 
+# Verify
+node --version
+python3 --version
+claude --version
+
 echo "Dependencies installed."
 ENDSSH
 
