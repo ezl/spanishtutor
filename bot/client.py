@@ -39,8 +39,12 @@ async def on_message(message: discord.Message):
     if text.lower() == '!reset':
         from learner.models import User
         await sync_to_async(User.objects.filter(discord_id=str(message.author.id)).delete)()
-        await message.channel.send('Reset done. Starting over...')
+        user, _ = await get_or_create_user(message.author)
         await message.channel.send(FIRST_MESSAGE)
+        from engine.core import handle_message
+        first_q = await handle_message(user, QUIZ_START_SENTINEL, [])
+        if first_q.get('text'):
+            await message.channel.send(first_q['text'])
         return
 
     try:

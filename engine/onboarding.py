@@ -14,7 +14,7 @@ from .core import call_llm
 FIRST_MESSAGE = """Hola! Soy Luz Angela, tu profesora de español!
 Hi! I'm Luz Angela, your Spanish teacher!
 
-I'll ask you 10-15 quick questions to figure out your level. If something stumps you, just say "I don't know" — that's more useful than a guess.
+I'm excited to start our Spanish language journey. I'll ask you a few questions to get a sense of your level. If something stumps you, just say "I don't know" — that's more useful than a guess.
 
 *(Send `!reset` anytime to start over.)*"""
 
