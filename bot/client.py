@@ -39,6 +39,8 @@ async def on_message(message: discord.Message):
     if text.lower() == '!reset':
         from learner.models import User
         await sync_to_async(User.objects.filter(discord_id=str(message.author.id)).delete)()
+        # Recreate with empty display_name so next message routes to _step_collect_name
+        await sync_to_async(User.objects.create)(discord_id=str(message.author.id), display_name='')
         await message.channel.send(FIRST_MESSAGE)
         return
 

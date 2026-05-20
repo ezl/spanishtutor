@@ -7,9 +7,15 @@ Quiz has two phases:
 
 Two strands woven together: grammar and vocabulary.
 """
+import re
 from asgiref.sync import sync_to_async
 from django.utils import timezone
 from .core import call_llm
+
+
+def _fix_blanks(text: str) -> str:
+    """Replace any LLM blank variants with the canonical 8-underscore format."""
+    return re.sub(r'\(\s*_+\s*\)', '________', text)
 
 FIRST_MESSAGE = """👋 Hola! Soy Luz Angela, tu profesora de español!
 (Hi! I'm Luz Angela, your Spanish teacher!)
@@ -33,7 +39,10 @@ STRICT RULES:
 
 QUESTION FORMAT by level:
   A1-A2: multiple choice, label options a/b/c/d
-  A2-B1: fill-in-the-blank, write blank as ________ (8 underscores). The blank replaces ONLY the missing word/verb — never wrap extra words in the blank. e.g. "Ella ________ cansada hoy." not "Ella ________ cansada hoy________ verano."
+  A2-B1: fill-in-the-blank. Format exactly like this, two lines:
+    "Ella ________ cansada hoy."
+    *(Translation: She is tired today.)*
+    The translation is always complete — it reveals the answer in English. Never put a blank in the translation line.
   B1-B2: free production — "How do you say X?" or "Translate: ..."
   B2+:   natural Spanish — "¿Qué hiciste ayer?" etc., student answers in Spanish
 
@@ -82,10 +91,7 @@ CONCLUDE only if ALL of these are true:
 Otherwise always CONTINUE.
 CONCLUDE
 CEFR_LEVEL: A1|A2|B1|B2|C1|C2
-SKILL_UPDATES: skill:score for every assessed skill
-STRONG: <comma-separated list of strong skills, plain English, e.g. "Preterite tense, Ser vs. estar">
-WEAK: <comma-separated list of weak/shaky skills>
-FOCUS: <1 sentence on what first sessions will target>"""
+SKILL_UPDATES: skill:score for every assessed skill"""
 
 PHASE_BINARY_SEARCH = """Q1-5: Binary search for CEFR estimate. Start A1. Go harder if correct, easier if wrong.
 The binary search implicitly confirms the floor — if you see 2+ correct answers at level-1, treat that level as mastered and don't re-probe it unless answers are inconsistent."""
@@ -109,7 +115,7 @@ def _parse_quiz_response(text: str) -> dict:
 
     current_key = None
     current_lines = []
-    keys = {'SKILL_UPDATES', 'NEXT_QUESTION', 'CEFR_LEVEL', 'ASSESSMENT', 'STRONG', 'WEAK', 'FOCUS'}
+    keys = {'SKILL_UPDATES', 'NEXT_QUESTION', 'CEFR_LEVEL'}
 
     for line in lines[1:]:
         matched_key = None
@@ -254,17 +260,36 @@ async def _step_adaptive_quiz(user, text: str) -> dict:
     if parsed['action'] == 'CONCLUDE':
         cefr = parsed.get('CEFR_LEVEL', 'A2')
 
-        strong_items = [f"— {s.strip()}" for s in parsed.get('STRONG', '').split(',') if s.strip()]
-        weak_items = [f"— {s.strip()}" for s in parsed.get('WEAK', '').split(',') if s.strip()]
-        focus = parsed.get('FOCUS', '').strip()
+        # Derive strong/weak from SKILL_UPDATES directly — don't trust LLM to format this
+        score_map_rev = {1: 'shaky', 2: 'developing', 3: 'confident', 4: 'mastered'}
+        skill_scores = {}
+        updates_str = parsed.get('SKILL_UPDATES', '')
+        if updates_str and updates_str.lower() != 'none':
+            score_map = {'shaky': 1, 'developing': 2, 'confident': 3, 'mastered': 4}
+            for pair in updates_str.split(','):
+                pair = pair.strip()
+                if ':' in pair:
+                    sid, _, sval = pair.partition(':')
+                    score = score_map.get(sval.strip())
+                    if score:
+                        skill_scores[sid.strip()] = score
+
+        # Human-readable skill names from ID (strip prefix, replace underscores)
+        def _skill_label(skill_id):
+            parts = skill_id.split('_', 1)
+            return parts[1].replace('_', ' ').title() if len(parts) > 1 else skill_id.replace('_', ' ').title()
+
+        strong_items = [f"— {_skill_label(k)}" for k, v in skill_scores.items() if v >= 3]
+        weak_items = [f"— {_skill_label(k)}" for k, v in skill_scores.items() if v <= 2]
+        focus_skills = [_skill_label(k) for k, v in skill_scores.items() if v <= 2]
+        focus = f"We'll start with {', '.join(focus_skills[:2])}." if focus_skills else "We'll build from your current level."
 
         assessment_parts = [f"📊 **Your Spanish level: {cefr}**\n"]
         if strong_items:
             assessment_parts.append("✅ **Strong:**\n" + "\n".join(strong_items))
         if weak_items:
             assessment_parts.append("⚠️ **Needs work:**\n" + "\n".join(weak_items))
-        if focus:
-            assessment_parts.append(f"🎯 **First sessions will focus on:** {focus}")
+        assessment_parts.append(f"🎯 **First sessions will focus on:** {focus}")
         assessment = "\n\n".join(assessment_parts)
 
         await sync_to_async(user.__class__.objects.filter(pk=user.pk).update)(
@@ -281,7 +306,7 @@ async def _step_adaptive_quiz(user, text: str) -> dict:
         return {"text": assessment, "audio_url": None, "session_ended": False}
 
     # CONTINUE — log next question and return it
-    next_q = parsed.get('NEXT_QUESTION', '')
+    next_q = _fix_blanks(parsed.get('NEXT_QUESTION', ''))
     await sync_to_async(SessionEvent.objects.create)(
         session=session,
         event_type='quiz',
