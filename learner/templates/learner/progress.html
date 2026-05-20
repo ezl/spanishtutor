@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% if user %}{{ user.display_name }}'s Spanish Progress{% else %}Spanish Progress{% endif %}</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0f0f0f;
+      color: #e8e8e8;
+      min-height: 100vh;
+      padding: 2rem 1rem;
+    }
+
+    .container { max-width: 900px; margin: 0 auto; }
+
+    header { margin-bottom: 2.5rem; }
+    header h1 { font-size: 1.6rem; font-weight: 600; margin-bottom: 0.25rem; }
+    header .meta { color: #888; font-size: 0.9rem; }
+    header .level-badge {
+      display: inline-block;
+      background: #2a2a2a;
+      border: 1px solid #444;
+      border-radius: 6px;
+      padding: 0.2rem 0.7rem;
+      font-size: 0.85rem;
+      font-weight: 600;
+      margin-left: 0.5rem;
+      vertical-align: middle;
+    }
+
+    .mastery-bar-wrap { margin: 1.5rem 0; }
+    .mastery-label { font-size: 0.85rem; color: #888; margin-bottom: 0.4rem; }
+    .mastery-bar {
+      background: #1e1e1e;
+      border-radius: 4px;
+      height: 8px;
+      overflow: hidden;
+    }
+    .mastery-fill {
+      height: 100%;
+      background: #4ade80;
+      border-radius: 4px;
+      transition: width 0.5s ease;
+    }
+
+    .legend {
+      display: flex;
+      gap: 1rem;
+      margin-bottom: 2rem;
+      flex-wrap: wrap;
+    }
+    .legend-item { display: flex; align-items: center; gap: 0.35rem; font-size: 0.8rem; color: #aaa; }
+    .dot {
+      width: 14px; height: 14px; border-radius: 3px; flex-shrink: 0;
+    }
+    .dot.untested   { background: #2a2a2a; border: 1px solid #444; }
+    .dot.shaky      { background: #7f1d1d; }
+    .dot.developing { background: #78350f; }
+    .dot.confident  { background: #1e3a5f; }
+    .dot.mastered   { background: #14532d; }
+
+    .cefr-section { margin-bottom: 2.5rem; }
+    .cefr-heading {
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #666;
+      margin-bottom: 0.75rem;
+      padding-bottom: 0.4rem;
+      border-bottom: 1px solid #222;
+    }
+
+    table { width: 100%; border-collapse: collapse; }
+
+    thead th {
+      font-size: 0.7rem;
+      font-weight: 500;
+      color: #666;
+      text-align: center;
+      padding: 0 0.25rem 0.5rem;
+      white-space: pre-line;
+      line-height: 1.3;
+    }
+    thead th.skill-col { text-align: left; width: 220px; }
+
+    tbody tr:hover { background: #161616; }
+
+    td {
+      padding: 0.35rem 0.25rem;
+      vertical-align: middle;
+    }
+    td.skill-name {
+      font-size: 0.85rem;
+      color: #ccc;
+      padding-right: 1rem;
+    }
+    td.skill-name .desc {
+      font-size: 0.72rem;
+      color: #555;
+      margin-top: 1px;
+    }
+    td.cell { text-align: center; }
+
+    .square {
+      display: inline-block;
+      width: 28px;
+      height: 28px;
+      border-radius: 4px;
+    }
+    .square.untested   { background: #1e1e1e; border: 1px solid #333; }
+    .square.shaky      { background: #7f1d1d; }
+    .square.developing { background: #78350f; }
+    .square.confident  { background: #1e3a5f; }
+    .square.mastered   { background: #14532d; }
+
+    .no-user { text-align: center; color: #666; margin-top: 4rem; font-size: 1.1rem; }
+  </style>
+</head>
+<body>
+<div class="container">
+
+{% if no_user %}
+  <p class="no-user">No users yet.</p>
+{% else %}
+
+  <header>
+    <h1>
+      {{ user.display_name }}'s Spanish Progress
+      {% if user.estimated_cefr_level %}
+        <span class="level-badge">{{ user.estimated_cefr_level }}</span>
+      {% endif %}
+    </h1>
+    <p class="meta">{{ mastered_cells }} / {{ total_cells }} cells mastered</p>
+
+    <div class="mastery-bar-wrap">
+      <div class="mastery-label">Overall mastery — {{ mastery_pct }}%</div>
+      <div class="mastery-bar">
+        <div class="mastery-fill" style="width: {{ mastery_pct }}%"></div>
+      </div>
+    </div>
+  </header>
+
+  <div class="legend">
+    <div class="legend-item"><div class="dot untested"></div> Untested</div>
+    <div class="legend-item"><div class="dot shaky"></div> Shaky</div>
+    <div class="legend-item"><div class="dot developing"></div> Developing</div>
+    <div class="legend-item"><div class="dot confident"></div> Confident</div>
+    <div class="legend-item"><div class="dot mastered"></div> Mastered</div>
+  </div>
+
+  {% for level in levels %}
+  <div class="cefr-section">
+    <div class="cefr-heading">{{ level.level }}</div>
+    <table>
+      {% if forloop.first %}
+      <thead>
+        <tr>
+          <th class="skill-col"></th>
+          {% for mode in modes %}
+          <th>{{ mode }}</th>
+          {% endfor %}
+        </tr>
+      </thead>
+      {% endif %}
+      <tbody>
+        {% for row in level.rows %}
+        <tr>
+          <td class="skill-name">
+            {{ row.skill.name }}
+            <div class="desc">{{ row.skill.description }}</div>
+          </td>
+          {% for cell in row.cells %}
+          <td class="cell">
+            <span class="square {{ cell.css_class }}" title="{{ cell.css_class }}"></span>
+          </td>
+          {% endfor %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endfor %}
+
+{% endif %}
+</div>
+</body>
+</html>

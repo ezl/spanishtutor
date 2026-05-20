@@ -37,9 +37,25 @@ QUESTION FORMAT by level:
   B1-B2: free production — "How do you say X?" or "Translate: ..."
   B2+:   natural Spanish — "¿Qué hiciste ayer?" etc., student answers in Spanish
 
-TWO STRANDS — weave both:
-  Grammar:    ser_estar, preterite, preterite_vs_imperfect, reflexive_verbs, conditional_subjunctive
-  Vocabulary: vocab_concrete_nouns, vocab_body_parts, vocab_descriptive, vocab_register
+TWO STRANDS — weave both through the quiz, using these exact skill IDs:
+
+  Grammar strand:
+    a1_ser_estar_basic, a1_present_regular, a2_present_irregular, a2_reflexive_verbs,
+    a2_object_pronouns, a2_preterite_regular, b1_preterite_irregular, b1_imperfect,
+    b1_preterite_vs_imperfect, b1_future, b1_conditional, b1_subjunctive_intro,
+    b1_ser_estar_advanced, b2_subjunctive_present, b2_subjunctive_past,
+    b2_passive_voice, b2_advanced_pronouns, b2_reported_speech, b2_discourse_markers,
+    c1_subjunctive_all, c1_compound_tenses, c1_register_shifts
+
+  Vocabulary strand (test with concrete words — translate, identify, produce):
+    a1_basic_vocab       → colors, body parts, food, family, basic objects
+    a1_greetings         → common expressions
+    a2_vocab_domains     → travel, shopping, directions, health, weather
+    a2_gustar_like_verbs → gustar/encantar/molestar constructions
+    b1_vocab_intermediate → work, opinions, emotions, media, technology
+    b2_vocab_advanced    → abstract concepts, formal register, collocations
+    c1_idiomatic_expressions → fixed phrases, collocations
+    c1_vocab_academic    → academic/professional vocabulary
 
 QUIZ HISTORY ({quiz_count} questions so far):
 {history}
@@ -60,7 +76,7 @@ NEXT_QUESTION: <question only — no preamble, no praise, no transition commenta
 
 CONCLUDE only if ALL of these are true:
 - 10+ questions answered
-- At least 3 vocabulary questions asked (vocab_concrete_nouns, vocab_body_parts, vocab_descriptive, vocab_register)
+- At least 3 vocabulary questions asked covering skills from the vocabulary strand (a1_basic_vocab, a2_vocab_domains, b1_vocab_intermediate, etc.)
 - At least 2 boundary-probe grammar questions asked
 - CEFR level and key gaps are clearly established
 Otherwise always CONTINUE.
@@ -71,8 +87,17 @@ STRONG: <comma-separated list of strong skills, plain English, e.g. "Preterite t
 WEAK: <comma-separated list of weak/shaky skills>
 FOCUS: <1 sentence on what first sessions will target>"""
 
-PHASE_BINARY_SEARCH = "Q1-5: Binary search for CEFR. Start A1. Harder if correct, easier if wrong."
-PHASE_BOUNDARY_PROBE = "Q6+: Working CEFR estimate established. Now probe subskill boundaries. Find where confident→developing. Alternate grammar and vocabulary strands. Target specific gaps."
+PHASE_BINARY_SEARCH = """Q1-5: Binary search for CEFR estimate. Start A1. Go harder if correct, easier if wrong.
+The binary search implicitly confirms the floor — if you see 2+ correct answers at level-1, treat that level as mastered and don't re-probe it unless answers are inconsistent."""
+
+PHASE_BOUNDARY_PROBE = """Q6+: You have a working CEFR estimate. Now do structured boundary probing:
+
+(B) AT estimated level — at least 2 questions targeting specific skills at this level to find internal variation (which skills are solid vs shaky).
+(C) ABOVE estimated level — at least 2 questions at the next level up to find where they break.
+(A) BELOW estimated level — only probe if the student seems inconsistent (wrong on easy things, right on hard ones). Otherwise skip — binary search already confirmed the floor.
+
+Alternate grammar and vocabulary strands. Target the specific skill IDs from the taxonomy."""
+
 PHASE_FIRST_QUESTION = "This is Q1. Ignore the input — ask the very first question. Start A1 (e.g. 'what does \"gracias\" mean?'). Use multiple choice."
 
 

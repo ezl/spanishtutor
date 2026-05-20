@@ -66,6 +66,10 @@ curriculum/
 - **Multi-tenant from day one**: every DB query scoped to `user_id`.
 - **Config over code**: skill taxonomy, SRS weights, Luz Angela's system prompt — all in config files. Changes to these don't require a redeploy, just a restart.
 
+## Workflow
+
+**Do not commit or deploy without explicit instruction from the user.** Make code changes locally, then wait to be told to commit and/or push.
+
 ## Common Commands
 
 ```bash

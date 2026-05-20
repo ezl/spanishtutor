@@ -16,7 +16,10 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path
+from learner.views import progress
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path('progress/', progress, name='progress'),
+    path('progress/<str:discord_id>/', progress, name='progress-user'),
 ]
