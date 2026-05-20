@@ -33,7 +33,7 @@ STRICT RULES:
 
 QUESTION FORMAT by level:
   A1-A2: multiple choice, label options a/b/c/d
-  A2-B1: fill-in-the-blank, write blank as ________ (8 underscores), e.g. "Ella ________ cansada hoy." The blank replaces exactly the missing word, nothing else.
+  A2-B1: fill-in-the-blank, write blank as ________ (8 underscores). The blank replaces ONLY the missing word/verb — never wrap extra words in the blank. e.g. "Ella ________ cansada hoy." not "Ella ________ cansada hoy________ verano."
   B1-B2: free production — "How do you say X?" or "Translate: ..."
   B2+:   natural Spanish — "¿Qué hiciste ayer?" etc., student answers in Spanish
 
@@ -58,7 +58,12 @@ CONTINUE
 SKILL_UPDATES: skill:score,skill:score  (or "none")
 NEXT_QUESTION: <question only — no preamble, no praise, no transition commentary>
 
-If concluding (10+ questions, OR level and gaps are clear):
+CONCLUDE only if ALL of these are true:
+- 10+ questions answered
+- At least 3 vocabulary questions asked (vocab_concrete_nouns, vocab_body_parts, vocab_descriptive, vocab_register)
+- At least 2 boundary-probe grammar questions asked
+- CEFR level and key gaps are clearly established
+Otherwise always CONTINUE.
 CONCLUDE
 CEFR_LEVEL: A1|A2|B1|B2|C1|C2
 SKILL_UPDATES: skill:score for every assessed skill
