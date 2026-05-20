@@ -7,3 +7,4 @@ dj-database-url>=2.0.0
 python-dotenv==1.0.1
 pyyaml>=6.0
 audioop-lts
+gunicorn>=21.0.0
