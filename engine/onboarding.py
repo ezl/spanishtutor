@@ -33,7 +33,7 @@ STRICT RULES:
 
 QUESTION FORMAT by level:
   A1-A2: multiple choice, label options a/b/c/d
-  A2-B1: fill-in-the-blank, write blank as ( _____ ) e.g. "Ella ( _____ ) cansada hoy."
+  A2-B1: fill-in-the-blank, write blank as ________ (8 underscores), e.g. "Ella ________ cansada hoy." The blank replaces exactly the missing word, nothing else.
   B1-B2: free production — "How do you say X?" or "Translate: ..."
   B2+:   natural Spanish — "¿Qué hiciste ayer?" etc., student answers in Spanish
 
@@ -62,7 +62,9 @@ If concluding (10+ questions, OR level and gaps are clear):
 CONCLUDE
 CEFR_LEVEL: A1|A2|B1|B2|C1|C2
 SKILL_UPDATES: skill:score for every assessed skill
-ASSESSMENT: <warm summary for student: level, strengths, specific gaps, what first sessions will target. 4-6 sentences.>"""
+STRONG: <comma-separated list of strong skills, plain English, e.g. "Preterite tense, Ser vs. estar">
+WEAK: <comma-separated list of weak/shaky skills>
+FOCUS: <1 sentence on what first sessions will target>"""
 
 PHASE_BINARY_SEARCH = "Q1-5: Binary search for CEFR. Start A1. Harder if correct, easier if wrong."
 PHASE_BOUNDARY_PROBE = "Q6+: Working CEFR estimate established. Now probe subskill boundaries. Find where confident→developing. Alternate grammar and vocabulary strands. Target specific gaps."
@@ -77,7 +79,7 @@ def _parse_quiz_response(text: str) -> dict:
 
     current_key = None
     current_lines = []
-    keys = {'SKILL_UPDATES', 'NEXT_QUESTION', 'CEFR_LEVEL', 'ASSESSMENT'}
+    keys = {'SKILL_UPDATES', 'NEXT_QUESTION', 'CEFR_LEVEL', 'ASSESSMENT', 'STRONG', 'WEAK', 'FOCUS'}
 
     for line in lines[1:]:
         matched_key = None
@@ -221,7 +223,19 @@ async def _step_adaptive_quiz(user, text: str) -> dict:
 
     if parsed['action'] == 'CONCLUDE':
         cefr = parsed.get('CEFR_LEVEL', 'A2')
-        assessment = parsed.get('ASSESSMENT', f"You're at {cefr} level. Let's get started!")
+
+        strong_items = [f"— {s.strip()}" for s in parsed.get('STRONG', '').split(',') if s.strip()]
+        weak_items = [f"— {s.strip()}" for s in parsed.get('WEAK', '').split(',') if s.strip()]
+        focus = parsed.get('FOCUS', '').strip()
+
+        assessment_parts = [f"📊 **Your Spanish level: {cefr}**\n"]
+        if strong_items:
+            assessment_parts.append("✅ **Strong:**\n" + "\n".join(strong_items))
+        if weak_items:
+            assessment_parts.append("⚠️ **Needs work:**\n" + "\n".join(weak_items))
+        if focus:
+            assessment_parts.append(f"🎯 **First sessions will focus on:** {focus}")
+        assessment = "\n\n".join(assessment_parts)
 
         await sync_to_async(user.__class__.objects.filter(pk=user.pk).update)(
             estimated_cefr_level=cefr,
