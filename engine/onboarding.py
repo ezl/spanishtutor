@@ -11,12 +11,12 @@ from asgiref.sync import sync_to_async
 from django.utils import timezone
 from .core import call_llm
 
-FIRST_MESSAGE = """Hola! Soy Luz Angela, tu profesora de español!
-Hi! I'm Luz Angela, your Spanish teacher!
+FIRST_MESSAGE = """👋 Hola! Soy Luz Angela, tu profesora de español!
+(Hi! I'm Luz Angela, your Spanish teacher!)
 
-I'm excited to start our Spanish language journey. I'll ask you a few questions to get a sense of your level. If something stumps you, just say "I don't know" — that's more useful than a guess.
+I'm excited to start our Spanish language journey. What's your name?"""
 
-*(Send `!reset` anytime to start over.)*"""
+LISTO_WORDS = {'listo', 'lista', 'ready', 'vamos', 'ok', 'okay', 'yes', 'si', 'sí', 'go', "let's go", 'dale'}
 
 # Sentinel used by bot/client.py to fire Q1 immediately on join
 QUIZ_START_SENTINEL = "\x00__quiz_start__\x00"
@@ -121,7 +121,40 @@ async def _save_skill_updates(user, updates_str: str):
 
 
 async def handle_onboarding(user, text: str, attachments: list = None) -> dict:
+    if not user.display_name:
+        return await _step_collect_name(user, text)
+
+    # Check if quiz has started yet
+    has_quiz_events = await sync_to_async(
+        lambda: user.sessions.filter(session_type='onboarding')
+                              .filter(events__event_type='quiz')
+                              .exists()
+    )()
+    if not has_quiz_events:
+        return await _step_listo_gate(user, text)
+
     return await _step_adaptive_quiz(user, text)
+
+
+async def _step_collect_name(user, text: str) -> dict:
+    # Extract just the name in case they wrote "I'm Eric" or "My name is Eric"
+    name = text.strip().split()[-1].capitalize() if text.strip() else text.strip()
+    # Save as display_name
+    await sync_to_async(user.__class__.objects.filter(pk=user.pk).update)(display_name=name)
+
+    welcome = (
+        f"Welcome, {name}! I'm excited to begin our Spanish journey together.\n\n"
+        f"👉 I'm going to ask you a few questions to get a sense of your current level.\n"
+        f"👉 If you aren't sure, just say \"I don't know\"\n\n"
+        f"When you're ready to get started, say **listo** (that means \"ready\" in Spanish 😊)"
+    )
+    return {"text": welcome, "audio_url": None, "session_ended": False}
+
+
+async def _step_listo_gate(user, text: str) -> dict:
+    if text.strip().lower() in LISTO_WORDS:
+        return await _step_adaptive_quiz(user, QUIZ_START_SENTINEL)
+    return {"text": "Say **listo** when you're ready to start!", "audio_url": None, "session_ended": False}
 
 
 async def _step_adaptive_quiz(user, text: str) -> dict:

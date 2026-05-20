@@ -2,7 +2,7 @@ import traceback
 import discord
 import django.conf
 from asgiref.sync import sync_to_async
-from engine.onboarding import FIRST_MESSAGE, QUIZ_START_SENTINEL
+from engine.onboarding import FIRST_MESSAGE
 
 
 intents = discord.Intents.default()
@@ -39,12 +39,7 @@ async def on_message(message: discord.Message):
     if text.lower() == '!reset':
         from learner.models import User
         await sync_to_async(User.objects.filter(discord_id=str(message.author.id)).delete)()
-        user, _ = await get_or_create_user(message.author)
         await message.channel.send(FIRST_MESSAGE)
-        from engine.core import handle_message
-        first_q = await handle_message(user, QUIZ_START_SENTINEL, [])
-        if first_q.get('text'):
-            await message.channel.send(first_q['text'])
         return
 
     try:
@@ -53,10 +48,6 @@ async def on_message(message: discord.Message):
 
             if is_new:
                 await message.channel.send(FIRST_MESSAGE)
-                from engine.core import handle_message
-                first_q = await handle_message(user, QUIZ_START_SENTINEL, [])
-                if first_q.get('text'):
-                    await message.channel.send(first_q['text'])
                 return
 
             from engine.core import handle_message
