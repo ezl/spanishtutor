@@ -21,6 +21,10 @@ def _load_skills():
     return grouped
 
 
+def landing(request):
+    return render(request, 'learner/landing.html')
+
+
 def progress(request, discord_id=None):
     if discord_id:
         user = get_object_or_404(User, discord_id=discord_id)
