@@ -120,7 +120,9 @@ async def _continue_session(user, session, text: str, attachments: list = None) 
 
 
 async def _close_session(user, explicit: bool = True) -> dict:
+    import django.conf
     from learner.models import Session
+    from .interests import extract_and_store_interests
 
     session = await sync_to_async(
         lambda: Session.objects.filter(user=user, ended_at__isnull=True)
@@ -146,4 +148,16 @@ Format: "¡Buena sesión, [name]! Hoy trabajamos en ____..." Keep it to 4-5 sent
             )
         )()
 
-    return {"text": summary, "audio_url": None, "session_ended": True}
+        facts = await extract_and_store_interests(session, user)
+
+        dev_log = None
+        if django.conf.settings.DEV_MODE:
+            if facts:
+                lines = [f"  {f['topic']} ({f['category']}, {f['confidence']}) {'[new]' if f.get('new') else '[reinforced]'}" for f in facts]
+                dev_log = "[dev] interests extracted:\n" + "\n".join(lines)
+            else:
+                dev_log = "[dev] no interests extracted this session"
+    else:
+        dev_log = None
+
+    return {"text": summary, "audio_url": None, "session_ended": True, "dev_log": dev_log}

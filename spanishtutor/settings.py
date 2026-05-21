@@ -79,6 +79,7 @@ ANTHROPIC_API_KEY = os.environ.get('ANTHROPIC_API_KEY', '')
 OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY', '')
 
 BASE_URL = os.environ.get('BASE_URL', 'https://spanish.up.railway.app')
+DEV_MODE = os.environ.get('DEV_MODE', 'true').lower() == 'true'
 
 # Bot config
 INACTIVITY_TIMEOUT_MINUTES = int(os.environ.get('INACTIVITY_TIMEOUT_MINUTES', '15'))

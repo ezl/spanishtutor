@@ -98,6 +98,23 @@ class Session(models.Model):
         return f"{self.user} | {self.session_type} | {self.started_at:%Y-%m-%d %H:%M}"
 
 
+class UserInterest(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='user_interests')
+    topic = models.CharField(max_length=128)
+    category = models.CharField(max_length=64)
+    confidence = models.FloatField(default=0.9)
+    mention_count = models.IntegerField(default=1)
+    first_seen_at = models.DateTimeField(auto_now_add=True)
+    last_reinforced_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ('user', 'topic')
+        app_label = 'learner'
+
+    def __str__(self):
+        return f"{self.user} | {self.topic} ({self.category})"
+
+
 class SessionEvent(models.Model):
     EVENT_TYPES = [
         ('quiz', 'Quiz Question'),

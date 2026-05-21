@@ -115,6 +115,9 @@ async def on_message(message: discord.Message):
         if result.get('follow_up'):
             await message.channel.send(result['follow_up'])
 
+        if result.get('dev_log'):
+            await message.channel.send(result['dev_log'])
+
     except Exception as e:
         tb = traceback.format_exc()
         print(f'ERROR handling message from {message.author}: {e}\n{tb}')
