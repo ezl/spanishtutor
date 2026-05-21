@@ -4,135 +4,390 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Luz Angela — Learn Spanish</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;600;700&family=Inter:ital,wght@0,300;0,400;1,300&display=swap" rel="stylesheet">
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      background: #0f0f0f;
-      color: #e8e8e8;
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      padding: 3rem 1.5rem;
+    :root {
+      --ink:        #1e1710;
+      --ink-mid:    #6b5e51;
+      --ink-light:  #a08878;
+      --paper:      #faf7f0;
+      --paper-warm: #f2ece0;
+      --rule:       #e4ddd0;
+      --green:      #2d6a4f;
+      --green-dark: #1b4332;
+      --green-tint: #f0f5f2;
     }
 
-    .container {
-      max-width: 560px;
-      width: 100%;
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--paper);
+      color: var(--ink);
+      min-height: 100vh;
+    }
+
+    /* ── Nav ── */
+    nav {
+      padding: 1.75rem 3rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
     }
 
     .wordmark {
+      font-family: 'Caveat', cursive;
+      font-size: 1.7rem;
+      font-weight: 700;
+      color: var(--ink);
+      letter-spacing: 0.01em;
+    }
+
+    /* ── Hero ── */
+    .hero {
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: 1rem 3rem 5rem;
+      display: grid;
+      grid-template-columns: 1.1fr 1fr;
+      gap: 5rem;
+      align-items: center;
+      min-height: calc(100vh - 88px);
+    }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-family: 'Caveat', cursive;
       font-size: 1rem;
-      font-weight: 700;
-      letter-spacing: 0.05em;
-      color: #aaa;
-      text-transform: uppercase;
-      margin-bottom: 2rem;
-    }
-
-    h1 {
-      font-size: 2.2rem;
-      font-weight: 700;
-      line-height: 1.2;
-      margin-bottom: 1rem;
-      color: #f0f0f0;
-    }
-
-    .subtitle {
-      font-size: 1.05rem;
-      color: #999;
-      line-height: 1.6;
-      margin-bottom: 2rem;
-    }
-
-    .cta-wrap {
-      margin-bottom: 0.75rem;
-    }
-
-    .cta {
-      display: inline-block;
-      background: #4ade80;
-      color: #0a0a0a;
-      font-size: 1rem;
-      font-weight: 700;
-      padding: 0.85rem 2rem;
-      border-radius: 8px;
-      text-decoration: none;
-      transition: background 0.15s;
-    }
-    .cta:hover { background: #22c55e; }
-
-    .pricing {
-      font-size: 0.85rem;
-      color: #555;
-      margin-bottom: 3rem;
-    }
-
-    .divider {
-      border: none;
-      border-top: 1px solid #222;
-      margin-bottom: 2.5rem;
-    }
-
-    .how-it-works {
-      font-size: 0.75rem;
-      font-weight: 700;
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-      color: #555;
+      font-weight: 600;
+      color: var(--green);
+      letter-spacing: 0.04em;
       margin-bottom: 1.25rem;
     }
 
-    .features {
-      list-style: none;
+    .tag::before {
+      content: '';
+      display: block;
+      width: 22px;
+      height: 1.5px;
+      background: var(--green);
+      border-radius: 2px;
+    }
+
+    h1 {
+      font-family: 'Caveat', cursive;
+      font-size: clamp(2.6rem, 4.5vw, 4rem);
+      font-weight: 700;
+      line-height: 1.18;
+      color: var(--ink);
+      margin-bottom: 1.25rem;
+    }
+
+    .hero-body {
+      font-size: 1rem;
+      font-weight: 300;
+      line-height: 1.8;
+      color: var(--ink-mid);
+      margin-bottom: 2.25rem;
+      max-width: 400px;
+    }
+
+    .cta-row { display: flex; flex-direction: column; align-items: flex-start; gap: 0.6rem; }
+
+    .cta {
+      display: inline-block;
+      background: var(--green);
+      color: #fff;
+      font-family: 'Caveat', cursive;
+      font-size: 1.25rem;
+      font-weight: 600;
+      padding: 0.8rem 2.2rem;
+      border-radius: 100px;
+      text-decoration: none;
+      letter-spacing: 0.03em;
+      transition: background 0.15s, transform 0.12s;
+    }
+    .cta:hover { background: var(--green-dark); transform: translateY(-2px); }
+
+    .pricing {
+      font-size: 0.8rem;
+      font-weight: 300;
+      color: var(--ink-light);
+      font-style: italic;
+      padding-left: 0.15rem;
+    }
+
+    /* ── Illustration ── */
+    .portrait-col {
       display: flex;
       flex-direction: column;
-      gap: 1rem;
-    }
-
-    .features li {
-      display: flex;
+      align-items: center;
       gap: 0.75rem;
-      align-items: flex-start;
-      font-size: 0.95rem;
-      color: #bbb;
-      line-height: 1.5;
     }
 
-    .features li::before {
-      content: '→';
-      color: #4ade80;
+    .portrait-frame {
+      position: relative;
+      width: min(340px, 100%);
+    }
+
+    .portrait-frame::before {
+      content: '';
+      position: absolute;
+      width: 88%;
+      aspect-ratio: 1;
+      background: var(--paper-warm);
+      border-radius: 50%;
+      top: 50%;
+      left: 50%;
+      transform: translate(-46%, -50%);
+      z-index: 0;
+    }
+
+    .portrait-frame svg {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      height: auto;
+    }
+
+    .portrait-name {
+      font-family: 'Caveat', cursive;
+      font-size: 1.15rem;
+      font-weight: 600;
+      color: var(--ink-mid);
+      letter-spacing: 0.03em;
+    }
+
+    /* ── How it works ── */
+    .how {
+      background: var(--green-tint);
+      border-top: 1px solid var(--rule);
+      padding: 4.5rem 3rem 5rem;
+    }
+
+    .how-inner {
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    .how-label {
+      font-family: 'Caveat', cursive;
+      font-size: 1.8rem;
+      font-weight: 600;
+      color: var(--green);
+      margin-bottom: 3rem;
+    }
+
+    .steps {
+      list-style: none;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 2.5rem;
+    }
+
+    .steps li {
+      display: flex;
+      gap: 1.1rem;
+      align-items: flex-start;
+    }
+
+    .step-num {
+      font-family: 'Caveat', cursive;
+      font-size: 2.25rem;
+      font-weight: 700;
+      color: var(--green);
+      line-height: 1;
       flex-shrink: 0;
-      margin-top: 0.05em;
+    }
+
+    .step-text {
+      font-size: 0.95rem;
+      font-weight: 300;
+      line-height: 1.7;
+      color: var(--ink);
+      padding-top: 0.3rem;
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 700px) {
+      nav { padding: 1.25rem 1.5rem; }
+      .hero {
+        grid-template-columns: 1fr;
+        gap: 2.5rem;
+        padding: 1rem 1.5rem 3.5rem;
+        min-height: auto;
+      }
+      .portrait-col { order: -1; }
+      .portrait-frame { width: min(260px, 80vw); }
+      .how { padding: 3rem 1.5rem 3.5rem; }
     }
   </style>
 </head>
 <body>
-<div class="container">
 
-  <div class="wordmark">Luz Angela</div>
+  <nav>
+    <span class="wordmark">Luz Angela</span>
+  </nav>
 
-  <h1>Learn Spanish faster through conversation.</h1>
+  <main class="hero">
 
-  <p class="subtitle">Chat-based lessons and quizzes, personalized to exactly where you are — A1 through C2.</p>
+    <div class="hero-content">
+      <div class="tag">Spanish for real life</div>
+      <h1>Learn Spanish faster through conversation.</h1>
+      <p class="hero-body">
+        Chat-based lessons and quizzes, personalized to exactly where you are — A1 through C2. No apps. No algorithms. Just you and your teacher.
+      </p>
+      <div class="cta-row">
+        <a class="cta" href="https://discord.gg/7MB73HYd" target="_blank" rel="noopener">Start learning →</a>
+        <span class="pricing">First 10 lessons free · $20/month · Cancel anytime</span>
+      </div>
+    </div>
 
-  <div class="cta-wrap">
-    <a class="cta" href="https://discord.gg/7MB73HYd" target="_blank" rel="noopener">Get started →</a>
-  </div>
-  <p class="pricing">First 10 lessons free, then $20/month. Cancel anytime.</p>
+    <div class="portrait-col">
+      <div class="portrait-frame">
+        <!--
+          Pen-drawn portrait of Luz Angela — Medellín, Colombia.
+          Fine-liner style: stroke only, warm ink, no fill.
+        -->
+        <svg viewBox="0 0 200 290" xmlns="http://www.w3.org/2000/svg"
+             stroke="#2a1f14" fill="none"
+             stroke-linecap="round" stroke-linejoin="round">
 
-  <hr class="divider">
+          <!-- ── Hair back layer ── -->
+          <path stroke-width="1.8"
+            d="M60,128 C52,96 57,62 73,47 C84,36 93,33 100,33 C107,33 116,36 127,47 C143,62 148,96 140,128"/>
 
-  <div class="how-it-works">How it works</div>
-  <ul class="features">
-    <li>Luz Angela chats with you, quizzes you, and figures out exactly where you are</li>
-    <li>Every session targets your specific gaps using spaced repetition</li>
-    <li>Track your progress against real CEFR benchmarks — A1 through C2</li>
-  </ul>
+          <!-- Hair left, flowing long -->
+          <path stroke-width="1.5"
+            d="M60,128 C48,160 44,196 46,234 C47,252 52,270 56,283"/>
+          <path stroke-width="1.1"
+            d="M55,145 C44,178 40,215 43,250 C44,265 48,276 51,283"/>
+          <path stroke-width="0.7"
+            d="M58,160 C50,190 48,220 51,252"/>
 
-</div>
+          <!-- Hair right, flowing long -->
+          <path stroke-width="1.5"
+            d="M140,128 C152,160 156,196 154,234 C153,252 148,270 144,283"/>
+          <path stroke-width="1.1"
+            d="M145,145 C156,178 160,215 157,250 C156,265 152,276 149,283"/>
+          <path stroke-width="0.7"
+            d="M142,160 C150,190 152,220 149,252"/>
+
+          <!-- ── Face oval ── -->
+          <path stroke-width="2"
+            d="M63,122 C57,152 60,178 71,196 C80,209 90,215 100,216 C110,215 120,209 129,196 C140,178 143,152 137,122 C130,103 117,92 100,91 C83,92 70,103 63,122"/>
+
+          <!-- ── Ears ── -->
+          <path stroke-width="1.1"
+            d="M63,144 C57,142 54,149 55,157 C56,165 62,167 66,163"/>
+          <path stroke-width="1.1"
+            d="M137,144 C143,142 146,149 145,157 C144,165 138,167 134,163"/>
+
+          <!-- ── Eyebrows — arched, expressive ── -->
+          <path stroke-width="1.6"
+            d="M70,119 C76,112 85,109 93,112"/>
+          <path stroke-width="1.6"
+            d="M107,112 C115,109 124,112 130,119"/>
+
+          <!-- ── Left eye ── -->
+          <path stroke-width="1.4"
+            d="M70,131 C76,124 84,122 92,125 C88,133 80,134 70,131"/>
+          <circle cx="81" cy="129" r="4.5" stroke-width="1.1"/>
+          <circle cx="81" cy="129" r="1.8" fill="#2a1f14" stroke="none"/>
+          <!-- lashes top -->
+          <path stroke-width="0.7"
+            d="M71,130 L69,126 M76,127 L75,123 M81,125 L81,121 M86,127 L88,123 M91,130 L94,126"/>
+
+          <!-- ── Right eye ── -->
+          <path stroke-width="1.4"
+            d="M108,125 C116,122 124,124 130,131 C120,134 112,133 108,125"/>
+          <circle cx="119" cy="129" r="4.5" stroke-width="1.1"/>
+          <circle cx="119" cy="129" r="1.8" fill="#2a1f14" stroke="none"/>
+          <!-- lashes top -->
+          <path stroke-width="0.7"
+            d="M109,130 L107,126 M113,127 L112,123 M119,125 L119,121 M124,127 L126,123 M129,130 L132,126"/>
+
+          <!-- ── Nose — minimal, refined ── -->
+          <path stroke-width="1"
+            d="M100,135 C99,146 96,155 94,160"/>
+          <path stroke-width="1.1"
+            d="M94,160 C96,164 98,166 100,166 C102,166 104,164 106,160"/>
+          <!-- nostrils -->
+          <path stroke-width="0.9"
+            d="M92,158 C90,156 89,159 90,162 C91,163 94,162 94,160"/>
+          <path stroke-width="0.9"
+            d="M108,158 C110,156 111,159 110,162 C109,163 106,162 106,160"/>
+
+          <!-- ── Lips ── -->
+          <!-- upper -->
+          <path stroke-width="1.4"
+            d="M82,176 C87,169 93,167 100,168 C107,167 113,169 118,176"/>
+          <!-- cupid's bow -->
+          <path stroke-width="0.9"
+            d="M88,168 C92,165 100,165 112,168"/>
+          <!-- lower (fuller) -->
+          <path stroke-width="1.6"
+            d="M82,176 C88,186 112,186 118,176"/>
+          <!-- center crease -->
+          <path stroke-width="0.7"
+            d="M87,176 C93,174 107,174 113,176"/>
+          <!-- smile lines -->
+          <path stroke-width="0.8"
+            d="M79,170 C77,177 78,184 80,188"/>
+          <path stroke-width="0.8"
+            d="M121,170 C123,177 122,184 120,188"/>
+
+          <!-- ── Neck ── -->
+          <path stroke-width="1.6" d="M87,216 C85,230 85,242 87,252"/>
+          <path stroke-width="1.6" d="M113,216 C115,230 115,242 113,252"/>
+
+          <!-- ── Shoulders + neckline ── -->
+          <path stroke-width="1.4"
+            d="M36,272 C53,257 68,252 87,252 C92,251 100,251 113,252 C132,252 147,257 164,272"/>
+          <!-- scoop neckline -->
+          <path stroke-width="1"
+            d="M87,252 C93,260 107,260 113,252"/>
+
+          <!-- ── Hair detail strands ── -->
+          <path stroke-width="0.8" d="M68,110 C64,122 62,134 64,146"/>
+          <path stroke-width="0.8" d="M132,110 C136,122 138,134 136,146"/>
+          <path stroke-width="0.7" d="M74,97 C78,87 86,80 94,77"/>
+          <path stroke-width="0.7" d="M126,97 C122,87 114,80 106,77"/>
+          <path stroke-width="0.6" d="M67,84 C70,76 76,69 84,65"/>
+          <path stroke-width="0.6" d="M133,84 C130,76 124,69 116,65"/>
+
+        </svg>
+      </div>
+      <span class="portrait-name">Luz Angela, Medellín</span>
+    </div>
+
+  </main>
+
+  <section class="how">
+    <div class="how-inner">
+      <div class="how-label">How it works</div>
+      <ul class="steps">
+        <li>
+          <span class="step-num">1</span>
+          <span class="step-text">Luz Angela chats with you, quizzes you, and figures out exactly where you are — in minutes.</span>
+        </li>
+        <li>
+          <span class="step-num">2</span>
+          <span class="step-text">Every session targets your specific gaps using spaced repetition. No time wasted on what you already know.</span>
+        </li>
+        <li>
+          <span class="step-num">3</span>
+          <span class="step-text">Track your progress against real CEFR benchmarks — A1 through C2. See exactly how far you've come.</span>
+        </li>
+      </ul>
+    </div>
+  </section>
+
 </body>
 </html>
