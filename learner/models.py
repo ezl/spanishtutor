@@ -78,6 +78,13 @@ class SkillScore(models.Model):
 class Session(models.Model):
     SESSION_TYPES = [
         ('onboarding', 'Onboarding'),
+        ('srs_review', 'SRS Review'),
+        ('new_skill', 'New Skill'),
+        ('vocab_sprint', 'Vocabulary Sprint'),
+        ('conversation', 'Conversation'),
+        ('reading', 'Reading'),
+        ('writing', 'Writing'),
+        # legacy
         ('evaluation', 'Evaluation'),
         ('review', 'Review'),
         ('push_forward', 'Push Forward'),
