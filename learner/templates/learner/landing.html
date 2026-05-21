@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="scroll-smooth">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,195 +7,61 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;600;700&family=Inter:ital,wght@0,300;0,400;1,300&display=swap" rel="stylesheet">
-  <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-    :root {
-      --ink:        #1e1710;
-      --ink-mid:    #6b5e51;
-      --ink-light:  #a08878;
-      --paper:      #faf7f0;
-      --rule:       #e4ddd0;
-      --green:      #2d6a4f;
-      --green-dark: #1b4332;
-      --green-tint: #f0f5f2;
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            ink:        '#1e1710',
+            'ink-mid':  '#6b5e51',
+            'ink-light':'#a08878',
+            paper:      '#faf7f0',
+            rule:       '#e4ddd0',
+            forest: {
+              DEFAULT: '#2d6a4f',
+              dark:    '#1b4332',
+              tint:    '#f0f5f2',
+            },
+          },
+          fontFamily: {
+            sans:   ['Inter', 'sans-serif'],
+            caveat: ['Caveat', 'cursive'],
+          },
+        },
+      },
     }
-
-    html { scroll-behavior: smooth; }
-
-    body {
-      font-family: 'Inter', sans-serif;
-      background: var(--paper);
-      color: var(--ink);
-      min-height: 100vh;
-    }
-
-    .hero {
-      max-width: 620px;
-      margin: 0 auto;
-      padding: 6rem 2.5rem 6rem;
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-    }
-
-    h1 {
-      font-family: 'Caveat', cursive;
-      font-size: clamp(2.8rem, 6vw, 4.2rem);
-      font-weight: 700;
-      line-height: 1.15;
-      color: var(--ink);
-      margin-bottom: 1.25rem;
-    }
-
-    .hero-body {
-      font-size: 1.05rem;
-      font-weight: 300;
-      line-height: 1.8;
-      color: var(--ink-mid);
-      margin-bottom: 2.5rem;
-    }
-
-    .cta-row {
-      display: flex;
-      flex-direction: column;
-      align-items: flex-start;
-      gap: 1.5rem;
-    }
-
-    .cta {
-      display: inline-block;
-      background: var(--green);
-      color: #fff;
-      font-family: 'Inter', sans-serif;
-      font-size: 1rem;
-      font-weight: 400;
-      padding: 0.85rem 2.2rem;
-      border-radius: 100px;
-      text-decoration: none;
-      letter-spacing: 0.02em;
-      transition: background 0.15s, transform 0.12s;
-    }
-    .cta:hover { background: var(--green-dark); transform: translateY(-2px); }
-
-    .pricing {
-      font-size: 0.8rem;
-      font-weight: 300;
-      color: var(--ink-light);
-      font-style: italic;
-      padding-left: 0.15rem;
-    }
-
-    .footnote {
-      margin-top: 3rem;
-      font-size: 0.78rem;
-      font-weight: 300;
-      line-height: 1.7;
-      color: var(--ink-light);
-    }
-
-    .philosophy {
-      border-top: 1px solid var(--rule);
-      padding: 4.5rem 2.5rem 5rem;
-    }
-
-    .philosophy-inner {
-      max-width: 620px;
-      margin: 0 auto;
-    }
-
-    .philosophy-label {
-      font-family: 'Caveat', cursive;
-      font-size: 2.4rem;
-      font-weight: 700;
-      color: var(--ink);
-      margin-bottom: 2rem;
-    }
-
-    .philosophy-body {
-      font-size: 0.95rem;
-      font-weight: 300;
-      line-height: 1.85;
-      color: var(--ink-mid);
-      display: flex;
-      flex-direction: column;
-      gap: 1.1rem;
-    }
-
-    .how {
-      background: var(--green-tint);
-      border-top: 1px solid var(--rule);
-      padding: 4.5rem 2.5rem 5rem;
-    }
-
-    .how-inner {
-      max-width: 620px;
-      margin: 0 auto;
-    }
-
-    .how-label {
-      font-family: 'Caveat', cursive;
-      font-size: 2.4rem;
-      font-weight: 700;
-      color: var(--green);
-      margin-bottom: 2.5rem;
-    }
-
-    .steps {
-      list-style: none;
-      display: flex;
-      flex-direction: column;
-      gap: 2.25rem;
-    }
-
-    .steps li {
-      display: flex;
-      gap: 1.1rem;
-      align-items: flex-start;
-    }
-
-    .step-num {
-      font-family: 'Caveat', cursive;
-      font-size: 2.25rem;
-      font-weight: 700;
-      color: var(--green);
-      line-height: 1;
-      flex-shrink: 0;
-      width: 1.8rem;
-    }
-
-    .step-text {
-      font-size: 0.92rem;
-      font-weight: 300;
-      line-height: 1.75;
-      color: var(--ink-mid);
-    }
-
-    @media (max-width: 600px) {
-      .hero { padding: 4rem 1.5rem 4rem; min-height: auto; }
-      .how { padding: 3rem 1.5rem 3.5rem; }
-    }
-  </style>
+  </script>
 </head>
-<body>
+<body class="bg-paper text-ink min-h-screen">
 
-  <main class="hero">
-    <h1>Learn Spanish Faster.</h1>
-    <p class="hero-body">
+  <!-- Hero -->
+  <main class="max-w-[620px] mx-auto px-6 py-16 sm:px-10 sm:py-24 sm:min-h-screen flex flex-col justify-center">
+    <h1 class="font-caveat font-bold text-[clamp(2.8rem,6vw,4.2rem)] leading-[1.15] mb-5">
+      Learn Spanish Faster.
+    </h1>
+    <p class="font-light text-[1.05rem] leading-[1.8] text-ink-mid mb-10">
       Chat-based learning through lessons, quizzes, and conversation. Personalized to you, instead of a template curriculum. From novice to mastery.*
     </p>
-    <div class="cta-row">
-      <a class="cta" href="https://discord.gg/7MB73HYd" target="_blank" rel="noopener">Start learning →</a>
-      <span class="pricing">First 10 lessons free · $20/month · Cancel anytime</span>
+    <div class="flex flex-col items-start gap-6">
+      <a href="https://discord.gg/7MB73HYd" target="_blank" rel="noopener"
+         class="inline-block bg-forest hover:bg-forest-dark text-white text-base font-normal px-9 py-[0.85rem] rounded-full tracking-[0.02em] no-underline transition-colors duration-150 hover:-translate-y-0.5 transition-transform">
+        Start learning →
+      </a>
+      <span class="text-[0.8rem] font-light text-ink-light italic">
+        First 10 lessons free · $20/month · Cancel anytime
+      </span>
     </div>
-    <p class="footnote">* We continuously and adaptively probe your skill level, map it to content overlapping with your personal interests, to create bite sized chat based lessons that teach you the next skill you need to advance towards mastery along CEFR guidelines.</p>
+    <p class="mt-12 text-[0.78rem] font-light leading-[1.7] text-ink-light">
+      * We continuously and adaptively probe your skill level, map it to content overlapping with your personal interests, to create bite sized chat based lessons that teach you the next skill you need to advance towards mastery along CEFR guidelines.
+    </p>
   </main>
 
-  <section class="philosophy">
-    <div class="philosophy-inner">
-      <div class="philosophy-label">How we think about learning</div>
-      <div class="philosophy-body">
+  <!-- Philosophy -->
+  <section class="border-t border-rule px-6 py-16 sm:px-10 sm:py-20">
+    <div class="max-w-[620px] mx-auto">
+      <div class="font-caveat font-bold text-[2.4rem] text-ink mb-8">How we think about learning</div>
+      <div class="flex flex-col gap-[1.1rem] text-[0.95rem] font-light leading-[1.85] text-ink-mid">
         <p>Most language apps make you choose what to practice. That's a problem — deciding what to learn <em>is</em> cognitive work, and it's work you shouldn't have to do.</p>
         <p>We track your skills across 35 grammar and vocabulary topics, from A1 to C2. After every session, we know what you've mastered, what's slipping, and what's at the edge of your ability.</p>
         <p>When you show up, we tell you what's next. Not a menu of options — a decision. We pick the skill most likely to move you forward and get to work.</p>
@@ -207,21 +73,22 @@
     </div>
   </section>
 
-  <section class="how">
-    <div class="how-inner">
-      <div class="how-label">How it works</div>
-      <ul class="steps">
-        <li>
-          <span class="step-num">1</span>
-          <span class="step-text">Through chat messages, we quiz you to assess your skill continuously to know your strengths and weaknesses.</span>
+  <!-- How it works -->
+  <section class="bg-forest-tint border-t border-rule px-6 py-12 sm:px-10 sm:py-20">
+    <div class="max-w-[620px] mx-auto">
+      <div class="font-caveat font-bold text-[2.4rem] text-forest mb-10">How it works</div>
+      <ul class="list-none flex flex-col gap-9">
+        <li class="flex gap-[1.1rem] items-start">
+          <span class="font-caveat font-bold text-[2.25rem] text-forest leading-none shrink-0 w-[1.8rem]">1</span>
+          <span class="text-[0.92rem] font-light leading-[1.75] text-ink-mid pt-0.5">Through chat messages, we quiz you to assess your skill continuously to know your strengths and weaknesses.</span>
         </li>
-        <li>
-          <span class="step-num">2</span>
-          <span class="step-text">We target your gaps using spaced repetition and learning science to accelerate your progress.</span>
+        <li class="flex gap-[1.1rem] items-start">
+          <span class="font-caveat font-bold text-[2.25rem] text-forest leading-none shrink-0 w-[1.8rem]">2</span>
+          <span class="text-[0.92rem] font-light leading-[1.75] text-ink-mid pt-0.5">We target your gaps using spaced repetition and learning science to accelerate your progress.</span>
         </li>
-        <li>
-          <span class="step-num">3</span>
-          <span class="step-text">Wherever you start, we provide specific content based on your level and your personal interests to take you to mastery.</span>
+        <li class="flex gap-[1.1rem] items-start">
+          <span class="font-caveat font-bold text-[2.25rem] text-forest leading-none shrink-0 w-[1.8rem]">3</span>
+          <span class="text-[0.92rem] font-light leading-[1.75] text-ink-mid pt-0.5">Wherever you start, we provide specific content based on your level and your personal interests to take you to mastery.</span>
         </li>
       </ul>
     </div>
