@@ -29,7 +29,7 @@ run = "ssh -i ~/.ssh/id_ed25519 root@5.78.211.212 \"grep -o '^[^=]*' /home/claud
 description = "Create venv and install dependencies (run on server in dev tmux)"
 run = """
 python3 -m venv venv
-source venv/bin/activate
+. venv/bin/activate
 pip install -r requirements.txt
 echo "Done. Run: source venv/bin/activate"
 """
