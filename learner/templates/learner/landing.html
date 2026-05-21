@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Luz Angela — Learn Spanish</title>
+  <title>Learn Spanish — Luz Angela</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;600;700&family=Inter:ital,wght@0,300;0,400;1,300&display=swap" rel="stylesheet">
@@ -30,47 +30,14 @@
       min-height: 100vh;
     }
 
-    nav {
-      padding: 1.75rem 3rem;
-    }
-
-    .wordmark {
-      font-family: 'Caveat', cursive;
-      font-size: 1.7rem;
-      font-weight: 700;
-      color: var(--ink);
-      letter-spacing: 0.01em;
-    }
-
     .hero {
       max-width: 620px;
       margin: 0 auto;
-      padding: 3rem 2.5rem 6rem;
-      min-height: calc(100vh - 88px);
+      padding: 6rem 2.5rem 6rem;
+      min-height: 100vh;
       display: flex;
       flex-direction: column;
       justify-content: center;
-    }
-
-    .tag {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.4rem;
-      font-family: 'Caveat', cursive;
-      font-size: 1rem;
-      font-weight: 600;
-      color: var(--green);
-      letter-spacing: 0.04em;
-      margin-bottom: 1.25rem;
-    }
-
-    .tag::before {
-      content: '';
-      display: block;
-      width: 22px;
-      height: 1.5px;
-      background: var(--green);
-      border-radius: 2px;
     }
 
     h1 {
@@ -95,19 +62,20 @@
       flex-direction: column;
       align-items: flex-start;
       gap: 0.6rem;
+      margin-left: 2rem;
     }
 
     .cta {
       display: inline-block;
       background: var(--green);
       color: #fff;
-      font-family: 'Caveat', cursive;
-      font-size: 1.25rem;
-      font-weight: 600;
-      padding: 0.8rem 2.2rem;
+      font-family: 'Inter', sans-serif;
+      font-size: 1rem;
+      font-weight: 400;
+      padding: 0.85rem 2.2rem;
       border-radius: 100px;
       text-decoration: none;
-      letter-spacing: 0.03em;
+      letter-spacing: 0.02em;
       transition: background 0.15s, transform 0.12s;
     }
     .cta:hover { background: var(--green-dark); transform: translateY(-2px); }
@@ -133,8 +101,8 @@
 
     .how-label {
       font-family: 'Caveat', cursive;
-      font-size: 1.8rem;
-      font-weight: 600;
+      font-size: 2.4rem;
+      font-weight: 700;
       color: var(--green);
       margin-bottom: 2.5rem;
     }
@@ -143,7 +111,7 @@
       list-style: none;
       display: flex;
       flex-direction: column;
-      gap: 1.75rem;
+      gap: 2.25rem;
     }
 
     .steps li {
@@ -162,30 +130,33 @@
       width: 1.8rem;
     }
 
+    .step-body { display: flex; flex-direction: column; gap: 0.3rem; padding-top: 0.2rem; }
+
+    .step-headline {
+      font-size: 0.9rem;
+      font-weight: 500;
+      color: var(--green);
+      line-height: 1.5;
+    }
+
     .step-text {
-      font-size: 0.95rem;
+      font-size: 0.92rem;
       font-weight: 300;
       line-height: 1.75;
-      color: var(--ink);
-      padding-top: 0.3rem;
+      color: var(--ink-mid);
     }
 
     @media (max-width: 600px) {
-      nav { padding: 1.25rem 1.5rem; }
-      .hero { padding: 2rem 1.5rem 4rem; min-height: auto; }
+      .hero { padding: 4rem 1.5rem 4rem; min-height: auto; }
+      .cta-row { margin-left: 0; }
       .how { padding: 3rem 1.5rem 3.5rem; }
     }
   </style>
 </head>
 <body>
 
-  <nav>
-    <span class="wordmark">Luz Angela</span>
-  </nav>
-
   <main class="hero">
-    <div class="tag">Spanish for real life</div>
-    <h1>Learn Spanish faster through conversation.</h1>
+    <h1>Learn Spanish Faster.</h1>
     <p class="hero-body">
       Chat-based lessons and quizzes, personalized to exactly where you are — A1 through C2. No apps. No algorithms. Just you and your teacher.
     </p>
@@ -201,15 +172,24 @@
       <ul class="steps">
         <li>
           <span class="step-num">1</span>
-          <span class="step-text">Your AI teacher chats with you, quizzes you, and figures out exactly where you are — in minutes.</span>
+          <div class="step-body">
+            <span class="step-headline">Through chat messages, we quiz you to assess your skill continuously to know your strengths and weaknesses.</span>
+            <span class="step-text">Your AI teacher chats with you, quizzes you, and figures out exactly where you are — in minutes.</span>
+          </div>
         </li>
         <li>
           <span class="step-num">2</span>
-          <span class="step-text">Every session targets your specific gaps using spaced repetition. No time wasted on what you already know.</span>
+          <div class="step-body">
+            <span class="step-headline">We target your gaps using spaced repetition and learning science to accelerate your progress.</span>
+            <span class="step-text">Every session targets your specific gaps using spaced repetition. No time wasted on what you already know.</span>
+          </div>
         </li>
         <li>
           <span class="step-num">3</span>
-          <span class="step-text">Track your progress against real CEFR benchmarks — A1 through C2. See exactly how far you've come.</span>
+          <div class="step-body">
+            <span class="step-headline">Wherever you start, we provide specific content based on your level and your personal interests to take you to mastery.</span>
+            <span class="step-text">Track your progress against real CEFR benchmarks — A1 through C2. See exactly how far you've come.</span>
+          </div>
         </li>
       </ul>
     </div>
