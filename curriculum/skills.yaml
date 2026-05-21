@@ -10,214 +10,244 @@ skills:
   - id: a1_greetings
     name: Greetings & basic expressions
     cefr_level: A1
-    description: Hola, adiós, por favor, gracias, mucho gusto, ¿cómo estás?, ¿cómo te llamas?
+    description: "Hola, adiós, por favor, gracias, mucho gusto, cómo estás, cómo te llamas"
 
   - id: a1_numbers
-    name: Numbers 1–1000
+    name: Numbers 1-1000
     cefr_level: A1
-    description: Cardinal numbers 1–1000; basic arithmetic phrases; how many, how much
+    description: "Cardinal numbers 1-1000; basic arithmetic phrases; how many, how much"
 
   - id: a1_dates_time
     name: Dates and telling time
     cefr_level: A1
-    description: Days of the week, months, seasons; ¿qué hora es?; times of day (mañana, tarde, noche)
+    description: "Days of the week, months, seasons; qué hora es; times of day (mañana, tarde, noche)"
+    prerequisites: [a1_numbers]
 
   - id: a1_nouns_gender
     name: Nouns and grammatical gender
     cefr_level: A1
-    description: Masculine/feminine distinction, el/la/los/las, patterns for guessing gender (-o/-a, -ión, -dad)
+    description: "Masculine/feminine distinction, el/la/los/las, patterns for guessing gender (-o/-a, -ión, -dad)"
 
   - id: a1_ser_estar_basic
     name: Ser vs. estar — basics
     cefr_level: A1
-    description: Ser for identity, origin, and permanent traits; estar for location and temporary states
+    description: "Ser for identity, origin, and permanent traits; estar for location and temporary states"
+    prerequisites: [a1_nouns_gender]
 
   - id: a1_present_ar
     name: Present tense — regular -AR verbs
     cefr_level: A1
-    description: hablar, trabajar, escuchar, caminar, comprar — full conjugation, first/second/third person
+    description: "hablar, trabajar, escuchar, caminar, comprar — full conjugation, first/second/third person"
+    prerequisites: [a1_nouns_gender]
 
   - id: a1_present_er_ir
     name: Present tense — regular -ER and -IR verbs
     cefr_level: A1
-    description: comer, beber, leer; vivir, escribir, abrir — patterns and contrast with -AR endings
+    description: "comer, beber, leer; vivir, escribir, abrir — patterns and contrast with -AR endings"
+    prerequisites: [a1_present_ar]
 
   - id: a1_vocab_family
     name: Vocabulary — family & relationships
     cefr_level: A1
-    description: madre, padre, hermano/a, abuelo/a, hijo/a, amigo/a, novio/a; possessives mi/tu/su
+    description: "madre, padre, hermano/a, abuelo/a, hijo/a, amigo/a, novio/a; possessives mi/tu/su"
 
   - id: a1_vocab_food_drink
     name: Vocabulary — food & drink
     cefr_level: A1
-    description: Common foods, drinks, meals (desayuno, almuerzo, cena); ordering basics; me gusta/no me gusta
+    description: "Common foods, drinks, meals (desayuno, almuerzo, cena); ordering basics; me gusta/no me gusta"
 
   - id: a1_vocab_colors_clothing
     name: Vocabulary — colors & clothing
     cefr_level: A1
-    description: Colors with gender agreement; common clothing items; llevar/usar
+    description: "Colors with gender agreement; common clothing items; llevar/usar"
+    prerequisites: [a1_nouns_gender]
 
   - id: a1_vocab_home_objects
     name: Vocabulary — home & common objects
     cefr_level: A1
-    description: Rooms (cocina, baño, sala); furniture; common classroom and everyday objects
+    description: "Rooms (cocina, baño, sala); furniture; common classroom and everyday objects"
 
   - id: a1_vocab_body
     name: Vocabulary — body parts
     cefr_level: A1
-    description: Head, face, torso, limbs; tengo dolor de...; reflexive use with body parts
+    description: "Head, face, torso, limbs; tengo dolor de; reflexive use with body parts"
 
   # ─── A2 ───────────────────────────────────────────────
   - id: a2_stem_change_e_ie
     name: Stem-changing verbs — e->ie
     cefr_level: A2
-    description: querer, preferir, entender, pensar, perder, venir (e->ie in all persons except nosotros/vosotros)
+    description: "querer, preferir, entender, pensar, perder — e->ie in all persons except nosotros/vosotros"
+    prerequisites: [a1_present_ar, a1_present_er_ir]
 
   - id: a2_stem_change_o_ue
     name: Stem-changing verbs — o->ue
     cefr_level: A2
-    description: poder, dormir, volver, recordar, encontrar, jugar (u->ue) — pattern and practice
+    description: "poder, dormir, volver, recordar, encontrar, jugar (u->ue) — pattern and practice"
+    prerequisites: [a1_present_ar, a1_present_er_ir]
 
   - id: a2_stem_change_e_i
     name: Stem-changing verbs — e->i
     cefr_level: A2
-    description: pedir, seguir, servir, repetir, elegir — pattern, contrast with e->ie verbs
+    description: "pedir, seguir, servir, repetir, elegir — pattern, contrast with e->ie verbs"
+    prerequisites: [a1_present_ar, a1_present_er_ir]
 
   - id: a2_go_verbs
     name: Go-verbs — irregular yo forms
     cefr_level: A2
-    description: tener (tengo), venir (vengo), hacer (hago), poner (pongo), salir (salgo), traer (traigo), saber (sé), conocer (conozco)
+    description: "tener (tengo), venir (vengo), hacer (hago), poner (pongo), salir (salgo), traer (traigo), saber (sé), conocer (conozco)"
+    prerequisites: [a1_present_ar]
 
   - id: a2_reflexive_verbs
     name: Reflexive verbs
     cefr_level: A2
-    description: Reflexive pronouns (me, te, se, nos); levantarse, llamarse, ducharse, acostarse, sentirse
+    description: "Reflexive pronouns (me, te, se, nos); levantarse, llamarse, ducharse, acostarse, sentirse"
+    prerequisites: [a1_present_ar]
 
   - id: a2_direct_object_pronouns
     name: Direct object pronouns — lo, la, los, las
     cefr_level: A2
-    description: Replacing direct object nouns; placement before conjugated verb or attached to infinitive/gerund
+    description: "Replacing direct object nouns; placement before conjugated verb or attached to infinitive/gerund"
+    prerequisites: [a1_nouns_gender, a1_present_ar]
 
   - id: a2_indirect_object_pronouns
     name: Indirect object pronouns — le, les
     cefr_level: A2
     description: "Le/les for to/for whom; common verbs: dar, decir, mandar, preguntar, regalar"
+    prerequisites: [a2_direct_object_pronouns]
 
   - id: a2_pronoun_order
     name: Pronoun stacking and placement
     cefr_level: A2
-    description: Combined direct + indirect pronouns; le/les -> se before lo/la; placement with infinitives and commands
+    description: "Combined direct + indirect pronouns; le/les -> se before lo/la; placement with infinitives and commands"
+    prerequisites: [a2_direct_object_pronouns, a2_indirect_object_pronouns]
 
   - id: a2_preterite_ar
     name: Preterite — regular -AR verbs
     cefr_level: A2
-    description: hablar->hablé, caminar->caminé; full conjugation; time markers ayer, anoche, la semana pasada
+    description: "hablar->hablé, caminar->caminé; full conjugation; time markers ayer, anoche, la semana pasada"
+    prerequisites: [a1_present_ar]
 
   - id: a2_preterite_er_ir
     name: Preterite — regular -ER and -IR verbs
     cefr_level: A2
-    description: comer->comí, vivir->viví; -ER/-IR share endings; contrast with -AR endings from previous skill
+    description: "comer->comí, vivir->viví; -ER/-IR share endings; contrast with -AR endings"
+    prerequisites: [a2_preterite_ar]
 
   - id: a2_adjective_agreement
     name: Adjective agreement and placement
     cefr_level: A2
-    description: Gender and number agreement; adjectives after noun (descriptive) vs before (limiting/value); apocopation (buen, gran)
+    description: "Gender and number agreement; adjectives after noun (descriptive) vs before (limiting/value); apocopation (buen, gran)"
+    prerequisites: [a1_nouns_gender]
 
   - id: a2_gustar_like_verbs
     name: Gustar and similar verbs
     cefr_level: A2
-    description: Gustar, encantar, molestar, interesar, doler, parecer — reverse construction; me/te/le/nos + gusta/gustan
+    description: "Gustar, encantar, molestar, interesar, doler, parecer — reverse construction; me/te/le/nos + gusta/gustan"
+    prerequisites: [a2_indirect_object_pronouns]
 
   - id: a2_vocab_travel_directions
     name: Vocabulary — travel & directions
     cefr_level: A2
-    description: Transportation, airport/station; giving and asking directions; izquierda, derecha, seguir recto, cruzar
+    description: "Transportation, airport/station; giving and asking directions; izquierda, derecha, seguir recto, cruzar"
 
   - id: a2_vocab_home_furniture
     name: Vocabulary — home & furniture
     cefr_level: A2
-    description: Rooms and spaces; furniture and appliances; hay, está/están for location; describing a home
+    description: "Rooms and spaces; furniture and appliances; hay, está/están for location; describing a home"
+    prerequisites: [a1_vocab_home_objects]
 
   - id: a2_vocab_shopping
     name: Vocabulary — shopping & money
     cefr_level: A2
-    description: ¿Cuánto cuesta?, prices, sizes, colors in context; ¿Tiene...?, quiero/quisiera; market vs store
+    description: "Cuánto cuesta, prices, sizes; quisiera; market vs store"
 
   - id: a2_vocab_health
     name: Vocabulary — health & the body
     cefr_level: A2
-    description: Symptoms, illness, doctor visits; me duele, tengo fiebre, estoy enfermo/a; pharmacy basics
+    description: "Symptoms, illness, doctor visits; me duele, tengo fiebre, estoy enfermo/a; pharmacy basics"
+    prerequisites: [a1_vocab_body]
 
   - id: a2_vocab_weather
     name: Vocabulary — weather & environment
     cefr_level: A2
-    description: Hace frío/calor/sol/viento, llueve, nieva; seasons in context; weather forecasts
+    description: "Hace frío/calor/sol/viento, llueve, nieva; seasons in context; weather forecasts"
 
   # ─── B1 ───────────────────────────────────────────────
   - id: b1_preterite_irreg_high_freq
     name: Preterite — high-frequency irregulars
     cefr_level: B1
-    description: ser/ir (fui), estar (estuve), tener (tuve), hacer (hice), poder (pude), querer (quise)
+    description: "ser/ir (fui), estar (estuve), tener (tuve), hacer (hice), poder (pude), querer (quise)"
+    prerequisites: [a2_preterite_ar, a2_preterite_er_ir]
 
   - id: b1_preterite_irreg_other
     name: Preterite — other irregular stems
     cefr_level: B1
-    description: saber (supe), venir (vine), poner (puse), decir (dije), traer (traje); spelling-change verbs (-car, -gar, -zar)
+    description: "saber (supe), venir (vine), poner (puse), decir (dije), traer (traje); spelling-change verbs (-car, -gar, -zar)"
+    prerequisites: [b1_preterite_irreg_high_freq]
 
   - id: b1_imperfect
     name: Imperfect tense
     cefr_level: B1
-    description: Regular imperfect (-aba/-ía); only 3 irregulars (ser->era, ir->iba, ver->veía); habitual past, descriptions, ongoing background
+    description: "Regular imperfect (-aba/-ía); only 3 irregulars (ser->era, ir->iba, ver->veía); habitual past, descriptions, ongoing background"
+    prerequisites: [a2_preterite_ar]
 
   - id: b1_preterite_vs_imperfect
     name: Preterite vs. imperfect — contrast
     cefr_level: B1
-    description: Completed events (preterite) vs. background/habitual (imperfect); trigger words; narrating a story
+    description: "Completed events (preterite) vs. background/habitual (imperfect); trigger words; narrating a story"
+    prerequisites: [b1_imperfect, a2_preterite_ar]
 
   - id: b1_future_periphrastic
     name: Future — ir + a + infinitive
     cefr_level: B1
-    description: Voy a + infinitive for near future and plans; contrast with present tense for plans; common in speech
+    description: "Voy a + infinitive for near future and plans; contrast with present tense for plans; common in speech"
+    prerequisites: [a1_present_ar, a2_go_verbs]
 
   - id: b1_future_simple
     name: Future tense — simple future
     cefr_level: B1
-    description: Regular future (-é/-ás/-á/-emos/-éis/-án) on infinitive stem; irregular stems (tener->tendr-, hacer->har-); future of probability
+    description: "Regular future (-é/-ás/-á/-emos/-éis/-án) on infinitive stem; irregular stems (tener->tendr-, hacer->har-); future of probability"
+    prerequisites: [b1_future_periphrastic]
 
   - id: b1_conditional
     name: Conditional tense
     cefr_level: B1
-    description: Regular conditional (same irregular stems as future); hypotheticals; polite requests (¿podría...?, quisiera)
+    description: "Regular conditional (same irregular stems as future); hypotheticals; polite requests (podría, quisiera)"
+    prerequisites: [b1_future_simple]
 
   - id: b1_subjunctive_formation
     name: Subjunctive — present formation
     cefr_level: B1
-    description: Forming present subjunctive from yo form; regular and irregular forms (ser->sea, estar->esté, ir->vaya, haber->haya)
+    description: "Forming present subjunctive from yo form; regular and irregular forms (ser->sea, estar->esté, ir->vaya, haber->haya)"
+    prerequisites: [a2_go_verbs, a2_stem_change_e_ie]
 
   - id: b1_subjunctive_triggers_want
     name: Subjunctive — want and hope triggers
     cefr_level: B1
-    description: Querer que, esperar que, necesitar que, pedir que, recomendar que + subjunctive; two-subject rule
+    description: "Querer que, esperar que, necesitar que, pedir que, recomendar que + subjunctive; two-subject rule"
+    prerequisites: [b1_subjunctive_formation]
 
   - id: b1_subjunctive_triggers_doubt_emotion
     name: Subjunctive — doubt and emotion triggers
     cefr_level: B1
-    description: Dudar que, no creer que, negar que (doubt); alegrarse de que, temer que, sorprender que (emotion)
+    description: "Dudar que, no creer que, negar que (doubt); alegrarse de que, temer que, sorprender que (emotion)"
+    prerequisites: [b1_subjunctive_triggers_want]
 
   - id: b1_ser_estar_advanced
     name: Ser vs. estar — advanced uses
     cefr_level: B1
-    description: Adjectives that change meaning (aburrido, listo, malo, seguro, rico); ser for passive; estar + gerund for progressive
+    description: "Adjectives that change meaning (aburrido, listo, malo, seguro, rico); ser for passive; estar + gerund for progressive"
+    prerequisites: [a1_ser_estar_basic]
 
   - id: b1_vocab_work_career
     name: Vocabulary — work & career
     cefr_level: B1
-    description: Job titles, workplace, responsibilities; job interviews; trabajar, contratar, renunciar, el sueldo
+    description: "Job titles, workplace, responsibilities; job interviews; trabajar, contratar, renunciar, el sueldo"
 
   - id: b1_vocab_opinions
     name: Vocabulary — opinions & arguments
     cefr_level: B1
-    description: Creo que, en mi opinión, estoy de acuerdo/en desacuerdo, sin embargo, por eso, aunque
+    description: "Creo que, en mi opinión, estoy de acuerdo/en desacuerdo, sin embargo, por eso, aunque"
 
   - id: b1_vocab_media_tech
     name: Vocabulary — media & technology
@@ -227,117 +257,131 @@ skills:
   - id: b1_vocab_emotions
     name: Vocabulary — emotions & feelings
     cefr_level: B1
-    description: Emotions with estar vs ser; sentirse + adjective; ponerse + emotion; mood nuances
+    description: "Emotions with estar vs ser; sentirse + adjective; ponerse + emotion; mood nuances"
 
   # ─── B2 ───────────────────────────────────────────────
   - id: b2_subjunctive_impersonal
     name: Subjunctive — impersonal expressions
     cefr_level: B2
-    description: Es importante que, es necesario que, es posible que, es una lástima que + subjunctive
+    description: "Es importante que, es necesario que, es posible que, es una lástima que + subjunctive"
+    prerequisites: [b1_subjunctive_formation]
 
   - id: b2_subjunctive_adjective_clauses
     name: Subjunctive — adjective clauses
     cefr_level: B2
-    description: Subjunctive in relative clauses when antecedent is unknown/non-existent; busco algo que..., no hay nadie que...
+    description: "Subjunctive in relative clauses when antecedent is unknown/non-existent; busco algo que, no hay nadie que"
+    prerequisites: [b1_subjunctive_triggers_want]
 
   - id: b2_subjunctive_past
     name: Subjunctive — imperfect (past subjunctive)
     cefr_level: B2
-    description: Imperfect subjunctive formation (-ra/-se forms); si clauses (si tuviera..., hablaría); sequence of tenses
+    description: "Imperfect subjunctive formation (-ra/-se forms); si clauses (si tuviera..., hablaría); sequence of tenses"
+    prerequisites: [b1_subjunctive_formation, b1_imperfect]
 
   - id: b2_passive_ser
     name: Passive voice — ser + past participle
     cefr_level: B2
-    description: Ser + past participle for true passive; agent with por; tense changes; passive vs active transformation
+    description: "Ser + past participle for true passive; agent with por; tense changes; passive vs active transformation"
+    prerequisites: [a2_preterite_ar, a1_ser_estar_basic]
 
   - id: b2_passive_se
     name: Passive se and impersonal se
     cefr_level: B2
-    description: Se + third person for passive (se vende, se habla); impersonal se (se dice, se puede); distinction from reflexive se
+    description: "Se + third person for passive (se vende, se habla); impersonal se (se dice, se puede); distinction from reflexive se"
+    prerequisites: [b2_passive_ser, a2_reflexive_verbs]
 
   - id: b2_advanced_pronouns
     name: Advanced pronouns
     cefr_level: B2
-    description: Leísmo; redundant pronouns (a Juan le dije); complex pronoun stacking edge cases; ello as neuter
+    description: "Leísmo; redundant pronouns (a Juan le dije); complex pronoun stacking edge cases; ello as neuter"
+    prerequisites: [a2_pronoun_order]
 
   - id: b2_reported_speech
     name: Reported speech
     cefr_level: B2
-    description: Dijo que + indicative or subjunctive; tense backshift; preguntó si; reporting questions vs statements
+    description: "Dijo que + indicative or subjunctive; tense backshift; preguntó si; reporting questions vs statements"
+    prerequisites: [b1_subjunctive_formation, b1_imperfect]
 
   - id: b2_discourse_markers
     name: Discourse markers & complex connectors
     cefr_level: B2
-    description: sin embargo, no obstante, a pesar de que, dado que, aunque + subjunctive/indicative; por lo tanto, en cambio
+    description: "sin embargo, no obstante, a pesar de que, dado que, aunque + subjunctive/indicative; por lo tanto, en cambio"
+    prerequisites: [b1_vocab_opinions]
 
   - id: b2_vocab_abstract
     name: Vocabulary — abstract concepts
     cefr_level: B2
-    description: Justice, freedom, identity, power, democracy; abstract noun formation; nuanced synonyms
+    description: "Justice, freedom, identity, power, democracy; abstract noun formation; nuanced synonyms"
 
   - id: b2_vocab_professional
     name: Vocabulary — professional & formal register
     cefr_level: B2
-    description: Business correspondence tone; formal vs informal equivalents; usted in professional contexts; meeting and negotiation language
+    description: "Business correspondence tone; formal vs informal equivalents; usted in professional contexts; meeting and negotiation language"
+    prerequisites: [b1_vocab_work_career]
 
   # ─── C1 ───────────────────────────────────────────────
-  - id: c1_subjunctive_perfect
-    name: Subjunctive — present perfect
-    cefr_level: C1
-    description: Haya + past participle; expressing doubt/emotion about past events; when to use vs imperfect subjunctive
-
-  - id: c1_subjunctive_pluperfect
-    name: Subjunctive — pluperfect
-    cefr_level: C1
-    description: Hubiera + past participle; unrealized past conditions (si hubiera sabido...); regret structures
-
-  - id: c1_subjunctive_nuanced
-    name: Subjunctive — nuanced indicative vs subjunctive
-    cefr_level: C1
-    description: aunque + ind/subj; cuando + ind/subj; el hecho de que; subtle meaning shifts based on mood choice
-
   - id: c1_compound_tenses_past
     name: Compound tenses — perfect and pluperfect
     cefr_level: C1
-    description: Present perfect (he hablado) vs preterite; pluperfect (había hablado) for prior past; regional variation (Spain vs Latin America)
+    description: "Present perfect (he hablado) vs preterite; pluperfect (había hablado) for prior past; regional variation (Spain vs Latin America)"
+    prerequisites: [b1_imperfect, a2_preterite_ar]
 
   - id: c1_compound_tenses_future
     name: Compound tenses — future and conditional perfect
     cefr_level: C1
-    description: Future perfect (habré llegado) for completed future; conditional perfect (habría ido) for unrealized past hypotheticals
+    description: "Future perfect (habré llegado) for completed future; conditional perfect (habría ido) for unrealized past hypotheticals"
+    prerequisites: [b1_future_simple, b1_conditional]
+
+  - id: c1_subjunctive_perfect
+    name: Subjunctive — present perfect
+    cefr_level: C1
+    description: "Haya + past participle; expressing doubt/emotion about past events; when to use vs imperfect subjunctive"
+    prerequisites: [b2_subjunctive_impersonal, b2_subjunctive_adjective_clauses, c1_compound_tenses_past]
+
+  - id: c1_subjunctive_pluperfect
+    name: Subjunctive — pluperfect
+    cefr_level: C1
+    description: "Hubiera + past participle; unrealized past conditions (si hubiera sabido...); regret structures"
+    prerequisites: [c1_subjunctive_perfect]
+
+  - id: c1_subjunctive_nuanced
+    name: Subjunctive — nuanced indicative vs subjunctive
+    cefr_level: C1
+    description: "aunque + ind/subj; cuando + ind/subj; el hecho de que; subtle meaning shifts based on mood choice"
+    prerequisites: [c1_subjunctive_perfect, b2_subjunctive_past]
 
   - id: c1_idiomatic_expressions
     name: Idiomatic expressions & collocations
     cefr_level: C1
-    description: Fixed expressions that don't translate literally; verb+noun collocations; Colombian/Latin American idioms; coger, tomar, agarrar nuances
+    description: "Fixed expressions that don't translate literally; verb+noun collocations; Colombian/Latin American idioms; coger, tomar, agarrar nuances"
 
   - id: c1_register_shifts
     name: Register shifts — formal, informal, written
     cefr_level: C1
-    description: Navigating formal/informal registers; written vs spoken grammar differences; voseo; academic vs colloquial style
+    description: "Navigating formal/informal registers; written vs spoken grammar differences; voseo; academic vs colloquial style"
 
   - id: c1_vocab_literary_academic
     name: Vocabulary — literary & academic
     cefr_level: C1
-    description: Academic discourse vocabulary; false cognates; nuanced synonyms (saber vs conocer vs enterarse); literary register
+    description: "Academic discourse vocabulary; false cognates; nuanced synonyms (saber vs conocer vs enterarse); literary register"
 
   # ─── C2 ───────────────────────────────────────────────
   - id: c2_stylistic_control
     name: Full stylistic control
     cefr_level: C2
-    description: Precise word choice for effect; rhetorical devices; writing style indistinguishable from educated native speaker
+    description: "Precise word choice for effect; rhetorical devices; writing style indistinguishable from educated native speaker"
 
   - id: c2_dialectal_variation
     name: Dialectal variation
     cefr_level: C2
-    description: Recognition and production across regional varieties; vos/tú/usted by region; Colombian paisa vs rolo vs costeño
+    description: "Recognition and production across regional varieties; vos/tú/usted by region; Colombian paisa vs rolo vs costeño"
 
   - id: c2_implication_subtext
     name: Ambiguity, implication & cultural subtext
     cefr_level: C2
-    description: Irony, understatement, sarcasm in Spanish; cultural references; reading between the lines in native-speed speech
+    description: "Irony, understatement, sarcasm in Spanish; cultural references; reading between the lines in native-speed speech"
 
   - id: c2_native_fluency
     name: Near-native production fluency
     cefr_level: C2
-    description: Real-time production without hesitation; self-correction; repair strategies; native-level discourse management
+    description: "Real-time production without hesitation; self-correction; repair strategies; native-level discourse management"

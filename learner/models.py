@@ -8,9 +8,9 @@ class User(models.Model):
     interests = models.TextField(blank=True)
     why_learning = models.TextField(blank=True)
     target_use = models.TextField(blank=True)
-    estimated_cefr_level = models.CharField(max_length=4, blank=True)  # A1, A2, B1, B2, C1, C2
+    estimated_cefr_level = models.CharField(max_length=4, blank=True)
     reminder_enabled = models.BooleanField(default=True)
-    reminder_schedule = models.JSONField(default=dict)  # {days: [0-6], time: "HH:MM"}
+    reminder_schedule = models.JSONField(default=dict)
     onboarding_complete = models.BooleanField(default=False)
     instruction_language = models.CharField(
         max_length=10,
@@ -25,6 +25,26 @@ class User(models.Model):
 
     class Meta:
         app_label = 'learner'
+
+
+class Skill(models.Model):
+    skill_id = models.CharField(max_length=64, unique=True)  # e.g. "a1_present_ar"
+    name = models.CharField(max_length=128)
+    cefr_level = models.CharField(max_length=4)
+    description = models.TextField(blank=True)
+    order = models.IntegerField(default=0)
+    active = models.BooleanField(default=True)
+    replaces = models.ForeignKey(
+        'self', null=True, blank=True, on_delete=models.SET_NULL, related_name='replaced_by'
+    )
+    prerequisites = models.ManyToManyField('self', symmetrical=False, blank=True, related_name='unlocks')
+
+    class Meta:
+        ordering = ['order']
+        app_label = 'learner'
+
+    def __str__(self):
+        return f"{self.cefr_level} | {self.name}"
 
 
 class EvaluationProgress(models.Model):
@@ -57,22 +77,39 @@ class SkillScore(models.Model):
     SCORES = [(0, 'Untested'), (1, 'Beginner'), (2, 'Developing'), (3, 'Confident'), (4, 'Mastered')]
 
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='skill_scores')
-    skill_id = models.CharField(max_length=64)  # matches id in skills.yaml
+    skill = models.ForeignKey(Skill, null=True, blank=True, on_delete=models.CASCADE, related_name='scores')
     mode = models.CharField(max_length=32, choices=MODES)
     score = models.IntegerField(default=0, choices=SCORES)
     last_tested_at = models.DateTimeField(null=True, blank=True)
     next_review_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
-        unique_together = ('user', 'skill_id', 'mode')
+        unique_together = ('user', 'skill', 'mode')
         app_label = 'learner'
 
     def __str__(self):
-        return f"{self.user} | {self.skill_id} / {self.mode} = {self.score}"
+        skill_name = self.skill.skill_id if self.skill else 'unknown'
+        return f"{self.user} | {skill_name} / {self.mode} = {self.score}"
 
     @property
     def emoji(self):
         return ['⬜', '🟥', '🟨', '🟦', '🟩'][self.score]
+
+
+class SkillScoreEvent(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='skill_score_events')
+    skill = models.ForeignKey(Skill, on_delete=models.CASCADE, related_name='score_events')
+    mode = models.CharField(max_length=32, choices=SkillScore.MODES)
+    score = models.IntegerField()
+    session = models.ForeignKey('Session', null=True, blank=True, on_delete=models.SET_NULL, related_name='score_events')
+    scored_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['scored_at']
+        app_label = 'learner'
+
+    def __str__(self):
+        return f"{self.user} | {self.skill.skill_id} / {self.mode} = {self.score}"
 
 
 class Session(models.Model):
@@ -103,6 +140,18 @@ class Session(models.Model):
 
     def __str__(self):
         return f"{self.user} | {self.session_type} | {self.started_at:%Y-%m-%d %H:%M}"
+
+
+class SessionSkill(models.Model):
+    session = models.ForeignKey(Session, on_delete=models.CASCADE, related_name='session_skills')
+    skill = models.ForeignKey(Skill, on_delete=models.CASCADE, related_name='session_skills')
+
+    class Meta:
+        unique_together = ('session', 'skill')
+        app_label = 'learner'
+
+    def __str__(self):
+        return f"{self.session} | {self.skill.skill_id}"
 
 
 class UserInterest(models.Model):
