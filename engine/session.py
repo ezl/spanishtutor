@@ -61,9 +61,9 @@ Based on their profile (level: {user.estimated_cefr_level}), the most overdue sk
 Generate the session opening message from Luz Angela:
 - Greet them warmly (use their name if known, otherwise just hola)
 - Reference what they worked on last time (if any)
-- State your recommendation: review or push forward, and why (decay/edge of ability)
-- Ask: "¿Revisamos o seguimos con algo nuevo?"
-Keep it natural and brief — 3-4 sentences max."""
+- State what you're working on today and why — make the decision, don't ask. Be direct.
+- Do NOT ask "¿Revisamos o seguimos?" or offer choices. Just tell them what's happening and begin.
+Keep it natural and brief — 2-3 sentences max."""
 
     opening = await call_llm([{"role": "user", "content": prompt}], user=user)
 
