@@ -12,6 +12,11 @@ class User(models.Model):
     reminder_enabled = models.BooleanField(default=True)
     reminder_schedule = models.JSONField(default=dict)  # {days: [0-6], time: "HH:MM"}
     onboarding_complete = models.BooleanField(default=False)
+    instruction_language = models.CharField(
+        max_length=10,
+        choices=[('auto', 'Auto'), ('english', 'English'), ('spanish', 'Spanish')],
+        default='auto',
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -103,6 +108,9 @@ class SessionEvent(models.Model):
         ('voice', 'Voice'),
         ('correction', 'Error Correction'),
         ('system', 'System'),
+        ('menu', 'Menu'),
+        ('redirect', 'Redirect'),
+        ('meta', 'Meta'),
     ]
     MODES = SkillScore.MODES
 

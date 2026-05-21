@@ -39,9 +39,60 @@ async def on_message(message: discord.Message):
     if text.lower() == '!reset':
         from learner.models import User
         await sync_to_async(User.objects.filter(discord_id=str(message.author.id)).delete)()
-        # Recreate with empty display_name so next message routes to _step_collect_name
         await sync_to_async(User.objects.create)(discord_id=str(message.author.id), display_name='')
         await message.channel.send(FIRST_MESSAGE)
+        return
+
+    if text.lower() == '!retest':
+        from learner.models import User, Session
+        user_obj = await sync_to_async(User.objects.filter(discord_id=str(message.author.id)).first)()
+        if user_obj:
+            await sync_to_async(
+                lambda: Session.objects.filter(user=user_obj, session_type='onboarding').delete()
+            )()
+            await sync_to_async(
+                User.objects.filter(pk=user_obj.pk).update
+            )(onboarding_complete=False, estimated_cefr_level='')
+        await message.channel.send(
+            "Starting fresh placement quiz! Let's see where you are now.\n\n"
+            "Say **listo** when you're ready."
+        )
+        return
+
+    if text.lower() == '!english':
+        from learner.models import User
+        await sync_to_async(
+            User.objects.filter(discord_id=str(message.author.id)).update
+        )(instruction_language='english')
+        await message.channel.send("Got it — I'll give all instructions in English from now on.")
+        return
+
+    if text.lower() == '!spanish':
+        from learner.models import User
+        await sync_to_async(
+            User.objects.filter(discord_id=str(message.author.id)).update
+        )(instruction_language='spanish')
+        await message.channel.send("¡Perfecto! De ahora en adelante, todo en español.")
+        return
+
+    if text.lower() == '!menu':
+        from learner.models import User
+        import django.conf
+        user_obj = await sync_to_async(User.objects.filter(discord_id=str(message.author.id)).first)()
+        base_url = django.conf.settings.BASE_URL
+        discord_id = str(message.author.id)
+        grid_url = f"{base_url}/progress/{discord_id}/"
+        level = f"**{user_obj.estimated_cefr_level}**" if user_obj and user_obj.estimated_cefr_level else "not yet assessed"
+        menu = (
+            f"**Current level:** {level}\n"
+            f"**Skill grid:** {grid_url}\n\n"
+            f"**Commands:**\n"
+            f"`!retest` — retake the placement quiz\n"
+            f"`!english` — force English instructions\n"
+            f"`!spanish` — force Spanish instructions\n"
+            f"`!reset` — wipe everything and start over\n"
+        )
+        await message.channel.send(menu)
         return
 
     try:
@@ -60,6 +111,9 @@ async def on_message(message: discord.Message):
             while response:
                 await message.channel.send(response[:1990])
                 response = response[1990:]
+
+        if result.get('follow_up'):
+            await message.channel.send(result['follow_up'])
 
     except Exception as e:
         tb = traceback.format_exc()

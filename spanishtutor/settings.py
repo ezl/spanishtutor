@@ -78,6 +78,8 @@ DISCORD_BOT_TOKEN = os.environ.get('DISCORD_BOT_TOKEN', '')
 ANTHROPIC_API_KEY = os.environ.get('ANTHROPIC_API_KEY', '')
 OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY', '')
 
+BASE_URL = os.environ.get('BASE_URL', 'https://spanish.up.railway.app')
+
 # Bot config
 INACTIVITY_TIMEOUT_MINUTES = int(os.environ.get('INACTIVITY_TIMEOUT_MINUTES', '15'))
 MAGIC_LINK_EXPIRY_SECONDS = int(os.environ.get('MAGIC_LINK_EXPIRY_SECONDS', '3600'))
