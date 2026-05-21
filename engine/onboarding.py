@@ -7,10 +7,13 @@ Quiz has two phases:
 
 Two strands woven together: grammar and vocabulary.
 """
+import logging
 import re
 from asgiref.sync import sync_to_async
 from django.utils import timezone
 from .core import call_llm
+
+log = logging.getLogger('onboarding')
 
 
 def _fix_blanks(text: str) -> str:
@@ -111,13 +114,23 @@ def _parse_quiz_response(text: str) -> dict:
     """Parse LLM quiz response into a dict. Handles multi-line NEXT_QUESTION/ASSESSMENT."""
     result = {}
     lines = text.strip().split('\n')
-    result['action'] = lines[0].strip()
+
+    # Scan all lines for the action word — LLM sometimes adds preamble before it
+    action = 'CONTINUE'
+    action_line_idx = 0
+    for i, line in enumerate(lines):
+        stripped = line.strip()
+        if stripped in ('CONTINUE', 'CONCLUDE'):
+            action = stripped
+            action_line_idx = i
+            break
+    result['action'] = action
 
     current_key = None
     current_lines = []
     keys = {'SKILL_UPDATES', 'NEXT_QUESTION', 'CEFR_LEVEL'}
 
-    for line in lines[1:]:
+    for line in lines[action_line_idx + 1:]:
         matched_key = None
         for key in keys:
             if line.startswith(key + ':'):
@@ -159,7 +172,9 @@ async def _save_skill_updates(user, updates_str: str):
 
 
 async def handle_onboarding(user, text: str, attachments: list = None) -> dict:
+    uid = user.discord_id
     if not user.display_name:
+        log.info('[%s] onboarding: collecting name', uid)
         return await _step_collect_name(user, text)
 
     # Check if quiz has started yet
@@ -169,6 +184,7 @@ async def handle_onboarding(user, text: str, attachments: list = None) -> dict:
                               .exists()
     )()
     if not has_quiz_events:
+        log.info('[%s] onboarding: listo gate — input=%r', uid, text)
         return await _step_listo_gate(user, text)
 
     return await _step_adaptive_quiz(user, text)
@@ -177,6 +193,7 @@ async def handle_onboarding(user, text: str, attachments: list = None) -> dict:
 async def _step_collect_name(user, text: str) -> dict:
     # Extract just the name in case they wrote "I'm Eric" or "My name is Eric"
     name = text.strip().split()[-1].capitalize() if text.strip() else text.strip()
+    log.info('[%s] onboarding: name collected — %r', user.discord_id, name)
     # Save as display_name
     await sync_to_async(user.__class__.objects.filter(pk=user.pk).update)(display_name=name)
 
@@ -191,6 +208,7 @@ async def _step_collect_name(user, text: str) -> dict:
 
 async def _step_listo_gate(user, text: str) -> dict:
     if text.strip().lower() in LISTO_WORDS:
+        log.info('[%s] quiz: starting — listo received', user.discord_id)
         return await _step_adaptive_quiz(user, QUIZ_START_SENTINEL)
     return {"text": "Say **listo** when you're ready to start!", "audio_url": None, "session_ended": False}
 
@@ -198,6 +216,7 @@ async def _step_listo_gate(user, text: str) -> dict:
 async def _step_adaptive_quiz(user, text: str) -> dict:
     from learner.models import Session, SessionEvent, EvaluationProgress
 
+    uid = user.discord_id
     is_first = text == QUIZ_START_SENTINEL
 
     # Get or create quiz session
@@ -210,6 +229,7 @@ async def _step_adaptive_quiz(user, text: str) -> dict:
         session = await sync_to_async(Session.objects.create)(
             user=user, session_type='onboarding'
         )
+        log.info('[%s] quiz: session created — id=%s', uid, session.pk)
 
     events = await sync_to_async(
         lambda: list(session.events.filter(event_type='quiz').order_by('timestamp'))
@@ -220,11 +240,14 @@ async def _step_adaptive_quiz(user, text: str) -> dict:
     if not is_first and events:
         last = events[-1]
         if not last.user_response:
+            log.info('[%s] quiz: turn %d answer received — %r', uid, quiz_count, text)
             await sync_to_async(
                 lambda: SessionEvent.objects.filter(pk=last.pk).update(user_response=text)
             )()
             # Refresh local copy
             last.user_response = text
+        else:
+            log.warning('[%s] quiz: turn %d already had a response — possible duplicate message', uid, quiz_count)
 
     history_text = '\n'.join(
         f"Q{i+1}: {e.content}\nA: {e.user_response or '(unanswered)'}"
@@ -234,12 +257,18 @@ async def _step_adaptive_quiz(user, text: str) -> dict:
     if is_first:
         phase = PHASE_FIRST_QUESTION
         latest = '(quiz start)'
+        log.info('[%s] quiz: Q1 — binary search phase', uid)
     elif quiz_count < 5:
         phase = PHASE_BINARY_SEARCH
         latest = f'"{text}"'
+        log.info('[%s] quiz: Q%d — binary search', uid, quiz_count + 1)
     else:
         phase = PHASE_BOUNDARY_PROBE
         latest = f'"{text}"'
+        if quiz_count == 5:
+            log.info('[%s] quiz: Q%d — entering boundary probe phase', uid, quiz_count + 1)
+        else:
+            log.info('[%s] quiz: Q%d — boundary probe', uid, quiz_count + 1)
 
     prompt = QUIZ_PROMPT.format(
         quiz_count=quiz_count,
@@ -253,9 +282,13 @@ async def _step_adaptive_quiz(user, text: str) -> dict:
         user=None,
         max_tokens=600,
     )
+    log.debug('[%s] quiz: raw LLM response:\n%s', uid, llm_response)
 
     parsed = _parse_quiz_response(llm_response)
-    await _save_skill_updates(user, parsed.get('SKILL_UPDATES', ''))
+    skill_updates = parsed.get('SKILL_UPDATES', '')
+    if skill_updates and skill_updates.lower() != 'none':
+        log.info('[%s] quiz: skill updates — %s', uid, skill_updates)
+    await _save_skill_updates(user, skill_updates)
 
     if parsed['action'] == 'CONCLUDE':
         cefr = parsed.get('CEFR_LEVEL', 'A2')
@@ -292,6 +325,8 @@ async def _step_adaptive_quiz(user, text: str) -> dict:
         assessment_parts.append(f"🎯 **First sessions will focus on:** {focus}")
         assessment = "\n\n".join(assessment_parts)
 
+        log.info('[%s] quiz: CONCLUDE after %d questions — CEFR=%s skills=%s',
+                 uid, quiz_count, cefr, skill_updates)
         await sync_to_async(user.__class__.objects.filter(pk=user.pk).update)(
             estimated_cefr_level=cefr,
             onboarding_complete=True,
@@ -302,11 +337,17 @@ async def _step_adaptive_quiz(user, text: str) -> dict:
         await sync_to_async(
             lambda: Session.objects.filter(pk=session.pk).update(ended_at=timezone.now())
         )()
+        log.info('[%s] quiz: onboarding complete', uid)
 
         return {"text": assessment, "audio_url": None, "session_ended": False}
 
     # CONTINUE — log next question and return it
     next_q = _fix_blanks(parsed.get('NEXT_QUESTION', ''))
+    if not next_q:
+        log.error('[%s] quiz: NEXT_QUESTION missing in LLM response (turn %d) — raw:\n%s',
+                  uid, quiz_count, llm_response)
+        return {"text": "Lo siento, algo salió mal. 😅 Can you repeat that?", "audio_url": None, "session_ended": False}
+    log.info('[%s] quiz: Q%d question sent — %r', uid, quiz_count + 1, next_q[:80])
     await sync_to_async(SessionEvent.objects.create)(
         session=session,
         event_type='quiz',
