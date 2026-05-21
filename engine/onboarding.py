@@ -101,7 +101,8 @@ STRICT RULES:
 - If the last 3 answers all resulted in shaky or unknown skill scores (consecutive wrong answers), prepend this exact text to your NEXT_QUESTION: "Quick reminder — if you're not sure, just say *I don't know* or *no sé*. No penalty, it actually helps me place you better.\n\n"
 
 QUESTION FORMAT by level:
-  A1-A2: multiple choice, label options a/b/c/d
+  A1-A2: multiple choice, label options a/b/c/d. Always end with this exact line on its own:
+    *(Not sure? Say "I don't know" — it's more useful than guessing)*
   A2-B1: fill-in-the-blank. Format exactly like this, two lines:
     "Ella ________ cansada hoy."
     *(Translation: She is tired today.)*
@@ -431,12 +432,15 @@ async def _step_adaptive_quiz(user, text: str) -> dict:
         else:
             log.warning('[%s] quiz: turn %d — no unanswered event to record response', uid, quiz_count)
 
-        # Guessing reminder: 2+ dont_know in recent answers, not yet shown
+        # Guessing reminder: 3+ shaky skill scores = consecutive wrong answers, not yet shown
         reminder_shown = any(e.event_type == 'meta' and e.content == 'guessing_reminder_shown' for e in all_events)
         if not reminder_shown:
-            recent_responses = [e.user_response for e in quiz_events[-4:] if e.user_response]
-            if sum(1 for r in recent_responses if _classify_input(r) == 'dont_know') >= 2:
-                log.info('[%s] quiz: guessing reminder triggered', uid)
+            from learner.models import SkillScore
+            shaky_count = await sync_to_async(
+                lambda: SkillScore.objects.filter(user=user, score=1).count()
+            )()
+            if shaky_count >= 3:
+                log.info('[%s] quiz: guessing reminder triggered (%d shaky scores)', uid, shaky_count)
                 await sync_to_async(SessionEvent.objects.create)(
                     session=session, event_type='meta',
                     content='guessing_reminder_shown', user_response='set',
