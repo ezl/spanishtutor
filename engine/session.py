@@ -42,6 +42,14 @@ MORE_PRACTICE_PHRASES = {
     'keep going', 'continue', 'not yet', 'more practice please', 'no',
 }
 
+SECOND_PASS_CHECK_STRING = (
+    'That covers everything — want to do a quick second pass to lock it in?'
+)
+SECOND_PASS_PHRASES = {
+    'yes', 'sure', 'yeah', 'yep', 'ok', 'okay', 'listo', 'sí', 'si',
+    "let's go", 'dale', 'second pass', 'go again', 'again',
+}
+
 # ── New skill prompts (opening / present phase) ────────────────────────────────
 
 GRAMMAR_PRESENT_PROMPT = """You are teaching {skill_name} to a Spanish student.
@@ -130,19 +138,37 @@ Rules:
 
 # ── Other session prompt templates ────────────────────────────────────────────
 
-SRS_REVIEW_PROMPT = """The student is starting a review session.
+SCORE_TO_QUESTIONS = {0: 2, 1: 3, 2: 2, 3: 1, 4: 1}
 
-Skills due for spaced repetition review:
-{skill_list}
+SRS_REVIEW_PROMPT = """The student is starting a spaced repetition review session.
 
-Session instructions:
-- Brief warm greeting, then straight into the first question. No preamble.
-- One retrieval question per skill. Vary formats: translate, fill-in-blank, produce a sentence.
-- Use the student's interests in examples wherever natural: {interests}
-- After each response: confirm or correct briefly, then move on immediately.
-- After all skills are covered: ask "Want to do one more quick set to lock it in?"
+Skills to review: {skill_list}
 
-Generate the opening message and first question now."""
+Open with 2-3 sentences: tell the student we're reviewing these skills, and that you'll ask one to three questions per skill depending on how well they know each one.
+
+Then immediately ask ONE retrieval question for the first skill: "{first_skill_name}"
+
+Vary the format: translate, fill-in-blank, or produce a sentence. No hints. Draw from student interests where natural: {interests}"""
+
+SRS_REVIEW_SAME_SKILL_SUFFIX = """CURRENT TASK: SRS Review
+
+Evaluate the student's last answer in ONE line. Then ask question {next_q_num} of {total_q} for "{skill_name}".
+
+Use a different format than the last question (vary: translate, fill-in-blank, produce a sentence). No hints. No preamble."""
+
+SRS_REVIEW_NEXT_SKILL_SUFFIX = """CURRENT TASK: SRS Review
+
+Evaluate the student's last answer in ONE line. Then move to the next skill:
+
+"{next_skill_name}" — {next_skill_description}
+
+Ask question 1 of {total_q}. Vary format: translate, fill-in-blank, produce a sentence. No hints. No preamble."""
+
+SRS_REVIEW_COMPLETE_SUFFIX = """CURRENT TASK: SRS Review — all skills covered
+
+Evaluate the student's last answer in ONE line only (correct or confirm). Stop there — do not add anything else."""
+
+CONVERSATION_TURNS = 6
 
 CONVERSATION_PROMPT = """The student is starting a free conversation session.
 
@@ -150,46 +176,119 @@ Student level: {cefr_level}
 Student interests: {interests}
 Last session: {last_summary}
 
-Session instructions:
-- Open with a genuine question about their life. Draw from their interests or last session.
-- Let conversation flow naturally for 4-6 exchanges.
-- Correct significant errors inline using the standard correction format.
-- Minor errors (accents, small typos): ignore, never interrupt flow.
-- Close with one thing they did well and one thing to watch next time.
+Open with a genuine question about their life. Draw from their interests or last session.
+Let the conversation flow naturally.
+Correct significant errors inline using the standard correction format.
+Minor errors (accents, small typos): ignore, never interrupt flow.
 
 Generate the opening question now. Spanish if B1+, English if A1-A2."""
 
-READING_PROMPT = """The student is starting a reading comprehension session.
+CONVERSATION_CLOSE_SUFFIX = """CURRENT TASK: Conversation wrap-up
 
+The conversation has reached its natural end. Close with 3-4 sentences:
+1. One specific thing the student did well (grammar, vocabulary, or expression — be concrete, name it)
+2. One specific thing to watch next time (equally concrete)
+3. A warm goodbye
+
+No generic praise. Be specific about what you actually observed in this conversation."""
+
+READING_PHASE_TURNS = {'comprehension': 4, 'production': 2}
+
+READING_PROMPT = """You are running a reading comprehension session.
+
+Target skill: {skill_name}
+Skill description: {skill_description}
 Student level: {cefr_level}
 Student interests: {interests}
 
-Session instructions:
-- Generate a short reading text in Spanish. Length: 100-150 words for B1, up to 250 for C1+.
-  Topic must connect directly to the student's interests.
-- Tell them to read it and say "listo" when done.
-- Ask 2-3 comprehension questions (real understanding — not just translation).
-- Pick one word from the text and ask them to use it in a new sentence.
-- Close with a brief note on what grammar or vocabulary the text was practicing.
+Write a reading passage in Spanish that:
+1. Naturally demonstrates {skill_name} multiple times throughout
+2. Is calibrated to level: ~100 words at B1, ~150 at B2, up to 250 at C1+
+3. Chooses ONE of these interests as the setting or subject: {interests}
 
-Generate the opening message introducing the text, then present the text."""
+After the passage, tell the student to read it and let you know when they're done. Do not ask any questions yet."""
 
-WRITING_PROMPT = """The student is starting a writing session.
+READING_COMPREHENSION_SUFFIX = """CURRENT TASK: Reading Comprehension — question {q_num} of 4
 
+The reading passage is in the conversation above. Ask ONE comprehension question that tests real understanding — not translation, not vocabulary lookup.
+
+Rules:
+- ONE question only. No preamble.
+- After student responds: confirm or correct in ONE line only."""
+
+READING_PRODUCTION_SUFFIX = """CURRENT TASK: Reading Production — turn {turn_num} of 2
+
+Pick ONE word or phrase from the passage that uses {skill_name}. Ask the student to use it in a new sentence of their own (not copied from the text).
+
+Rules:
+- ONE word or phrase. No preamble.
+- After student responds: confirm or correct usage in ONE line only.
+- Turn 2: pick a different word or phrase than turn 1."""
+
+READING_CLOSE_SUFFIX = """CURRENT TASK: Reading session wrap-up
+
+Close with 3-4 sentences:
+1. Name the skill the passage was practicing: {skill_name}
+2. One specific thing the student did well in their comprehension or production answers
+3. One thing to watch
+4. Warm goodbye
+
+Session ends after this message."""
+
+WRITING_CORRECTION_TURNS = 6  # 3 errors × (rewrite + new sentence)
+
+WRITING_PROMPT = """You are running a writing session.
+
+Target skill: {skill_name}
+Skill description: {skill_description}
 Student level: {cefr_level}
 Student interests: {interests}
 
-Session instructions:
-- Give a writing prompt tied to their interests, calibrated to level:
-    A1: 2-3 sentences in present tense
-    A2: short paragraph using past tense
-    B1: paragraph mixing preterite and imperfect
-    B2+: short opinion piece with discourse markers
-- After they write: correct the top 2-3 errors only. Don't overwhelm.
-- Ask them to rewrite one corrected sentence.
-- Close with specific feedback on what improved.
+Give the student ONE writing prompt that:
+1. Requires them to use {skill_name} naturally
+2. Invites them to share a personal experience, preference, or opinion — choose a topic that elicits real content from their life
+3. Is calibrated to level: 2-3 sentences at A1, short paragraph at A2-B1, 4-6 sentences at B2+
+4. Draws the topic from their interests: {interests}
 
-Generate the opening message with the writing prompt now."""
+State the prompt clearly. Do not write an example or start writing for them."""
+
+WRITING_FIRST_ERROR_SUFFIX = """CURRENT TASK: Writing Correction — error 1 of up to 3
+
+The student just submitted their writing (shown above). Read it carefully.
+
+Find the most important error. Present:
+1. The error sentence — quote it exactly
+2. The corrected version
+3. Why — one sentence
+
+Ask them to rewrite that sentence. Nothing else."""
+
+WRITING_REWRITE_SUFFIX = """CURRENT TASK: Writing Correction — rewrite done
+
+The student just rewrote an error sentence. Confirm their rewrite in ONE line (correct or flag any remaining issue).
+
+Then ask them to write a BRAND NEW sentence using the same grammatical pattern — completely fresh, not from their original text."""
+
+WRITING_NEXT_ERROR_SUFFIX = """CURRENT TASK: Writing Correction — error {error_num} of up to 3
+
+The student just wrote a new sentence. Confirm it in ONE line.
+
+Then find error {error_num} from their ORIGINAL writing piece. Present:
+1. The error sentence — quote it exactly
+2. The corrected version
+3. Why — one sentence
+
+Ask them to rewrite it. If there aren't {error_num} distinct errors, give a stretch challenge instead: ask them to write a more complex sentence using the same pattern they've been practicing."""
+
+WRITING_CLOSE_SUFFIX = """CURRENT TASK: Writing session wrap-up
+
+Close with 3-4 sentences:
+1. What the student did well overall
+2. The main pattern they practiced today ({skill_name})
+3. One thing to keep working on
+4. Warm goodbye
+
+Session ends after this message."""
 
 
 # ── Phase helpers ──────────────────────────────────────────────────────────────
@@ -222,6 +321,25 @@ def _wants_quiz(text: str) -> bool:
 
 def _wants_more_practice(text: str) -> bool:
     return text.strip().lower() in MORE_PRACTICE_PHRASES
+
+
+def _srs_build_schedule(session_skills, score_map):
+    """Returns [(skill_obj, question_count), ...] in due order."""
+    return [(ss.skill, SCORE_TO_QUESTIONS.get(score_map.get(ss.skill.skill_id, 0), 2))
+            for ss in session_skills]
+
+
+def _srs_position(turns, schedule):
+    """
+    Returns (skill_obj, question_num_1indexed, total_for_skill) for the question
+    at position `turns` in the flat question sequence, or None if past the end.
+    """
+    cumulative = 0
+    for skill, q in schedule:
+        if turns < cumulative + q:
+            return skill, turns - cumulative + 1, q
+        cumulative += q
+    return None
 
 
 async def _set_phase(session, phase: str, turns: int) -> None:
@@ -367,6 +485,18 @@ async def handle_session(user, text: str, attachments: list = None) -> dict:
     if session.session_type == 'new_skill':
         return await _continue_new_skill(user, session, text)
 
+    if session.session_type == 'srs_review':
+        return await _continue_srs_review(user, session, text)
+
+    if session.session_type == 'conversation':
+        return await _continue_conversation(user, session, text)
+
+    if session.session_type == 'reading':
+        return await _continue_reading(user, session, text)
+
+    if session.session_type == 'writing':
+        return await _continue_writing(user, session, text)
+
     return await _continue_session(user, session, text, attachments)
 
 
@@ -386,8 +516,16 @@ async def _open_session(user, text: str) -> dict:
         user=user, session_type=session_type
     )
 
-    # Write SessionSkill frontier pool
-    if frontier_skills:
+    # Write SessionSkill pool — due skills for srs_review, frontier for everything else
+    if session_type == 'srs_review':
+        due_ids = [s['id'] for s in context.get('due_skills', [])]
+        due_map = await sync_to_async(
+            lambda: {s.skill_id: s for s in Skill.objects.filter(skill_id__in=due_ids)}
+        )()
+        for sid in due_ids:
+            if sid in due_map:
+                await sync_to_async(SessionSkill.objects.get_or_create)(session=session, skill=due_map[sid])
+    elif frontier_skills:
         for skill in frontier_skills:
             await sync_to_async(SessionSkill.objects.get_or_create)(session=session, skill=skill)
 
@@ -442,25 +580,99 @@ async def _open_session(user, text: str) -> dict:
             )()
 
     elif session_type == 'srs_review':
-        skill_list = "\n".join(
-            f"- {s['name']}: {s['description']}" for s in context['due_skills']
+        due_skills = context.get('due_skills', [])
+        skill_list = "\n".join(f"- {s['name']}: {s['description']}" for s in due_skills)
+        first_skill_name = due_skills[0]['name'] if due_skills else 'the first topic'
+        prompt = SRS_REVIEW_PROMPT.format(
+            skill_list=skill_list,
+            first_skill_name=first_skill_name,
+            interests=interests,
         )
-        prompt = SRS_REVIEW_PROMPT.format(skill_list=skill_list, interests=interests)
         opening = await call_llm([{"role": "user", "content": prompt}], user=user)
+        await sync_to_async(
+            lambda: Session.objects.filter(pk=session.pk).update(
+                current_phase='review', phase_turns_completed=0
+            )
+        )()
 
     elif session_type == 'conversation':
         prompt = CONVERSATION_PROMPT.format(
             cefr_level=level, interests=interests, last_summary=last_summary
         )
         opening = await call_llm([{"role": "user", "content": prompt}], user=user)
+        await sync_to_async(
+            lambda: Session.objects.filter(pk=session.pk).update(
+                current_phase='conversation', phase_turns_completed=0
+            )
+        )()
 
     elif session_type == 'reading':
-        prompt = READING_PROMPT.format(cefr_level=level, interests=interests)
+        from learner.models import SkillScore, Skill as SkillModel
+        writing_scores = await sync_to_async(
+            lambda: {s.skill.skill_id: s.score
+                     for s in SkillScore.objects.filter(user=user, mode='writing').select_related('skill')
+                     if s.skill}
+        )()
+        reading_scores = await sync_to_async(
+            lambda: {s.skill.skill_id: s.score
+                     for s in SkillScore.objects.filter(user=user, mode='reading').select_related('skill')
+                     if s.skill}
+        )()
+        reading_target = await sync_to_async(
+            lambda: next(
+                (s for s in SkillModel.objects.filter(active=True).order_by('order')
+                 if writing_scores.get(s.skill_id, 0) >= 1
+                 and reading_scores.get(s.skill_id, 0) < writing_scores.get(s.skill_id, 0)),
+                SkillModel.objects.filter(active=True).order_by('order').first()
+            )
+        )()
+        prompt = READING_PROMPT.format(
+            skill_name=reading_target.name if reading_target else 'Spanish',
+            skill_description=reading_target.description if reading_target else '',
+            cefr_level=level,
+            interests=interests,
+        )
         opening = await call_llm([{"role": "user", "content": prompt}], user=user)
+        if reading_target:
+            await sync_to_async(
+                lambda: Session.objects.filter(pk=session.pk).update(
+                    target_skill=reading_target,
+                    current_phase='present',
+                    phase_turns_completed=0,
+                )
+            )()
+            await sync_to_async(SessionSkill.objects.get_or_create)(session=session, skill=reading_target)
 
     elif session_type == 'writing':
-        prompt = WRITING_PROMPT.format(cefr_level=level, interests=interests)
+        from learner.models import SkillScore, Skill as SkillModel
+        writing_scores_map = await sync_to_async(
+            lambda: {s.skill.skill_id: s.score
+                     for s in SkillScore.objects.filter(user=user, mode='writing').select_related('skill')
+                     if s.skill}
+        )()
+        writing_target = await sync_to_async(
+            lambda: next(
+                (s for s in SkillModel.objects.filter(active=True).order_by('order')
+                 if writing_scores_map.get(s.skill_id, 0) < 3),
+                SkillModel.objects.filter(active=True).order_by('order').first()
+            )
+        )()
+        prompt = WRITING_PROMPT.format(
+            skill_name=writing_target.name if writing_target else 'Spanish',
+            skill_description=writing_target.description if writing_target else '',
+            cefr_level=level,
+            interests=interests,
+        )
         opening = await call_llm([{"role": "user", "content": prompt}], user=user)
+        if writing_target:
+            await sync_to_async(
+                lambda: Session.objects.filter(pk=session.pk).update(
+                    target_skill=writing_target,
+                    current_phase='prompt',
+                    phase_turns_completed=0,
+                )
+            )()
+            await sync_to_async(SessionSkill.objects.get_or_create)(session=session, skill=writing_target)
 
     else:
         prompt = CONVERSATION_PROMPT.format(
@@ -559,6 +771,315 @@ async def _continue_new_skill(user, session, text: str) -> dict:
     return {"text": response_text, "audio_url": None, "session_ended": False}
 
 
+# ── SRS review phase control ──────────────────────────────────────────────────
+
+async def _continue_srs_review(user, session, text: str) -> dict:
+    from learner.models import SessionEvent, SessionSkill, SkillScore
+
+    phase = session.current_phase  # 'review', 'second_pass_check', 'second_pass'
+    turns = session.phase_turns_completed
+
+    session_skills = await sync_to_async(
+        lambda: list(SessionSkill.objects.filter(session=session).select_related('skill').order_by('pk'))
+    )()
+
+    # Build mastery-based question schedule
+    skill_ids = [ss.skill.skill_id for ss in session_skills]
+    score_map = await sync_to_async(
+        lambda: {s.skill.skill_id: s.score
+                 for s in SkillScore.objects.filter(user=user, mode='writing').select_related('skill')
+                 if s.skill and s.skill.skill_id in skill_ids}
+    )()
+    schedule = _srs_build_schedule(session_skills, score_map)
+    total_questions = sum(q for _, q in schedule)
+
+    events = await sync_to_async(
+        lambda: list(session.events.order_by('timestamp')[:60])
+    )()
+
+    pending = next((e for e in reversed(events) if not e.user_response), None)
+    if pending:
+        await sync_to_async(
+            lambda: SessionEvent.objects.filter(pk=pending.pk).update(user_response=text)
+        )()
+        pending.user_response = text
+
+    # Build history
+    history = [{"role": "user", "content": "[start]"}]
+    for e in events:
+        history.append({"role": "assistant", "content": e.content})
+        if e.user_response:
+            history.append({"role": "user", "content": e.user_response})
+    history.append({"role": "user", "content": text})
+
+    # Handle second pass check response
+    if phase == 'second_pass_check':
+        if text.strip().lower() in SECOND_PASS_PHRASES:
+            await _set_phase(session, 'second_pass', 0)
+            phase = 'second_pass'
+            turns = 0
+        else:
+            return await _close_session(user, explicit=False)
+
+    # Determine next question position
+    next_pos = _srs_position(turns + 1, schedule)
+
+    if next_pos is None:
+        # All questions answered — wrap up and offer second pass
+        response_text = await call_llm(history, user=user, system_suffix=SRS_REVIEW_COMPLETE_SUFFIX)
+        response_text = response_text + "\n\n" + SECOND_PASS_CHECK_STRING
+        await _set_phase(session, 'second_pass_check', 0)
+    else:
+        next_skill, next_q_num, next_q_total = next_pos
+        current_pos = _srs_position(turns, schedule)
+        current_skill = current_pos[0] if current_pos else None
+
+        if current_skill and current_skill.skill_id == next_skill.skill_id:
+            suffix = SRS_REVIEW_SAME_SKILL_SUFFIX.format(
+                next_q_num=next_q_num,
+                total_q=next_q_total,
+                skill_name=next_skill.name,
+            )
+        else:
+            suffix = SRS_REVIEW_NEXT_SKILL_SUFFIX.format(
+                next_skill_name=next_skill.name,
+                next_skill_description=next_skill.description,
+                total_q=next_q_total,
+            )
+
+        response_text = await call_llm(history, user=user, system_suffix=suffix)
+        await _set_phase(session, phase, turns + 1)
+
+    await sync_to_async(SessionEvent.objects.create)(
+        session=session,
+        event_type='conversation',
+        content=response_text,
+        user_response='',
+    )
+
+    return {"text": response_text, "audio_url": None, "session_ended": False}
+
+
+# ── Conversation phase control ────────────────────────────────────────────────
+
+async def _continue_conversation(user, session, text: str) -> dict:
+    from learner.models import SessionEvent, Session
+    from .interests import extract_and_store_interests
+    from .scoring import score_session
+
+    turns = session.phase_turns_completed
+
+    events = await sync_to_async(
+        lambda: list(session.events.order_by('timestamp')[:30])
+    )()
+
+    pending = next((e for e in reversed(events) if not e.user_response), None)
+    if pending:
+        await sync_to_async(
+            lambda: SessionEvent.objects.filter(pk=pending.pk).update(user_response=text)
+        )()
+        pending.user_response = text
+
+    history = [{"role": "user", "content": "[start]"}]
+    for e in events:
+        history.append({"role": "assistant", "content": e.content})
+        if e.user_response:
+            history.append({"role": "user", "content": e.user_response})
+    history.append({"role": "user", "content": text})
+
+    if turns >= CONVERSATION_TURNS:
+        response_text = await call_llm(history, user=user, system_suffix=CONVERSATION_CLOSE_SUFFIX)
+
+        await sync_to_async(SessionEvent.objects.create)(
+            session=session, event_type='conversation',
+            content=response_text, user_response='',
+        )
+        await sync_to_async(
+            lambda: Session.objects.filter(pk=session.pk).update(
+                ended_at=timezone.now(), summary=response_text[:500]
+            )
+        )()
+        await extract_and_store_interests(session, user)
+        try:
+            await score_session(session, user)
+        except Exception:
+            pass
+
+        return {"text": response_text, "audio_url": None, "session_ended": True}
+
+    response_text = await call_llm(history, user=user)
+    await _set_phase(session, 'conversation', turns + 1)
+
+    await sync_to_async(SessionEvent.objects.create)(
+        session=session, event_type='conversation',
+        content=response_text, user_response='',
+    )
+
+    return {"text": response_text, "audio_url": None, "session_ended": False}
+
+
+# ── Reading phase control ─────────────────────────────────────────────────────
+
+async def _continue_reading(user, session, text: str) -> dict:
+    from learner.models import SessionEvent, Session
+    from .interests import extract_and_store_interests
+    from .scoring import score_session
+
+    skill = session.target_skill
+    skill_name = skill.name if skill else 'this skill'
+    phase = session.current_phase
+    turns = session.phase_turns_completed
+
+    if phase == 'complete':
+        return await _close_session(user, explicit=False)
+
+    events = await sync_to_async(
+        lambda: list(session.events.order_by('timestamp')[:40])
+    )()
+
+    pending = next((e for e in reversed(events) if not e.user_response), None)
+    if pending:
+        await sync_to_async(
+            lambda: SessionEvent.objects.filter(pk=pending.pk).update(user_response=text)
+        )()
+        pending.user_response = text
+
+    history = [{"role": "user", "content": "[start]"}]
+    for e in events:
+        history.append({"role": "assistant", "content": e.content})
+        if e.user_response:
+            history.append({"role": "user", "content": e.user_response})
+    history.append({"role": "user", "content": text})
+
+    if phase == 'present':
+        await _set_phase(session, 'comprehension', 0)
+        suffix = READING_COMPREHENSION_SUFFIX.format(q_num=1)
+        response_text = await call_llm(history, user=user, system_suffix=suffix)
+
+    elif phase == 'comprehension':
+        new_turns = turns + 1
+        if new_turns >= READING_PHASE_TURNS['comprehension']:
+            await _set_phase(session, 'production', 0)
+            suffix = READING_PRODUCTION_SUFFIX.format(skill_name=skill_name, turn_num=1)
+        else:
+            await _set_phase(session, 'comprehension', new_turns)
+            suffix = READING_COMPREHENSION_SUFFIX.format(q_num=new_turns + 1)
+        response_text = await call_llm(history, user=user, system_suffix=suffix)
+
+    elif phase == 'production':
+        new_turns = turns + 1
+        if new_turns >= READING_PHASE_TURNS['production']:
+            suffix = READING_CLOSE_SUFFIX.format(skill_name=skill_name)
+            response_text = await call_llm(history, user=user, system_suffix=suffix)
+            await sync_to_async(SessionEvent.objects.create)(
+                session=session, event_type='conversation',
+                content=response_text, user_response='',
+            )
+            await sync_to_async(
+                lambda: Session.objects.filter(pk=session.pk).update(
+                    ended_at=timezone.now(), summary=response_text[:500]
+                )
+            )()
+            await extract_and_store_interests(session, user)
+            try:
+                await score_session(session, user)
+            except Exception:
+                pass
+            return {"text": response_text, "audio_url": None, "session_ended": True}
+        else:
+            await _set_phase(session, 'production', new_turns)
+            suffix = READING_PRODUCTION_SUFFIX.format(skill_name=skill_name, turn_num=new_turns + 1)
+            response_text = await call_llm(history, user=user, system_suffix=suffix)
+
+    else:
+        response_text = await call_llm(history, user=user)
+
+    await sync_to_async(SessionEvent.objects.create)(
+        session=session, event_type='conversation',
+        content=response_text, user_response='',
+    )
+
+    return {"text": response_text, "audio_url": None, "session_ended": False}
+
+
+# ── Writing phase control ─────────────────────────────────────────────────────
+
+async def _continue_writing(user, session, text: str) -> dict:
+    from learner.models import SessionEvent, Session
+    from .interests import extract_and_store_interests
+    from .scoring import score_session
+
+    skill = session.target_skill
+    skill_name = skill.name if skill else 'this skill'
+    phase = session.current_phase
+    turns = session.phase_turns_completed
+
+    events = await sync_to_async(
+        lambda: list(session.events.order_by('timestamp')[:40])
+    )()
+
+    pending = next((e for e in reversed(events) if not e.user_response), None)
+    if pending:
+        await sync_to_async(
+            lambda: SessionEvent.objects.filter(pk=pending.pk).update(user_response=text)
+        )()
+        pending.user_response = text
+
+    history = [{"role": "user", "content": "[start]"}]
+    for e in events:
+        history.append({"role": "assistant", "content": e.content})
+        if e.user_response:
+            history.append({"role": "user", "content": e.user_response})
+    history.append({"role": "user", "content": text})
+
+    async def _do_close():
+        suffix = WRITING_CLOSE_SUFFIX.format(skill_name=skill_name)
+        response_text = await call_llm(history, user=user, system_suffix=suffix)
+        await sync_to_async(SessionEvent.objects.create)(
+            session=session, event_type='conversation',
+            content=response_text, user_response='',
+        )
+        await sync_to_async(
+            lambda: Session.objects.filter(pk=session.pk).update(
+                ended_at=timezone.now(), summary=response_text[:500]
+            )
+        )()
+        await extract_and_store_interests(session, user)
+        try:
+            await score_session(session, user)
+        except Exception:
+            pass
+        return {"text": response_text, "audio_url": None, "session_ended": True}
+
+    if phase == 'prompt':
+        await _set_phase(session, 'correction', 0)
+        response_text = await call_llm(history, user=user, system_suffix=WRITING_FIRST_ERROR_SUFFIX)
+
+    elif phase == 'correction':
+        if turns >= WRITING_CORRECTION_TURNS - 1:
+            return await _do_close()
+        elif turns % 2 == 0:
+            # Student just rewrote an error → confirm + ask for new sentence
+            response_text = await call_llm(history, user=user, system_suffix=WRITING_REWRITE_SUFFIX)
+            await _set_phase(session, 'correction', turns + 1)
+        else:
+            # Student wrote new sentence → confirm + present next error
+            error_num = (turns // 2) + 2
+            suffix = WRITING_NEXT_ERROR_SUFFIX.format(error_num=error_num)
+            response_text = await call_llm(history, user=user, system_suffix=suffix)
+            await _set_phase(session, 'correction', turns + 1)
+
+    else:
+        response_text = await call_llm(history, user=user)
+
+    await sync_to_async(SessionEvent.objects.create)(
+        session=session, event_type='conversation',
+        content=response_text, user_response='',
+    )
+
+    return {"text": response_text, "audio_url": None, "session_ended": False}
+
+
 # ── Standard session continuation ─────────────────────────────────────────────
 
 async def _continue_session(user, session, text: str, attachments: list = None) -> dict:
@@ -568,30 +1089,32 @@ async def _continue_session(user, session, text: str, attachments: list = None) 
         lambda: list(session.events.order_by('timestamp')[:20])
     )()
 
-    history = []
+    # Build history: dummy user message first (API requires user-first),
+    # then each event as assistant + the student reply that followed it.
+    history = [{"role": "user", "content": "[start]"}]
     for e in events:
+        history.append({"role": "assistant", "content": e.content})
         if e.user_response:
             history.append({"role": "user", "content": e.user_response})
-            history.append({"role": "assistant", "content": e.content})
 
     history.append({"role": "user", "content": text})
 
     response_text = await call_llm(history, user=user)
 
+    # Record student response on pending event without touching its content.
     pending = next((e for e in reversed(events) if not e.user_response), None)
     if pending:
         await sync_to_async(
-            lambda: SessionEvent.objects.filter(pk=pending.pk).update(
-                user_response=text, content=response_text
-            )
+            lambda: SessionEvent.objects.filter(pk=pending.pk).update(user_response=text)
         )()
-    else:
-        await sync_to_async(SessionEvent.objects.create)(
-            session=session,
-            event_type='conversation',
-            content=response_text,
-            user_response=text,
-        )
+
+    # Always create a new event for Luz's response.
+    await sync_to_async(SessionEvent.objects.create)(
+        session=session,
+        event_type='conversation',
+        content=response_text,
+        user_response='',
+    )
 
     return {"text": response_text, "audio_url": None, "session_ended": False}
 

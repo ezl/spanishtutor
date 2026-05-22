@@ -72,6 +72,17 @@ skills:
     cefr_level: A1
     description: "Head, face, torso, limbs; tengo dolor de; reflexive use with body parts"
 
+  - id: a1_vocab_question_words
+    name: Vocabulary — question words
+    cefr_level: A1
+    description: "qué, quién/quiénes, cuándo, dónde, por qué, cómo, cuánto/a/os/as; question word order; accent marks that distinguish qué from que"
+
+  - id: a1_vocab_core_adjectives
+    name: Vocabulary — core adjectives & opposites
+    cefr_level: A1
+    description: "grande/pequeño, bueno/malo, nuevo/viejo, fácil/difícil, rápido/lento, caro/barato, bonito/feo, fuerte/débil; gender agreement with each pair"
+    prerequisites: [a1_nouns_gender]
+
   # ─── A2 ───────────────────────────────────────────────
   - id: a2_stem_change_e_ie
     name: Stem-changing verbs — e->ie
@@ -102,6 +113,18 @@ skills:
     cefr_level: A2
     description: "Reflexive pronouns (me, te, se, nos); levantarse, llamarse, ducharse, acostarse, sentirse"
     prerequisites: [a1_present_ar]
+
+  - id: a2_pattern_verb_infinitive
+    name: Verb + infinitive constructions
+    cefr_level: A2
+    description: "querer, poder, deber, necesitar, tener que, hay que + infinitive; meaning differences; no conjugation on second verb; very high-frequency constructions"
+    prerequisites: [a2_stem_change_e_ie, a2_stem_change_o_ue]
+
+  - id: a2_imperatives
+    name: Imperative — commands
+    cefr_level: A2
+    description: "Tú affirmative commands (habla, come, escribe); irregular tú commands (ven, di, haz, ten, sal, sé, ve, pon); usted/ustedes commands from subjunctive; negative commands with no + subjunctive"
+    prerequisites: [a2_go_verbs, a2_reflexive_verbs]
 
   - id: a2_direct_object_pronouns
     name: Direct object pronouns — lo, la, los, las
@@ -139,6 +162,17 @@ skills:
     description: "Gender and number agreement; adjectives after noun (descriptive) vs before (limiting/value); apocopation (buen, gran)"
     prerequisites: [a1_nouns_gender]
 
+  - id: a2_pattern_comparisons
+    name: Comparisons — more, less, as…as
+    cefr_level: A2
+    description: "más/menos + adjective/adverb + que; tan + adjective/adverb + como; superlatives (el/la más, el/la menos); irregular forms (mejor, peor, mayor, menor)"
+    prerequisites: [a2_adjective_agreement]
+
+  - id: a2_vocab_connectors_basic
+    name: Vocabulary — basic connectors
+    cefr_level: A2
+    description: "Coordinating: y, o, pero, sino; causal: porque, ya que; temporal: cuando, antes de, después de; additive: también, además, tampoco; result: entonces, por eso"
+
   - id: a2_gustar_like_verbs
     name: Gustar and similar verbs
     cefr_level: A2
@@ -173,6 +207,12 @@ skills:
     description: "Hace frío/calor/sol/viento, llueve, nieva; seasons in context; weather forecasts"
 
   # ─── B1 ───────────────────────────────────────────────
+  - id: b1_pattern_present_progressive
+    name: Present progressive — estar + gerundio
+    cefr_level: B1
+    description: "Gerund formation: -ando (-AR), -iendo (-ER/-IR); irregular gerunds (diciendo, durmiendo, pidiendo, yendo); estar + gerundio for ongoing actions; contrast with simple present"
+    prerequisites: [a1_ser_estar_basic, a1_present_er_ir]
+
   - id: b1_preterite_irreg_high_freq
     name: Preterite — high-frequency irregulars
     cefr_level: B1
@@ -221,6 +261,18 @@ skills:
     description: "9 irregular stems: tener->tendr-, hacer->har-, decir->dir-, poder->podr-, poner->pondr-, querer->querr-, saber->sabr-, salir->saldr-, venir->vendr-; same endings as regular"
     prerequisites: [b1_future_regular]
 
+  - id: b1_pattern_si_clauses_real
+    name: Si clauses — real conditionals
+    cefr_level: B1
+    description: "Si + present indicative + future: si tienes tiempo, llamaré; si + present + imperative: si quieres, ven; distinction from hypothetical si clauses (which use subjunctive)"
+    prerequisites: [b1_future_regular, a1_present_ar]
+
+  - id: b1_pattern_time_expressions
+    name: Time expressions — hace, desde, llevar
+    cefr_level: B1
+    description: "hace + time + que + present (ongoing): hace dos años que vivo aquí; desde hace + time; llevar + time + gerundio: llevo tres horas estudiando; hace + time + preterite (ago): llegué hace una hora"
+    prerequisites: [b1_imperfect_ar, b1_future_periphrastic]
+
   - id: b1_conditional
     name: Conditional tense
     cefr_level: B1
@@ -250,6 +302,11 @@ skills:
     cefr_level: B1
     description: "Adjectives that change meaning (aburrido, listo, malo, seguro, rico); ser for passive; estar + gerund for progressive"
     prerequisites: [a1_ser_estar_basic]
+
+  - id: b1_vocab_conversation_fillers
+    name: Vocabulary — conversation fillers & management
+    cefr_level: B1
+    description: "Fillers: bueno, pues, o sea, a ver, es que, la verdad es que; tag questions: ¿no?, ¿verdad?, ¿cierto?; hesitation: mmm, este...; turn-taking: espera, ¿cómo se dice?, ¿me entiendes?"
 
   - id: b1_vocab_work_career
     name: Vocabulary — work & career

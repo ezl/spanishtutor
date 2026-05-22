@@ -1,9 +1,6 @@
-import yaml
-import os
 from django.shortcuts import render, get_object_or_404
-from .models import User, SkillScore
+from .models import User, Skill, SkillScore
 
-SKILLS_PATH = os.path.join(os.path.dirname(__file__), '..', 'curriculum', 'skills.yaml')
 MODES = ['listening', 'reading', 'spoken_interaction', 'spoken_production', 'writing']
 MODE_LABELS = ['Listening', 'Reading', 'Spoken\nInteraction', 'Spoken\nProduction', 'Writing']
 SCORE_CLASSES = ['untested', 'shaky', 'developing', 'confident', 'mastered']
@@ -12,12 +9,9 @@ CEFR_ORDER = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2']
 
 
 def _load_skills():
-    with open(SKILLS_PATH) as f:
-        data = yaml.safe_load(f)
-    skills = data['skills']
     grouped = {level: [] for level in CEFR_ORDER}
-    for skill in skills:
-        grouped[skill['cefr_level']].append(skill)
+    for skill in Skill.objects.filter(active=True).order_by('order'):
+        grouped[skill.cefr_level].append({'id': skill.skill_id, 'name': skill.name, 'cefr_level': skill.cefr_level})
     return grouped
 
 
@@ -34,8 +28,9 @@ def progress(request, discord_id=None):
             return render(request, 'learner/progress.html', {'no_user': True})
 
     scores = {
-        (s.skill_id, s.mode): s.score
-        for s in SkillScore.objects.filter(user=user)
+        (s.skill.skill_id, s.mode): s.score
+        for s in SkillScore.objects.filter(user=user).select_related('skill')
+        if s.skill
     }
 
     grouped_skills = _load_skills()
