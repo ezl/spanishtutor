@@ -151,8 +151,11 @@ NEXT_QUESTION: <question only — no preamble, no praise, no transition commenta
 
 CONCLUDE when ALL of these are true:
 - CEFR level is clearly established
-- At least 3 consecutive skills in the taxonomy have scores (consecutive = adjacent on the A1→C2 ladder, e.g. the last A2 skill and first two B1 skills). This ensures depth at the boundary, not scattered data points.
-- The boundary between what the student knows and doesn't know is located (you've seen both correct and incorrect, or consistent failure at a level)
+- Skills at 2+ different CEFR levels have been assessed (e.g. A1 AND A2, not just A1 alone)
+- The ceiling is located: you have seen at least one incorrect or unknown answer ABOVE the estimated level — this is what proves the ceiling. Exception: a student failing 3+ consecutive A1 questions has a clear ceiling without probing higher.
+- The floor is confirmed: at least 2 correct answers at or below the estimated level
+
+NEVER conclude when all scored skills are at a single CEFR level and all answers were correct — that means you found a floor but not a ceiling. You must go one level higher before concluding.
 
 For true beginners showing consistent failure at A1, this may happen in 5-6 questions. For students near a B1/B2 boundary, it may take 12+. Conclude as soon as confidence is high — do not pad with extra questions. Only CONTINUE if there is a specific named ambiguity that exactly one more question would resolve.
 
@@ -162,6 +165,7 @@ SKILL_UPDATES: skill:score for every assessed skill
 COMMENT: <1-2 sentences, first person, directed to the student. Something specific you genuinely noticed — write "your..." or "you...", never "the student...". Warm but honest. Example: "Your instinct on individual words is solid — full sentences are where things get fuzzy, and that's exactly what we'll work on.">"""
 
 PHASE_BINARY_SEARCH = """Q1-5: Binary search for CEFR estimate. Start A1. Go harder if correct, easier if wrong.
+CRITICAL: After 2 consecutive correct answers at the same level, you MUST move to the next level up on the next question. Do not stay at the same level. Do not conclude — the ceiling has not been found yet.
 The binary search implicitly confirms the floor — if you see 2+ correct answers at level-1, treat that level as mastered and don't re-probe it unless answers are inconsistent."""
 
 PHASE_BOUNDARY_PROBE = """Q6+: You have a working CEFR estimate. Now do structured boundary probing:
