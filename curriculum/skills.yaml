@@ -185,17 +185,23 @@ skills:
     description: "saber (supe), venir (vine), poner (puse), decir (dije), traer (traje); spelling-change verbs (-car, -gar, -zar)"
     prerequisites: [b1_preterite_irreg_high_freq]
 
-  - id: b1_imperfect
-    name: Imperfect tense
+  - id: b1_imperfect_ar
+    name: Imperfect — -AR verbs
     cefr_level: B1
-    description: "Regular imperfect (-aba/-ía); only 3 irregulars (ser->era, ir->iba, ver->veía); habitual past, descriptions, ongoing background"
+    description: "hablar->hablaba, hablabas, hablaba, hablábamos, hablabais, hablaban; caminar->caminaba; habitual past (siempre hablaba), background descriptions"
     prerequisites: [a2_preterite_ar]
+
+  - id: b1_imperfect_er_ir
+    name: Imperfect — -ER/-IR verbs & irregulars
+    cefr_level: B1
+    description: "comer->comía, vivir->vivía; endings -ía/-ías/-ía/-íamos/-íais/-ían; 3 irregulars: ser->era, ir->iba, ver->veía; contrast with -AR endings"
+    prerequisites: [b1_imperfect_ar]
 
   - id: b1_preterite_vs_imperfect
     name: Preterite vs. imperfect — contrast
     cefr_level: B1
     description: "Completed events (preterite) vs. background/habitual (imperfect); trigger words; narrating a story"
-    prerequisites: [b1_imperfect, a2_preterite_ar]
+    prerequisites: [b1_imperfect_er_ir, a2_preterite_ar]
 
   - id: b1_future_periphrastic
     name: Future — ir + a + infinitive
@@ -203,17 +209,23 @@ skills:
     description: "Voy a + infinitive for near future and plans; contrast with present tense for plans; common in speech"
     prerequisites: [a1_present_ar, a2_go_verbs]
 
-  - id: b1_future_simple
-    name: Future tense — simple future
+  - id: b1_future_regular
+    name: Future tense — regular verbs
     cefr_level: B1
-    description: "Regular future (-é/-ás/-á/-emos/-éis/-án) on infinitive stem; irregular stems (tener->tendr-, hacer->har-); future of probability"
+    description: "Add -é/-ás/-á/-emos/-éis/-án to infinitive stem; hablaré, comeré, viviré; time markers: mañana, la próxima semana, algún día; future of probability"
     prerequisites: [b1_future_periphrastic]
+
+  - id: b1_future_irregular
+    name: Future tense — irregular stems
+    cefr_level: B1
+    description: "9 irregular stems: tener->tendr-, hacer->har-, decir->dir-, poder->podr-, poner->pondr-, querer->querr-, saber->sabr-, salir->saldr-, venir->vendr-; same endings as regular"
+    prerequisites: [b1_future_regular]
 
   - id: b1_conditional
     name: Conditional tense
     cefr_level: B1
-    description: "Regular conditional (same irregular stems as future); hypotheticals; polite requests (podría, quisiera)"
-    prerequisites: [b1_future_simple]
+    description: "Same irregular stems as future; add -ía/-ías/-ía/-íamos/-íais/-ían; hypotheticals; polite requests (podría, quisiera, debería)"
+    prerequisites: [b1_future_irregular]
 
   - id: b1_subjunctive_formation
     name: Subjunctive — present formation
@@ -276,7 +288,7 @@ skills:
     name: Subjunctive — imperfect (past subjunctive)
     cefr_level: B2
     description: "Imperfect subjunctive formation (-ra/-se forms); si clauses (si tuviera..., hablaría); sequence of tenses"
-    prerequisites: [b1_subjunctive_formation, b1_imperfect]
+    prerequisites: [b1_subjunctive_formation, b1_imperfect_er_ir]
 
   - id: b2_passive_ser
     name: Passive voice — ser + past participle
@@ -300,7 +312,7 @@ skills:
     name: Reported speech
     cefr_level: B2
     description: "Dijo que + indicative or subjunctive; tense backshift; preguntó si; reporting questions vs statements"
-    prerequisites: [b1_subjunctive_formation, b1_imperfect]
+    prerequisites: [b1_subjunctive_formation, b1_imperfect_er_ir]
 
   - id: b2_discourse_markers
     name: Discourse markers & complex connectors
@@ -324,19 +336,19 @@ skills:
     name: Compound tenses — perfect and pluperfect
     cefr_level: C1
     description: "Present perfect (he hablado) vs preterite; pluperfect (había hablado) for prior past; regional variation (Spain vs Latin America)"
-    prerequisites: [b1_imperfect, a2_preterite_ar]
+    prerequisites: [b1_imperfect_ar, a2_preterite_ar]
 
   - id: c1_compound_tenses_future
     name: Compound tenses — future and conditional perfect
     cefr_level: C1
     description: "Future perfect (habré llegado) for completed future; conditional perfect (habría ido) for unrealized past hypotheticals"
-    prerequisites: [b1_future_simple, b1_conditional]
+    prerequisites: [b1_future_irregular, b1_conditional]
 
   - id: c1_subjunctive_perfect
     name: Subjunctive — present perfect
     cefr_level: C1
     description: "Haya + past participle; expressing doubt/emotion about past events; when to use vs imperfect subjunctive"
-    prerequisites: [b2_subjunctive_impersonal, b2_subjunctive_adjective_clauses, c1_compound_tenses_past]
+    prerequisites: [b2_subjunctive_past, b2_subjunctive_adjective_clauses, c1_compound_tenses_past]
 
   - id: c1_subjunctive_pluperfect
     name: Subjunctive — pluperfect

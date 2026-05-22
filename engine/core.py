@@ -8,9 +8,11 @@ def get_anthropic_client():
     return anthropic.Anthropic(api_key=django.conf.settings.ANTHROPIC_API_KEY)
 
 
-async def call_llm(messages: list, user=None, max_tokens: int = 1024) -> str:
+async def call_llm(messages: list, user=None, max_tokens: int = 1024, system_suffix: str = None) -> str:
     client = get_anthropic_client()
     system = get_system_prompt(user)
+    if system_suffix:
+        system = system + "\n\n" + system_suffix
     response = await sync_to_async(client.messages.create)(
         model="claude-sonnet-4-6",
         max_tokens=max_tokens,

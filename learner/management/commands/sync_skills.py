@@ -36,6 +36,12 @@ class Command(BaseCommand):
             else:
                 updated += 1
 
+        # Deactivate skills removed from YAML
+        yaml_ids = {entry['id'] for entry in skills_data}
+        deactivated = Skill.objects.filter(active=True).exclude(skill_id__in=yaml_ids).update(active=False)
+        if deactivated:
+            self.stdout.write(self.style.WARNING(f'Deactivated {deactivated} skills no longer in YAML'))
+
         # Second pass: wire up prerequisites (all skills must exist first)
         for entry in skills_data:
             prereq_ids = entry.get('prerequisites', []) or []

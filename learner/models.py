@@ -134,6 +134,11 @@ class Session(models.Model):
     started_at = models.DateTimeField(auto_now_add=True)
     ended_at = models.DateTimeField(null=True, blank=True)
     summary = models.TextField(blank=True)
+    current_phase = models.CharField(max_length=32, blank=True, default='')
+    phase_turns_completed = models.IntegerField(default=0)
+    target_skill = models.ForeignKey(
+        'Skill', null=True, blank=True, on_delete=models.SET_NULL, related_name='targeted_sessions'
+    )
 
     class Meta:
         app_label = 'learner'

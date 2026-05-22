@@ -542,6 +542,8 @@ async def _step_adaptive_quiz(user, text: str) -> dict:
             estimated_cefr_level=cefr,
             onboarding_complete=True,
         )
+        from .interests import seed_interests
+        await seed_interests(user)
         await sync_to_async(EvaluationProgress.objects.get_or_create)(
             user=user, phase='session1'
         )

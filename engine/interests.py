@@ -88,6 +88,47 @@ async def _regenerate_interests_prose(user) -> None:
     )()
 
 
+SEEDED_INTERESTS = [
+    ("making coffee or tea in the morning", "daily_routine"),
+    ("taking a shower", "daily_routine"),
+    ("eating breakfast", "daily_routine"),
+    ("commuting to work", "daily_routine"),
+    ("working at a desk or laptop", "work"),
+    ("having lunch during the workday", "work"),
+    ("finishing work late and being tired", "work"),
+    ("going for a jog", "exercise"),
+    ("going to the gym", "exercise"),
+    ("taking a walk to clear your head", "exercise"),
+    ("cooking dinner at home", "food"),
+    ("ordering food delivery", "food"),
+    ("trying a new restaurant", "food"),
+    ("going grocery shopping", "errands"),
+    ("doing laundry", "errands"),
+    ("cleaning the apartment", "errands"),
+    ("watching Netflix or a show", "entertainment"),
+    ("scrolling through social media before bed", "entertainment"),
+    ("meeting a friend for coffee", "social"),
+    ("having dinner with family", "social"),
+    ("calling or texting someone", "social"),
+    ("going to a birthday party or celebration", "social"),
+    ("making plans that fall through", "social"),
+    ("sleeping in on a Saturday", "leisure"),
+    ("going on vacation", "leisure"),
+]
+
+
+async def seed_interests(user) -> None:
+    """Seed universal interests at onboarding completion. Idempotent."""
+    from learner.models import UserInterest
+    for topic, category in SEEDED_INTERESTS:
+        await sync_to_async(UserInterest.objects.get_or_create)(
+            user=user,
+            topic=topic,
+            defaults={'category': category, 'confidence': 0.4},
+        )
+    await _regenerate_interests_prose(user)
+
+
 async def extract_and_store_interests(session, user) -> list[dict]:
     """
     Run post-session interest extraction. Returns list of extracted facts.

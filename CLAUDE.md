@@ -70,6 +70,8 @@ curriculum/
 
 **Do not commit or deploy without explicit instruction from the user.** Make code changes locally, then wait to be told to commit and/or push.
 
+**Do not write any code or make any changes without explicit instruction.** When the user reports a bug or asks a question, respond with analysis and proposed solutions only. Wait for explicit instruction ("fix it", "do it", "make that change") before touching any file. Questions and bug reports are openings for discussion — not action items.
+
 ## Common Commands
 
 ```bash
