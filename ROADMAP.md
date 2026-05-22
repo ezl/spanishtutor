@@ -181,17 +181,37 @@ User sends voice messages → transcribed via Whisper → evaluated. Luz Angela 
 
 ---
 
-## APP-5: Progressive Evaluation Phases
+## APP-5: Listening & Speaking Session Types
+
+**Depends on:** APP-4 (STT + TTS infrastructure)
 
 **Description:**
-Each session after session 1 adds one evaluation phase until the full grid is covered. Phases: listening, speaking, reading, translation, written production.
+Add listening and speaking session types to cover the two modes the current system can't reach without voice. Scope is evaluation and rough scoring only — accent/pronunciation coaching is out of scope. The transcript is sufficient to score grammar and vocabulary accuracy; a pronunciation API or GPT-4o audio input is used to score fluency and rhythm. We do not attempt to coach phoneme-level articulation through a chat interface — the feedback loop is too weak to be reliable.
+
+**Session types added:**
+
+*Listening:* Luz generates a short passage and sends it as TTS audio. Student replies in text with comprehension answers and then produces sentences using target structures. Same comprehension (4 turns) + production (2 turns) structure as reading sessions. Scores `listening` mode.
+
+*Spoken interaction:* Student sends voice messages; Luz responds with TTS audio. Structured like a conversation session (turn-limited). Transcript evaluated for grammar/vocab accuracy. Fluency scored via pronunciation API or GPT-4o audio. Brief qualitative feedback at close — no phoneme drilling. Scores `spoken_interaction` mode.
+
+*Spoken production:* Student records a response to a prompt (text or audio). Single voice message. Transcript evaluated for accuracy; fluency scored via audio analysis. Luz surfaces 1-2 errors and asks for a single re-recording. Scores `spoken_production` mode.
+
+**Session selection logic:**
+- Listening: triggers when listening score lags reading score (same gap heuristic as reading vs writing)
+- Spoken interaction: B1+ only, inserted into rotation alongside conversation
+- Spoken production: triggers when spoken_production score lags writing score
 
 **Acceptance criteria:**
-- `evaluation_progress` tracks which phases are complete per user
-- At session start, if phases remain, Luz Angela runs the next one naturally within the session
-- Phases: listening (TTS + comprehension), speaking (voice message), reading (passage + questions), translation (EN→ES and ES→EN), written production (open prompt)
-- Each phase saves results to `skill_scores`
-- Once all phases complete, evaluation is done — future sessions are pure learning
+- `_select_session` extended with rules for all three new types
+- Listening sessions use TTS for passage delivery, text for student responses
+- Speaking sessions accept voice message input via APP-4 STT pipeline
+- All three types score the appropriate mode in `skill_scores`
+- Close summary gives brief qualitative feedback; no pronunciation coaching content
+
+**Explicitly out of scope:**
+- Phoneme-level articulation coaching
+- Prosody drilling or shadowing exercises
+- Tracking pronunciation improvement over time at phoneme granularity
 
 ---
 

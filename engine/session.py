@@ -290,6 +290,23 @@ Close with 3-4 sentences:
 
 Session ends after this message."""
 
+# ── Session close summary prompts (English / Spanish variants) ────────────────
+
+CLOSE_SUMMARY_PROMPT_EN = """The student is finishing a Spanish tutoring session. Write a warm closing message from Luz Angela:
+- One sentence: what we covered today
+- One sentence: one specific thing they did well
+- One sentence: what to focus on next session
+- One warm goodbye line
+
+No lists. No headers. 4 sentences, conversational."""
+
+CLOSE_SUMMARY_PROMPT_ES = """El estudiante está terminando la sesión de español. Escribe un mensaje de cierre cálido de Luz Angela:
+- Una oración: lo que cubrimos hoy
+- Una oración: algo específico que hicieron bien
+- Una oración: en qué enfocarse la próxima vez
+- Una despedida cálida
+
+Sin listas. Sin encabezados. 4 oraciones en tono conversacional."""
 
 # ── Phase helpers ──────────────────────────────────────────────────────────────
 
@@ -351,6 +368,54 @@ async def _set_phase(session, phase: str, turns: int) -> None:
     )()
     session.current_phase = phase
     session.phase_turns_completed = turns
+
+
+ADVANCED_LEVELS = {'B1', 'B2', 'C1', 'C2'}
+
+
+def _is_advanced(user) -> bool:
+    return (user.estimated_cefr_level or 'A1') in ADVANCED_LEVELS
+
+
+def _build_checkin(user, session_type: str, last_snippet: str, context: dict, target_name: str = None) -> str:
+    """Return a scripted check-in message. English for A1/A2, Spanish for B1+."""
+    advanced = _is_advanced(user)
+    snippet = last_snippet or ('la última sesión' if advanced else 'your last session')
+
+    if session_type == 'srs_review':
+        due_count = len(context.get('due_skills', []))
+        skills_word = f"{due_count} tema{'s' if due_count != 1 else ''}" if advanced else f"{due_count} skill{'s' if due_count != 1 else ''}"
+        if advanced:
+            return f"¡Hola! Última vez: {snippet}. Hoy quiero hacer un repaso — tienes {skills_word} para revisar. ¿Listo/a para empezar?"
+        return f"Hey! Last time: {snippet}. Today I want to do a quick review — you have {skills_word} to practice. It helps lock things in. Ready?"
+
+    elif session_type == 'new_skill':
+        name = target_name or ('algo nuevo' if advanced else 'something new')
+        if advanced:
+            return f"¡Hola! Última vez: {snippet}. Hoy quiero avanzar con algo nuevo: {name}. ¿Listo/a?"
+        return f"Hey! Last time: {snippet}. Today I want to push forward with something new: {name}. Ready to dive in?"
+
+    elif session_type == 'conversation':
+        if advanced:
+            return f"¡Hola! Última vez: {snippet}. Hoy vamos a tener una charla libre. ¿Listo/a?"
+        return f"Hey! Last time: {snippet}. Today let's have a free conversation session in Spanish. Ready when you are!"
+
+    elif session_type == 'reading':
+        name = target_name or ('lectura' if advanced else 'some reading')
+        if advanced:
+            return f"¡Hola! Última vez: {snippet}. Hoy vamos a trabajar en lectura con «{name}». ¿Listo/a?"
+        return f"Hey! Last time: {snippet}. Today let's do some reading practice — we'll work with {name}. Ready?"
+
+    elif session_type == 'writing':
+        name = target_name or ('escritura' if advanced else 'some writing')
+        if advanced:
+            return f"¡Hola! Última vez: {snippet}. Hoy vamos a trabajar en escritura — específicamente {name}. ¿Listo/a?"
+        return f"Hey! Last time: {snippet}. Today let's work on your writing — specifically {name}. Ready?"
+
+    else:
+        if advanced:
+            return f"¡Hola! Última vez: {snippet}. ¿Listo/a para continuar?"
+        return f"Hey! Last time: {snippet}. Ready to keep going?"
 
 
 def _get_phase_suffix(phase: str, skill, stype: str, events: list) -> str:
@@ -482,6 +547,9 @@ async def handle_session(user, text: str, attachments: list = None) -> dict:
     if not session:
         return await _open_session(user, text)
 
+    if session.current_phase == 'check_in':
+        return await _handle_check_in(user, session, text)
+
     if session.session_type == 'new_skill':
         return await _continue_new_skill(user, session, text)
 
@@ -531,8 +599,88 @@ async def _open_session(user, text: str) -> dict:
 
     level = user.estimated_cefr_level or 'A1'
     interests = user.interests or "daily life, work, food, exercise, friends and family"
-
     win_state = context.get('win_state', False)
+
+    # ── Pre-resolve target skill (needed for check-in message + opening content) ──
+
+    target_skill_obj = None
+
+    if session_type == 'new_skill' and not win_state:
+        skill_dict = context.get('skill')
+        if skill_dict:
+            target_skill_obj = await sync_to_async(Skill.objects.get)(skill_id=skill_dict['id'])
+            _ts = target_skill_obj
+            await sync_to_async(
+                lambda: Session.objects.filter(pk=session.pk).update(target_skill=_ts)
+            )()
+
+    elif session_type == 'reading':
+        from learner.models import SkillScore, Skill as SkillModel
+        _w = await sync_to_async(
+            lambda: {s.skill.skill_id: s.score
+                     for s in SkillScore.objects.filter(user=user, mode='writing').select_related('skill')
+                     if s.skill}
+        )()
+        _r = await sync_to_async(
+            lambda: {s.skill.skill_id: s.score
+                     for s in SkillScore.objects.filter(user=user, mode='reading').select_related('skill')
+                     if s.skill}
+        )()
+        target_skill_obj = await sync_to_async(
+            lambda: next(
+                (s for s in SkillModel.objects.filter(active=True).order_by('order')
+                 if _w.get(s.skill_id, 0) >= 1 and _r.get(s.skill_id, 0) < _w.get(s.skill_id, 0)),
+                SkillModel.objects.filter(active=True).order_by('order').first()
+            )
+        )()
+        if target_skill_obj:
+            _ts = target_skill_obj
+            await sync_to_async(
+                lambda: Session.objects.filter(pk=session.pk).update(target_skill=_ts)
+            )()
+            await sync_to_async(SessionSkill.objects.get_or_create)(session=session, skill=target_skill_obj)
+
+    elif session_type == 'writing':
+        from learner.models import SkillScore, Skill as SkillModel
+        _wm = await sync_to_async(
+            lambda: {s.skill.skill_id: s.score
+                     for s in SkillScore.objects.filter(user=user, mode='writing').select_related('skill')
+                     if s.skill}
+        )()
+        target_skill_obj = await sync_to_async(
+            lambda: next(
+                (s for s in SkillModel.objects.filter(active=True).order_by('order')
+                 if _wm.get(s.skill_id, 0) < 3),
+                SkillModel.objects.filter(active=True).order_by('order').first()
+            )
+        )()
+        if target_skill_obj:
+            _ts = target_skill_obj
+            await sync_to_async(
+                lambda: Session.objects.filter(pk=session.pk).update(target_skill=_ts)
+            )()
+            await sync_to_async(SessionSkill.objects.get_or_create)(session=session, skill=target_skill_obj)
+
+    # ── Check-in for returning users ──────────────────────────────────────────
+
+    if last_session and not win_state:
+        raw = last_session.summary or ''
+        last_snippet = (raw[:80] + '…') if len(raw) > 80 else raw
+        target_name = target_skill_obj.name if target_skill_obj else None
+        checkin_text = _build_checkin(user, session_type, last_snippet, context, target_name)
+        await sync_to_async(SessionEvent.objects.create)(
+            session=session, event_type='conversation',
+            content=checkin_text, user_response='',
+        )
+        await sync_to_async(
+            lambda: Session.objects.filter(pk=session.pk).update(
+                current_phase='check_in', phase_turns_completed=0
+            )
+        )()
+        return {"text": checkin_text, "audio_url": None, "session_ended": False}
+
+    # ── Generate opening content (first-time user, or win state) ─────────────
+
     if win_state:
         prompt = (
             f"Student level: {level}. Send them a genuine win message: "
@@ -542,40 +690,39 @@ async def _open_session(user, text: str) -> dict:
         opening = await call_llm([{"role": "user", "content": prompt}], user=user)
 
     elif session_type == 'new_skill':
-        skill = context.get('skill')
-        if not skill:
+        skill_dict = context.get('skill')
+        if not skill_dict or not target_skill_obj:
             prompt = CONVERSATION_PROMPT.format(
                 cefr_level=level, interests=interests, last_summary=last_summary
             )
             opening = await call_llm([{"role": "user", "content": prompt}], user=user)
+            await sync_to_async(
+                lambda: Session.objects.filter(pk=session.pk).update(
+                    current_phase='conversation', phase_turns_completed=0
+                )
+            )()
         else:
-            stype = 'vocab' if 'vocab' in skill['id'] else 'grammar'
+            stype = _skill_type(target_skill_obj)
             if stype == 'grammar':
                 prompt = GRAMMAR_PRESENT_PROMPT.format(
-                    skill_name=skill['name'],
-                    skill_description=skill['description'],
-                    cefr_level=level,
-                    interests=interests,
+                    skill_name=target_skill_obj.name,
+                    skill_description=target_skill_obj.description,
+                    cefr_level=level, interests=interests,
                 )
                 opening = await call_llm([{"role": "user", "content": prompt}], user=user)
                 opening = opening + "\n\n" + CLARIFYING_QUESTIONS_STRING
                 initial_phase = 'questions'
             else:
                 prompt = VOCAB_PRESENT_PROMPT.format(
-                    skill_name=skill['name'],
-                    skill_description=skill['description'],
-                    cefr_level=level,
-                    interests=interests,
+                    skill_name=target_skill_obj.name,
+                    skill_description=target_skill_obj.description,
+                    cefr_level=level, interests=interests,
                 )
                 opening = await call_llm([{"role": "user", "content": prompt}], user=user)
                 initial_phase = 'guided_practice'
-
-            skill_obj = await sync_to_async(Skill.objects.get)(skill_id=skill['id'])
             await sync_to_async(
                 lambda: Session.objects.filter(pk=session.pk).update(
-                    target_skill=skill_obj,
-                    current_phase=initial_phase,
-                    phase_turns_completed=0,
+                    current_phase=initial_phase, phase_turns_completed=0
                 )
             )()
 
@@ -584,9 +731,7 @@ async def _open_session(user, text: str) -> dict:
         skill_list = "\n".join(f"- {s['name']}: {s['description']}" for s in due_skills)
         first_skill_name = due_skills[0]['name'] if due_skills else 'the first topic'
         prompt = SRS_REVIEW_PROMPT.format(
-            skill_list=skill_list,
-            first_skill_name=first_skill_name,
-            interests=interests,
+            skill_list=skill_list, first_skill_name=first_skill_name, interests=interests,
         )
         opening = await call_llm([{"role": "user", "content": prompt}], user=user)
         await sync_to_async(
@@ -607,72 +752,32 @@ async def _open_session(user, text: str) -> dict:
         )()
 
     elif session_type == 'reading':
-        from learner.models import SkillScore, Skill as SkillModel
-        writing_scores = await sync_to_async(
-            lambda: {s.skill.skill_id: s.score
-                     for s in SkillScore.objects.filter(user=user, mode='writing').select_related('skill')
-                     if s.skill}
-        )()
-        reading_scores = await sync_to_async(
-            lambda: {s.skill.skill_id: s.score
-                     for s in SkillScore.objects.filter(user=user, mode='reading').select_related('skill')
-                     if s.skill}
-        )()
-        reading_target = await sync_to_async(
-            lambda: next(
-                (s for s in SkillModel.objects.filter(active=True).order_by('order')
-                 if writing_scores.get(s.skill_id, 0) >= 1
-                 and reading_scores.get(s.skill_id, 0) < writing_scores.get(s.skill_id, 0)),
-                SkillModel.objects.filter(active=True).order_by('order').first()
-            )
-        )()
         prompt = READING_PROMPT.format(
-            skill_name=reading_target.name if reading_target else 'Spanish',
-            skill_description=reading_target.description if reading_target else '',
-            cefr_level=level,
-            interests=interests,
+            skill_name=target_skill_obj.name if target_skill_obj else 'Spanish',
+            skill_description=target_skill_obj.description if target_skill_obj else '',
+            cefr_level=level, interests=interests,
         )
         opening = await call_llm([{"role": "user", "content": prompt}], user=user)
-        if reading_target:
+        if target_skill_obj:
             await sync_to_async(
                 lambda: Session.objects.filter(pk=session.pk).update(
-                    target_skill=reading_target,
-                    current_phase='present',
-                    phase_turns_completed=0,
+                    current_phase='present', phase_turns_completed=0
                 )
             )()
-            await sync_to_async(SessionSkill.objects.get_or_create)(session=session, skill=reading_target)
 
     elif session_type == 'writing':
-        from learner.models import SkillScore, Skill as SkillModel
-        writing_scores_map = await sync_to_async(
-            lambda: {s.skill.skill_id: s.score
-                     for s in SkillScore.objects.filter(user=user, mode='writing').select_related('skill')
-                     if s.skill}
-        )()
-        writing_target = await sync_to_async(
-            lambda: next(
-                (s for s in SkillModel.objects.filter(active=True).order_by('order')
-                 if writing_scores_map.get(s.skill_id, 0) < 3),
-                SkillModel.objects.filter(active=True).order_by('order').first()
-            )
-        )()
         prompt = WRITING_PROMPT.format(
-            skill_name=writing_target.name if writing_target else 'Spanish',
-            skill_description=writing_target.description if writing_target else '',
-            cefr_level=level,
-            interests=interests,
+            skill_name=target_skill_obj.name if target_skill_obj else 'Spanish',
+            skill_description=target_skill_obj.description if target_skill_obj else '',
+            cefr_level=level, interests=interests,
         )
         opening = await call_llm([{"role": "user", "content": prompt}], user=user)
-        if writing_target:
+        if target_skill_obj:
             await sync_to_async(
                 lambda: Session.objects.filter(pk=session.pk).update(
-                    target_skill=writing_target,
-                    current_phase='prompt',
-                    phase_turns_completed=0,
+                    current_phase='prompt', phase_turns_completed=0
                 )
             )()
-            await sync_to_async(SessionSkill.objects.get_or_create)(session=session, skill=writing_target)
 
     else:
         prompt = CONVERSATION_PROMPT.format(
@@ -681,12 +786,134 @@ async def _open_session(user, text: str) -> dict:
         opening = await call_llm([{"role": "user", "content": prompt}], user=user)
 
     await sync_to_async(SessionEvent.objects.create)(
-        session=session,
-        event_type='conversation',
-        content=opening,
-        user_response='',
+        session=session, event_type='conversation',
+        content=opening, user_response='',
     )
+    return {"text": opening, "audio_url": None, "session_ended": False}
 
+
+# ── Check-in handler ──────────────────────────────────────────────────────────
+
+async def _handle_check_in(user, session, text: str) -> dict:
+    """Student acknowledged the check-in. Generate the real session opening content."""
+    from learner.models import Session, SessionEvent, SessionSkill
+
+    events = await sync_to_async(
+        lambda: list(session.events.order_by('timestamp')[:10])
+    )()
+    pending = next((e for e in reversed(events) if not e.user_response), None)
+    if pending:
+        await sync_to_async(
+            lambda: SessionEvent.objects.filter(pk=pending.pk).update(user_response=text)
+        )()
+
+    level = user.estimated_cefr_level or 'A1'
+    interests = user.interests or "daily life, work, food, exercise, friends and family"
+    last_session = await sync_to_async(
+        lambda: Session.objects.filter(user=user, ended_at__isnull=False)
+                               .exclude(session_type='onboarding')
+                               .order_by('-ended_at').first()
+    )()
+    last_summary = last_session.summary[:120] if last_session and last_session.summary else "this is their first session"
+
+    session_type = session.session_type
+    skill = session.target_skill  # pre-set in _open_session
+
+    if session_type == 'new_skill':
+        if skill:
+            stype = _skill_type(skill)
+            if stype == 'grammar':
+                prompt = GRAMMAR_PRESENT_PROMPT.format(
+                    skill_name=skill.name, skill_description=skill.description,
+                    cefr_level=level, interests=interests,
+                )
+                opening = await call_llm([{"role": "user", "content": prompt}], user=user)
+                opening = opening + "\n\n" + CLARIFYING_QUESTIONS_STRING
+                initial_phase = 'questions'
+            else:
+                prompt = VOCAB_PRESENT_PROMPT.format(
+                    skill_name=skill.name, skill_description=skill.description,
+                    cefr_level=level, interests=interests,
+                )
+                opening = await call_llm([{"role": "user", "content": prompt}], user=user)
+                initial_phase = 'guided_practice'
+        else:
+            prompt = CONVERSATION_PROMPT.format(
+                cefr_level=level, interests=interests, last_summary=last_summary
+            )
+            opening = await call_llm([{"role": "user", "content": prompt}], user=user)
+            initial_phase = 'conversation'
+        await sync_to_async(
+            lambda: Session.objects.filter(pk=session.pk).update(
+                current_phase=initial_phase, phase_turns_completed=0
+            )
+        )()
+
+    elif session_type == 'srs_review':
+        session_skills = await sync_to_async(
+            lambda: list(SessionSkill.objects.filter(session=session).select_related('skill').order_by('pk'))
+        )()
+        due_skills = [{'name': ss.skill.name, 'description': ss.skill.description}
+                      for ss in session_skills if ss.skill]
+        skill_list = "\n".join(f"- {s['name']}: {s['description']}" for s in due_skills)
+        first_skill_name = due_skills[0]['name'] if due_skills else 'the first topic'
+        prompt = SRS_REVIEW_PROMPT.format(
+            skill_list=skill_list, first_skill_name=first_skill_name, interests=interests,
+        )
+        opening = await call_llm([{"role": "user", "content": prompt}], user=user)
+        await sync_to_async(
+            lambda: Session.objects.filter(pk=session.pk).update(
+                current_phase='review', phase_turns_completed=0
+            )
+        )()
+
+    elif session_type == 'conversation':
+        prompt = CONVERSATION_PROMPT.format(
+            cefr_level=level, interests=interests, last_summary=last_summary
+        )
+        opening = await call_llm([{"role": "user", "content": prompt}], user=user)
+        await sync_to_async(
+            lambda: Session.objects.filter(pk=session.pk).update(
+                current_phase='conversation', phase_turns_completed=0
+            )
+        )()
+
+    elif session_type == 'reading':
+        prompt = READING_PROMPT.format(
+            skill_name=skill.name if skill else 'Spanish',
+            skill_description=skill.description if skill else '',
+            cefr_level=level, interests=interests,
+        )
+        opening = await call_llm([{"role": "user", "content": prompt}], user=user)
+        await sync_to_async(
+            lambda: Session.objects.filter(pk=session.pk).update(
+                current_phase='present', phase_turns_completed=0
+            )
+        )()
+
+    elif session_type == 'writing':
+        prompt = WRITING_PROMPT.format(
+            skill_name=skill.name if skill else 'Spanish',
+            skill_description=skill.description if skill else '',
+            cefr_level=level, interests=interests,
+        )
+        opening = await call_llm([{"role": "user", "content": prompt}], user=user)
+        await sync_to_async(
+            lambda: Session.objects.filter(pk=session.pk).update(
+                current_phase='prompt', phase_turns_completed=0
+            )
+        )()
+
+    else:
+        prompt = CONVERSATION_PROMPT.format(
+            cefr_level=level, interests=interests, last_summary=last_summary
+        )
+        opening = await call_llm([{"role": "user", "content": prompt}], user=user)
+
+    await sync_to_async(SessionEvent.objects.create)(
+        session=session, event_type='conversation',
+        content=opening, user_response='',
+    )
     return {"text": opening, "audio_url": None, "session_ended": False}
 
 
@@ -1152,14 +1379,7 @@ async def _close_session(user, explicit: bool = True) -> dict:
                                .first()
     )()
 
-    summary_prompt = """The student is ending the session. Generate a warm closing message from Luz Angela calibrated to their level:
-- Brief summary of what was covered today
-- One specific thing they did well
-- What to work on next session
-- Warm goodbye
-
-Keep it to 4-5 sentences."""
-
+    summary_prompt = CLOSE_SUMMARY_PROMPT_ES if _is_advanced(user) else CLOSE_SUMMARY_PROMPT_EN
     summary = await call_llm([{"role": "user", "content": summary_prompt}], user=user)
 
     dev_log = None
