@@ -76,6 +76,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # API keys
 DISCORD_BOT_TOKEN = os.environ.get('DISCORD_BOT_TOKEN', '')
 ANTHROPIC_API_KEY = os.environ.get('ANTHROPIC_API_KEY', '')
+ANTHROPIC_MODEL = os.environ.get('ANTHROPIC_MODEL', 'claude-sonnet-4-6')
 OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY', '')
 
 BASE_URL = os.environ.get('BASE_URL', 'https://spanish.up.railway.app')

@@ -478,7 +478,10 @@ async def _select_session(user):
         frontier_ids = {fs.skill_id for fs in frontier_skills} if frontier_skills else set()
         due_in_frontier = [s for s in due if _sid(s) in frontier_ids]
         due_pool = due_in_frontier if len(due_in_frontier) >= 3 else due
-        due_skill_objs = [d for s in due_pool[:6] if (d := get_skill(_sid(s)))]
+        _pool = due_pool[:6]
+        due_skill_objs = await sync_to_async(
+            lambda: [d for s in _pool if (d := get_skill(_sid(s)))]
+        )()
         if due_skill_objs:
             return 'srs_review', {'due_skills': due_skill_objs}, frontier_skills
 
@@ -508,7 +511,7 @@ async def _select_session(user):
 
     # 4. Default: push a new skill
     scored_ids = {_sid(s) for s in scores}
-    skill = next_new_skill(level, scored_ids)
+    skill = await sync_to_async(next_new_skill)(level, scored_ids)
     return 'new_skill', {'skill': skill}, frontier_skills
 
 

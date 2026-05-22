@@ -23,11 +23,15 @@ def get_anthropic_client():
     return anthropic.Anthropic(api_key=django.conf.settings.ANTHROPIC_API_KEY)
 
 
-async def call_llm(messages: list, user=None, max_tokens: int = 1024, system_suffix: str = None) -> str:
+async def call_llm(messages: list, user=None, max_tokens: int = 1024,
+                   system_suffix: str = None, system_override: str = None) -> str:
     client = get_anthropic_client()
-    system = get_system_prompt(user)
-    if system_suffix:
-        system = system + "\n\n" + system_suffix
+    if system_override is not None:
+        system = system_override
+    else:
+        system = get_system_prompt(user)
+        if system_suffix:
+            system = system + "\n\n" + system_suffix
 
     last_exc = None
     for attempt in range(LLM_RETRIES + 1):

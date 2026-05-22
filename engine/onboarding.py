@@ -178,6 +178,12 @@ Alternate grammar and vocabulary strands. Target the specific skill IDs from the
 
 PHASE_FIRST_QUESTION = "This is Q1. Ignore the input — ask the very first question. Start A1 (e.g. 'what does \"gracias\" mean?'). Use multiple choice."
 
+QUIZ_SYSTEM = (
+    "You are a Spanish placement evaluator. "
+    "Follow the output format exactly. "
+    "Do not add preamble, praise, or commentary outside the specified fields."
+)
+
 # ---------------------------------------------------------------------------
 # Input classification
 # ---------------------------------------------------------------------------
@@ -245,21 +251,27 @@ async def _save_skill_updates(user, updates_str: str):
     """Parse and save SKILL_UPDATES string to SkillScore rows."""
     if not updates_str or updates_str.lower() == 'none':
         return
-    from learner.models import SkillScore
+    from learner.models import SkillScore, Skill
     score_map = {'shaky': 1, 'developing': 2, 'confident': 3, 'mastered': 4}
     for pair in updates_str.split(','):
         pair = pair.strip()
         if ':' not in pair:
             continue
-        skill_id, _, score_str = pair.partition(':')
+        skill_slug, _, score_str = pair.partition(':')
         score = score_map.get(score_str.strip())
-        if score:
-            await sync_to_async(SkillScore.objects.update_or_create)(
-                user=user,
-                skill_id=skill_id.strip(),
-                mode='writing',
-                defaults={'score': score},
-            )
+        if not score:
+            continue
+        try:
+            skill = await sync_to_async(Skill.objects.get)(skill_id=skill_slug.strip())
+        except Skill.DoesNotExist:
+            log.warning('quiz: unknown skill_id in SKILL_UPDATES: %s', skill_slug.strip())
+            continue
+        await sync_to_async(SkillScore.objects.update_or_create)(
+            user=user,
+            skill=skill,
+            mode='writing',
+            defaults={'score': score},
+        )
 
 # ---------------------------------------------------------------------------
 # Menu helpers
@@ -492,6 +504,7 @@ async def _step_adaptive_quiz(user, text: str) -> dict:
         [{"role": "user", "content": prompt}],
         user=None,
         max_tokens=600,
+        system_override=QUIZ_SYSTEM,
     )
     log.debug('[%s] quiz: raw LLM response:\n%s', uid, llm_response)
 
@@ -566,6 +579,7 @@ async def _step_adaptive_quiz(user, text: str) -> dict:
             [{"role": "user", "content": prompt}],
             user=None,
             max_tokens=600,
+            system_override=QUIZ_SYSTEM,
         )
         parsed = _parse_quiz_response(llm_response)
         next_q_raw = _fix_blanks(parsed.get('NEXT_QUESTION', ''))
