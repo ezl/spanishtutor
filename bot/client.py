@@ -1,8 +1,37 @@
+import asyncio
+import logging
 import traceback
 import discord
 import django.conf
 from asgiref.sync import sync_to_async
 from engine.onboarding import FIRST_MESSAGE
+
+logger = logging.getLogger('bot')
+
+DISCORD_RETRIES = 1
+DISCORD_RETRY_DELAY = 2.0
+USER_ERROR_MESSAGE = "Lo siento, tuve un problema. 😅 Try again in a moment!"
+
+
+def _is_retryable_discord_error(exc) -> bool:
+    return isinstance(exc, discord.DiscordServerError)
+
+
+async def _send(channel, text: str) -> None:
+    """Send a message with one retry on transient Discord errors."""
+    last_exc = None
+    for attempt in range(DISCORD_RETRIES + 1):
+        try:
+            await channel.send(text)
+            return
+        except discord.DiscordServerError as exc:
+            last_exc = exc
+            if attempt < DISCORD_RETRIES:
+                logger.warning('Discord send failed (attempt %d/%d), retrying in %.0fs: %s',
+                               attempt + 1, DISCORD_RETRIES + 1, DISCORD_RETRY_DELAY, exc)
+                await asyncio.sleep(DISCORD_RETRY_DELAY)
+            else:
+                raise
 
 
 intents = discord.Intents.default()
@@ -100,7 +129,7 @@ async def on_message(message: discord.Message):
             user, is_new = await get_or_create_user(message.author)
 
             if is_new:
-                await message.channel.send(FIRST_MESSAGE)
+                await _send(message.channel, FIRST_MESSAGE)
                 return
 
             from engine.core import handle_message
@@ -109,22 +138,20 @@ async def on_message(message: discord.Message):
         if result.get('text'):
             response = result['text']
             while response:
-                await message.channel.send(response[:1990])
+                await _send(message.channel, response[:1990])
                 response = response[1990:]
 
         if result.get('follow_up'):
-            await message.channel.send(result['follow_up'])
+            await _send(message.channel, result['follow_up'])
 
         if result.get('dev_log'):
-            await message.channel.send(result['dev_log'])
+            await _send(message.channel, result['dev_log'])
 
     except Exception as e:
-        tb = traceback.format_exc()
-        print(f'ERROR handling message from {message.author}: {e}\n{tb}')
+        logger.error('Error handling message from %s: %s\n%s',
+                     message.author, e, traceback.format_exc())
         try:
-            await message.channel.send(
-                f'Lo siento, algo salió mal. 😅 (Error: `{type(e).__name__}: {str(e)[:100]}`)'
-            )
+            await message.channel.send(USER_ERROR_MESSAGE)
         except Exception:
             pass
 
