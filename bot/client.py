@@ -93,7 +93,7 @@ async def on_message(message: discord.Message):
         await sync_to_async(
             User.objects.filter(discord_id=str(message.author.id)).update
         )(instruction_language='english')
-        await message.channel.send("Got it — I'll give all instructions in English from now on.")
+        await message.channel.send("Got it - I'll give all instructions in English from now on.")
         return
 
     if text.lower() == '!spanish':
@@ -116,10 +116,10 @@ async def on_message(message: discord.Message):
             f"**Current level:** {level}\n"
             f"**Skill grid:** {grid_url}\n\n"
             f"**Commands:**\n"
-            f"`!retest` — retake the placement quiz\n"
-            f"`!english` — force English instructions\n"
-            f"`!spanish` — force Spanish instructions\n"
-            f"`!reset` — wipe everything and start over\n"
+            f"`!retest` - retake the placement quiz\n"
+            f"`!english` - force English instructions\n"
+            f"`!spanish` - force Spanish instructions\n"
+            f"`!reset` - wipe everything and start over\n"
         )
         await message.channel.send(menu)
         return

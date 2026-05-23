@@ -135,12 +135,31 @@ async def test_select_session_srs_review_when_3_overdue(make_user, make_skill):
 
 
 @pytest.mark.django_db(transaction=True)
-async def test_select_session_conversation_for_b1_user(make_user, make_skill):
-    """B1 user with no recent conversation → conversation session (before new_skill)."""
+async def test_select_session_b1_first_session_is_new_skill(make_user, make_skill):
+    """B1 user with no prior sessions → new_skill, not conversation (conversation requires prior sessions)."""
     from engine.session import _select_session
 
     user = await sync_to_async(make_user)(discord_id='u_sel3', cefr_level='B1')
     await sync_to_async(make_skill)(skill_id='b1_imperfect', cefr_level='B1', order=1)
+
+    session_type, _, _ = await _select_session(user)
+    assert session_type == 'new_skill'
+
+
+@pytest.mark.django_db(transaction=True)
+async def test_select_session_conversation_after_prior_sessions(make_user, make_skill):
+    """B1 user with 4 prior non-conversation sessions → conversation fires."""
+    from learner.models import Session
+    from engine.session import _select_session
+    from django.utils import timezone
+
+    user = await sync_to_async(make_user)(discord_id='u_sel4', cefr_level='B1')
+    await sync_to_async(make_skill)(skill_id='b1_imperfect', cefr_level='B1', order=1)
+
+    for _ in range(4):
+        await sync_to_async(Session.objects.create)(
+            user=user, session_type='new_skill', ended_at=timezone.now()
+        )
 
     session_type, _, _ = await _select_session(user)
     assert session_type == 'conversation'

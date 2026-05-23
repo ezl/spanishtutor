@@ -43,6 +43,7 @@ See V1 tickets below.
 - Session timing analytics (time of day, duration, retention correlation)
 - Evaluatory summaries on demand
 - Weekly progress reports via DM
+- **Custom vocabulary / phrase sets**: user can add their own vocab or ask Luz to generate a set ("create a set of phrases around ordering food at a restaurant"). Sets are stored per-user and enter the SRS rotation alongside the core curriculum. Luz generates the set, confirms it with the user before saving, and treats each item as a skill cell in the grid.
 
 ---
 
@@ -70,6 +71,22 @@ See V1 tickets below.
 - Billing and subscription management
 - User dashboard (account, subscription, progress)
 - Admin tooling beyond Django admin
+
+---
+
+## Phase 8 — Messenger Migration
+
+Discord was the right channel for early development but Facebook Messenger is the right channel for US users learning Spanish. The engine is already interface-agnostic — the migration is an I/O swap, not an architecture change.
+
+**What changes:**
+- Replace `bot/client.py` (Discord socket) with a Django webhook view (Messenger HTTP callbacks)
+- Rename `User.discord_id` → `User.external_id` (one migration)
+- Remove `discord.py` dependency, add `requests` or `httpx` for Meta Graph API calls
+- Update magic link auth to use Messenger identity instead of Discord
+
+**What doesn't change:** engine, session logic, scoring, curriculum — everything below the I/O layer.
+
+**When to do it:** when ready to grow beyond the initial test user(s). Not worth the Meta app review friction until the product is proven.
 
 ---
 

@@ -43,7 +43,7 @@ MORE_PRACTICE_PHRASES = {
 }
 
 SECOND_PASS_CHECK_STRING = (
-    'That covers everything — want to do a quick second pass to lock it in?'
+    'That covers everything. Want to do a quick second pass to lock it in?'
 )
 SECOND_PASS_PHRASES = {
     'yes', 'sure', 'yeah', 'yep', 'ok', 'okay', 'listo', 'sí', 'si',
@@ -386,8 +386,8 @@ def _build_checkin(user, session_type: str, last_snippet: str, context: dict, ta
         due_count = len(context.get('due_skills', []))
         skills_word = f"{due_count} tema{'s' if due_count != 1 else ''}" if advanced else f"{due_count} skill{'s' if due_count != 1 else ''}"
         if advanced:
-            return f"¡Hola! Última vez: {snippet}. Hoy quiero hacer un repaso — tienes {skills_word} para revisar. ¿Listo/a para empezar?"
-        return f"Hey! Last time: {snippet}. Today I want to do a quick review — you have {skills_word} to practice. It helps lock things in. Ready?"
+            return f"¡Hola! Última vez: {snippet}. Hoy quiero hacer un repaso, tienes {skills_word} para revisar. ¿Listo/a para empezar?"
+        return f"Hey! Last time: {snippet}. Today I want to do a quick review - you have {skills_word} to practice. It helps lock things in. Ready?"
 
     elif session_type == 'new_skill':
         name = target_name or ('algo nuevo' if advanced else 'something new')
@@ -404,13 +404,13 @@ def _build_checkin(user, session_type: str, last_snippet: str, context: dict, ta
         name = target_name or ('lectura' if advanced else 'some reading')
         if advanced:
             return f"¡Hola! Última vez: {snippet}. Hoy vamos a trabajar en lectura con «{name}». ¿Listo/a?"
-        return f"Hey! Last time: {snippet}. Today let's do some reading practice — we'll work with {name}. Ready?"
+        return f"Hey! Last time: {snippet}. Today let's do some reading practice - we'll work with {name}. Ready?"
 
     elif session_type == 'writing':
         name = target_name or ('escritura' if advanced else 'some writing')
         if advanced:
-            return f"¡Hola! Última vez: {snippet}. Hoy vamos a trabajar en escritura — específicamente {name}. ¿Listo/a?"
-        return f"Hey! Last time: {snippet}. Today let's work on your writing — specifically {name}. Ready?"
+            return f"¡Hola! Última vez: {snippet}. Hoy vamos a trabajar en escritura, específicamente {name}. ¿Listo/a?"
+        return f"Hey! Last time: {snippet}. Today let's work on your writing, specifically {name}. Ready?"
 
     else:
         if advanced:
@@ -485,20 +485,7 @@ async def _select_session(user):
         if due_skill_objs:
             return 'srs_review', {'due_skills': due_skill_objs}, frontier_skills
 
-    # 2. Conversation — B1+ and not in last 3 sessions
-    if level_idx >= 2:
-        recent_types = await sync_to_async(
-            lambda: list(
-                Session.objects.filter(user=user, ended_at__isnull=False)
-                               .exclude(session_type='onboarding')
-                               .order_by('-ended_at')
-                               .values_list('session_type', flat=True)[:3]
-            )
-        )()
-        if 'conversation' not in recent_types:
-            return 'conversation', {}, frontier_skills
-
-    # 3. Reading — B1+ and reading mode significantly underscored
+    # 2. Reading — B1+ and reading mode significantly underscored
     if level_idx >= 2:
         reading_scores = await sync_to_async(
             lambda: list(SkillScore.objects.filter(user=user, mode='reading').select_related('skill'))
@@ -508,6 +495,19 @@ async def _select_session(user):
             writing_avg = sum(s.score for s in scores) / len(scores)
             if reading_avg < writing_avg - 1.0:
                 return 'reading', {}, frontier_skills
+
+    # 3. Conversation — B1+, has prior sessions, not in last 4 sessions (~20% cadence)
+    if level_idx >= 2:
+        recent_types = await sync_to_async(
+            lambda: list(
+                Session.objects.filter(user=user, ended_at__isnull=False)
+                               .exclude(session_type='onboarding')
+                               .order_by('-ended_at')
+                               .values_list('session_type', flat=True)[:4]
+            )
+        )()
+        if recent_types and 'conversation' not in recent_types:
+            return 'conversation', {}, frontier_skills
 
     # 4. Default: push a new skill
     scored_ids = {_sid(s) for s in scores}

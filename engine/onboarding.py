@@ -44,41 +44,41 @@ RAGE_WORDS = {
 }
 
 REDIRECT_MESSAGE = (
-    "I'm just here to assess your Spanish right now — "
+    "I'm just here to assess your Spanish right now. "
     "I'll be a better conversation partner once we're done! "
     "Let's continue:\n\n{question}"
 )
 
 GUESSING_REMINDER = (
-    "Quick reminder — if you're not sure, just say *I don't know* or *no sé*. "
+    "Quick reminder: if you're not sure, just say *I don't know* or *no sé*. "
     "No penalty, it actually helps me place you better.\n\n"
 )
 
 MENU_MESSAGE = """No worries! Here are your options:
 
-**1.** Start over — reset the quiz from the beginning
-**2.** English mode — I'll give instructions in English from here
-**3.** How does this work? — explain what I'm doing and why
+**1.** Start over - reset the quiz from the beginning
+**2.** English mode - I'll give instructions in English from here
+**3.** How does this work? - explain what I'm doing and why
 
 Reply with 1, 2, or 3."""
 
 HOW_IT_WORKS = (
-    "I'm giving you a short placement quiz to figure out your Spanish level — "
+    "I'm giving you a short placement quiz to figure out your Spanish level, "
     "somewhere between A1 (beginner) and C2 (fluent). I'll ask a few questions, "
-    "starting easy and adjusting based on your answers — it should take about 2–3 minutes. "
+    "starting easy and adjusting based on your answers. Should take about 2-3 minutes. "
     "Once I have a clear picture, we'll start actual lessons tailored to exactly where you are. "
-    "Just answer as best you can — if you don't know, say *no sé*."
+    "Just answer as best you can. If you don't know, say *no sé*."
 )
 
 POST_ASSESSMENT_EN = (
     'Listo! Now the real fun starts. Any time you want to practice, just say something like '
-    '*"let\'s do a lesson"* or *"teach me something"* — I\'ll take it from there.\n\n'
+    '*"let\'s do a lesson"* or *"teach me something"* and I\'ll take it from there.\n\n'
     "If you're ready for a lesson, try it now by asking me to start a lesson!"
 )
 
 POST_ASSESSMENT_ES = (
     '¡Listo! Ahora empieza la diversión. Cuando quieras practicar, solo dime algo como '
-    '*"hagamos una lección"* o *"enséñame algo"* — yo me encargo.\n\n'
+    '*"hagamos una lección"* o *"enséñame algo"* y yo me encargo.\n\n'
     '¡Si estás listo para una lección, pruébalo ahora y pídeme que empecemos!'
 )
 
@@ -98,11 +98,11 @@ STRICT RULES:
 - Never embed the target word, grammatical form, or structure in the question text. No scaffolding hints ever.
 - If the student fails or says "I don't know" on the same skill at the same level twice, record the score and move on immediately.
 - If the student sends something unrelated to the quiz, ignore it and ask the next question as if it wasn't sent.
-- If the last 3 answers all resulted in shaky or unknown skill scores (consecutive wrong answers), prepend this exact text to your NEXT_QUESTION: "Quick reminder — if you're not sure, just say *I don't know* or *no sé*. No penalty, it actually helps me place you better.\n\n"
+- If the last 3 answers all resulted in shaky or unknown skill scores (consecutive wrong answers), prepend this exact text to your NEXT_QUESTION: "Quick reminder: if you're not sure, just say *I don't know* or *no sé*. No penalty, it actually helps me place you better.\n\n"
 
 QUESTION FORMAT by level:
   A1-A2: multiple choice, label options a/b/c/d. Always end with this exact line on its own:
-    *(Not sure? Say "I don't know" — it's more useful than guessing)*
+    *(Not sure? Say "I don't know" - it's more useful than guessing)*
   A2-B1: fill-in-the-blank. Format exactly like this, two lines:
     "Ella ________ cansada hoy."
     *(Translation: She is tired today.)*
@@ -162,7 +162,7 @@ For true beginners showing consistent failure at A1, this may happen in 5-6 ques
 CONCLUDE
 CEFR_LEVEL: A1|A2|B1|B2|C1|C2
 SKILL_UPDATES: skill:score for every assessed skill
-COMMENT: <1-2 sentences, first person, directed to the student. Something specific you genuinely noticed — write "your..." or "you...", never "the student...". Warm but honest. Example: "Your instinct on individual words is solid — full sentences are where things get fuzzy, and that's exactly what we'll work on.">"""
+COMMENT: <1-2 sentences, first person, directed to the student. Something specific you genuinely noticed - write "your..." or "you...", never "the student...". Warm but honest. Example: "Your instinct on individual words is solid, but full sentences are where things get fuzzy, and that's exactly what we'll work on.">"""
 
 PHASE_BINARY_SEARCH = """Q1-5: Binary search for CEFR estimate. Start A1. Go harder if correct, easier if wrong.
 CRITICAL: After 2 consecutive correct answers at the same level, you MUST move to the next level up on the next question. Do not stay at the same level. Do not conclude — the ceiling has not been found yet.
@@ -313,7 +313,7 @@ async def _handle_menu_response(user, session, text: str, menu_event, quiz_event
         )
         last_q = next((e for e in reversed(quiz_events) if e.content), None)
         reask = f"\n\nLet's continue:\n\n{last_q.content}" if last_q else ""
-        return {"text": f"Got it — I'll give instructions in English from here.{reask}", "audio_url": None, "session_ended": False}
+        return {"text": f"Got it - I'll give instructions in English from here.{reask}", "audio_url": None, "session_ended": False}
 
     elif t in ('3', 'how', 'how does this work', 'explain', 'what is this'):
         log.info('[%s] menu: how it works selected', uid)
@@ -534,8 +534,8 @@ async def _step_adaptive_quiz(user, text: str) -> dict:
             parts = skill_id.split('_', 1)
             return parts[1].replace('_', ' ').title() if len(parts) > 1 else skill_id.replace('_', ' ').title()
 
-        strong_items = [f"— {_skill_label(k)}" for k, v in skill_scores.items() if v >= 3]
-        weak_items = [f"— {_skill_label(k)}" for k, v in skill_scores.items() if v <= 2]
+        strong_items = [f"- {_skill_label(k)}" for k, v in skill_scores.items() if v >= 3]
+        weak_items = [f"- {_skill_label(k)}" for k, v in skill_scores.items() if v <= 2]
         focus_skills = [_skill_label(k) for k, v in skill_scores.items() if v <= 2]
         focus = f"We'll start with {', '.join(focus_skills[:2])}." if focus_skills else "We'll build from your current level."
 
