@@ -792,6 +792,16 @@ async def _open_session(user, text: str) -> dict:
         session=session, event_type='conversation',
         content=opening, user_response='',
     )
+
+    # First lesson after onboarding: scripted intro as first message, lesson as follow_up
+    if not last_session and session_type == 'new_skill' and target_skill_obj:
+        first_name = (user.display_name or '').split()[0] or 'amigo'
+        intro = (
+            f"Empezamos, {first_name}! Let's start your first lesson. "
+            f"Based on your estimated level, we're going to start you off with {target_skill_obj.name}."
+        )
+        return {"text": intro, "follow_up": opening, "audio_url": None, "session_ended": False}
+
     return {"text": opening, "audio_url": None, "session_ended": False}
 
 

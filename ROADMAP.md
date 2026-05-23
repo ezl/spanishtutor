@@ -29,6 +29,7 @@ See V1 tickets below.
 ## Phase 3 — Public Launch
 
 - Landing page + public signup
+  - Wire up "Start" button: clicking it should initiate the onboarding sequence (redirect user to Discord DM or trigger bot intro)
 - Discord join flow triggers bot DM automatically
 - Stripe integration: first 10 lessons free, then subscription or pay-per-lesson
 - Paywall enforcement in conversation engine
