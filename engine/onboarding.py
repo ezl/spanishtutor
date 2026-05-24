@@ -374,6 +374,17 @@ async def _step_adaptive_quiz(user, text: str) -> dict:
     question, chosen_idx = await _draw_question(skills, skill_idx, quiz_state)
 
     if question is None:
+        if quiz_state['question_count'] == 0:
+            log.error('[%s] quiz: no active QuizQuestion rows found — question bank is empty', uid)
+            return {
+                "text": (
+                    "Uh oh — I don't have any assessment questions loaded. "
+                    "This isn't your fault, it's a setup problem on our end. "
+                    "Please contact support and let them know so it can be fixed."
+                ),
+                "audio_url": None,
+                "session_ended": False,
+            }
         log.warning('[%s] quiz: no question available near idx=%d — concluding early', uid, skill_idx)
         quiz_state['pass'] = 'done'
         return await _conclude_quiz(user, session, quiz_state, skills, uid)
