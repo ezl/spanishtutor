@@ -139,6 +139,7 @@ class Session(models.Model):
     target_skill = models.ForeignKey(
         'Skill', null=True, blank=True, on_delete=models.SET_NULL, related_name='targeted_sessions'
     )
+    quiz_state = models.JSONField(null=True, blank=True)
 
     class Meta:
         app_label = 'learner'
@@ -174,6 +175,28 @@ class UserInterest(models.Model):
 
     def __str__(self):
         return f"{self.user} | {self.topic} ({self.category})"
+
+
+class QuizQuestion(models.Model):
+    FORMAT_CHOICES = [
+        ('multiple_choice',   'Multiple Choice'),
+        ('freeform_word',     'Freeform Word'),
+        ('freeform_response', 'Freeform Response'),
+    ]
+    skill = models.ForeignKey('Skill', on_delete=models.CASCADE, related_name='quiz_questions')
+    format = models.CharField(max_length=20, choices=FORMAT_CHOICES)
+    question_text = models.TextField()
+    options = models.JSONField(null=True, blank=True)   # {"a":..,"b":..,"c":..,"d":..}
+    correct_answer = models.TextField()                  # "a" / word / exemplar sentence
+    rubric = models.TextField(blank=True)                # freeform_response: target structures
+    active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        app_label = 'learner'
+
+    def __str__(self):
+        return f"{self.skill.skill_id} | {self.format} | {self.question_text[:60]}"
 
 
 class SessionEvent(models.Model):

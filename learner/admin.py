@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import User, SkillScore, Session, SessionEvent, EvaluationProgress
+from .models import User, SkillScore, Session, SessionEvent, EvaluationProgress, QuizQuestion
 
 
 @admin.register(User)
@@ -31,3 +31,15 @@ class SessionEventAdmin(admin.ModelAdmin):
 @admin.register(EvaluationProgress)
 class EvaluationProgressAdmin(admin.ModelAdmin):
     list_display = ('user', 'phase', 'completed_at')
+
+
+@admin.register(QuizQuestion)
+class QuizQuestionAdmin(admin.ModelAdmin):
+    list_display = ('skill', 'format', 'question_preview', 'active', 'created_at')
+    list_filter = ('format', 'active', 'skill__cefr_level')
+    search_fields = ('question_text',)
+    list_editable = ('active',)
+
+    @admin.display(description='Question')
+    def question_preview(self, obj):
+        return obj.question_text[:80]

@@ -1,9 +1,9 @@
 """
 Onboarding: new user → adaptive placement quiz → skill grid + CEFR estimate.
 
-Quiz phases:
-  Q1-5:  Binary search for CEFR level
-  Q6+:   Boundary probing at estimated level
+Quiz uses a three-pass probe algorithm (engine/quiz_flow.py) with pre-built
+questions from the QuizQuestion bank. LLM is used only for scoring answers
+(engine/quiz_evaluator.py) — not question generation or flow control.
 """
 import logging
 import re
@@ -83,108 +83,6 @@ POST_ASSESSMENT_ES = (
 )
 
 # ---------------------------------------------------------------------------
-# Quiz prompt
-# ---------------------------------------------------------------------------
-
-QUIZ_PROMPT = """You are running a Spanish placement evaluation. Your ONLY job is to assess level — not teach, not coach, not encourage.
-
-STRICT RULES:
-- ONE attempt per question. Never re-ask, never hint, never say "almost" or "close".
-- Give NO feedback on individual answers. Just move to the next question.
-- Never reveal what skill you are measuring.
-- Missing accents (esta→está, el→él) = treat as correct. Lazy typing, not a knowledge gap.
-- "I don't know" / "no idea" / "idk" = unanswered, mark unknown, move on silently.
-- Do NOT say "good", "nice", "great", or any praise. Pure neutral transitions only.
-- Never embed the target word, grammatical form, or structure in the question text. No scaffolding hints ever.
-- If the student fails or says "I don't know" on the same skill at the same level twice, record the score and move on immediately.
-- If the student sends something unrelated to the quiz, ignore it and ask the next question as if it wasn't sent.
-- If the last 3 answers all resulted in shaky or unknown skill scores (consecutive wrong answers), prepend this exact text to your NEXT_QUESTION: "Quick reminder: if you're not sure, just say *I don't know* or *no sé*. No penalty, it actually helps me place you better.\n\n"
-
-QUESTION FORMAT by level:
-  A1-A2: multiple choice, label options a/b/c/d. Always end with this exact line on its own:
-    *(Not sure? Say "I don't know" - it's more useful than guessing)*
-  A2-B1: fill-in-the-blank. Format exactly like this, two lines:
-    "Ella ________ cansada hoy."
-    *(Translation: She is tired today.)*
-    The translation is always complete — it reveals the answer in English. Never put a blank in the translation line.
-  B1-B2: free production — "How do you say X?" or "Translate: ..."
-  B2+:   natural Spanish — "¿Qué hiciste ayer?" etc., student answers in Spanish
-
-TWO STRANDS — weave both through the quiz, using these exact skill IDs:
-
-  Grammar strand:
-    a1_ser_estar_basic, a1_present_regular, a2_present_irregular, a2_reflexive_verbs,
-    a2_object_pronouns, a2_preterite_regular, b1_preterite_irregular, b1_imperfect,
-    b1_preterite_vs_imperfect, b1_future, b1_conditional, b1_subjunctive_intro,
-    b1_ser_estar_advanced, b2_subjunctive_present, b2_subjunctive_past,
-    b2_passive_voice, b2_advanced_pronouns, b2_reported_speech, b2_discourse_markers,
-    c1_subjunctive_all, c1_compound_tenses, c1_register_shifts
-
-  Vocabulary strand (test with concrete words — translate, identify, produce):
-    a1_basic_vocab       → colors, body parts, food, family, basic objects
-    a1_greetings         → common expressions
-    a2_vocab_domains     → travel, shopping, directions, health, weather
-    a2_gustar_like_verbs → gustar/encantar/molestar constructions
-    b1_vocab_intermediate → work, opinions, emotions, media, technology
-    b2_vocab_advanced    → abstract concepts, formal register, collocations
-    c1_idiomatic_expressions → fixed phrases, collocations
-    c1_vocab_academic    → academic/professional vocabulary
-
-QUIZ HISTORY ({quiz_count} questions so far):
-{history}
-
-LATEST INPUT: {latest}
-
-PHASE: {phase}
-
-{english_mode_note}
-
-SKILL GRID — update scores based on all evidence:
-  unknown | shaky | developing | confident | mastered
-
-OUTPUT FORMAT:
-
-If continuing:
-CONTINUE
-SKILL_UPDATES: skill:score,skill:score  (or "none")
-NEXT_QUESTION: <question only — no preamble, no praise, no transition commentary>
-
-CONCLUDE when ALL of these are true:
-- CEFR level is clearly established
-- Skills at 2+ different CEFR levels have been assessed (e.g. A1 AND A2, not just A1 alone)
-- The ceiling is located: you have seen at least one incorrect or unknown answer ABOVE the estimated level — this is what proves the ceiling. Exception: a student failing 3+ consecutive A1 questions has a clear ceiling without probing higher.
-- The floor is confirmed: at least 2 correct answers at or below the estimated level
-
-NEVER conclude when all scored skills are at a single CEFR level and all answers were correct — that means you found a floor but not a ceiling. You must go one level higher before concluding.
-
-For true beginners showing consistent failure at A1, this may happen in 5-6 questions. For students near a B1/B2 boundary, it may take 12+. Conclude as soon as confidence is high — do not pad with extra questions. Only CONTINUE if there is a specific named ambiguity that exactly one more question would resolve.
-
-CONCLUDE
-CEFR_LEVEL: A1|A2|B1|B2|C1|C2
-SKILL_UPDATES: skill:score for every assessed skill
-COMMENT: <1-2 sentences, first person, directed to the student. Something specific you genuinely noticed - write "your..." or "you...", never "the student...". Warm but honest. Example: "Your instinct on individual words is solid, but full sentences are where things get fuzzy, and that's exactly what we'll work on.">"""
-
-PHASE_BINARY_SEARCH = """Q1-5: Binary search for CEFR estimate. Start A1. Go harder if correct, easier if wrong.
-CRITICAL: After 2 consecutive correct answers at the same level, you MUST move to the next level up on the next question. Do not stay at the same level. Do not conclude — the ceiling has not been found yet.
-The binary search implicitly confirms the floor — if you see 2+ correct answers at level-1, treat that level as mastered and don't re-probe it unless answers are inconsistent."""
-
-PHASE_BOUNDARY_PROBE = """Q6+: You have a working CEFR estimate. Now do structured boundary probing:
-
-(B) AT estimated level — at least 2 questions targeting specific skills at this level to find internal variation (which skills are solid vs shaky).
-(C) ABOVE estimated level — at least 2 questions at the next level up to find where they break.
-(A) BELOW estimated level — only probe if the student seems inconsistent (wrong on easy things, right on hard ones). Otherwise skip — binary search already confirmed the floor.
-
-Alternate grammar and vocabulary strands. Target the specific skill IDs from the taxonomy."""
-
-PHASE_FIRST_QUESTION = "This is Q1. Ignore the input — ask the very first question. Start A1 (e.g. 'what does \"gracias\" mean?'). Use multiple choice."
-
-QUIZ_SYSTEM = (
-    "You are a Spanish placement evaluator. "
-    "Follow the output format exactly. "
-    "Do not add preamble, praise, or commentary outside the specified fields."
-)
-
-# ---------------------------------------------------------------------------
 # Input classification
 # ---------------------------------------------------------------------------
 
@@ -199,79 +97,6 @@ def _classify_input(text: str) -> str:
     if text.strip().endswith('?') and len(text.strip()) > 15:
         return 'off_topic'
     return 'answer'
-
-# ---------------------------------------------------------------------------
-# Response parsing
-# ---------------------------------------------------------------------------
-
-def _parse_quiz_response(text: str) -> dict:
-    """Parse LLM quiz response into a dict. Handles multi-line values."""
-    result = {}
-    lines = text.strip().split('\n')
-
-    # Scan all lines for the action word — LLM sometimes adds preamble before it
-    action = 'CONTINUE'
-    action_line_idx = 0
-    for i, line in enumerate(lines):
-        stripped = line.strip()
-        if stripped in ('CONTINUE', 'CONCLUDE'):
-            action = stripped
-            action_line_idx = i
-            break
-    result['action'] = action
-
-    current_key = None
-    current_lines = []
-    keys = {'SKILL_UPDATES', 'NEXT_QUESTION', 'CEFR_LEVEL', 'COMMENT'}
-
-    for line in lines[action_line_idx + 1:]:
-        matched_key = None
-        for key in keys:
-            if line.startswith(key + ':'):
-                matched_key = key
-                break
-        if matched_key:
-            if current_key:
-                result[current_key] = '\n'.join(current_lines).strip()
-            current_key = matched_key
-            current_lines = [line[len(matched_key) + 1:].strip()]
-        elif current_key:
-            current_lines.append(line)
-
-    if current_key:
-        result[current_key] = '\n'.join(current_lines).strip()
-
-    return result
-
-# ---------------------------------------------------------------------------
-# Skill score persistence
-# ---------------------------------------------------------------------------
-
-async def _save_skill_updates(user, updates_str: str):
-    """Parse and save SKILL_UPDATES string to SkillScore rows."""
-    if not updates_str or updates_str.lower() == 'none':
-        return
-    from learner.models import SkillScore, Skill
-    score_map = {'shaky': 1, 'developing': 2, 'confident': 3, 'mastered': 4}
-    for pair in updates_str.split(','):
-        pair = pair.strip()
-        if ':' not in pair:
-            continue
-        skill_slug, _, score_str = pair.partition(':')
-        score = score_map.get(score_str.strip())
-        if not score:
-            continue
-        try:
-            skill = await sync_to_async(Skill.objects.get)(skill_id=skill_slug.strip())
-        except Skill.DoesNotExist:
-            log.warning('quiz: unknown skill_id in SKILL_UPDATES: %s', skill_slug.strip())
-            continue
-        await sync_to_async(SkillScore.objects.update_or_create)(
-            user=user,
-            skill=skill,
-            mode='writing',
-            defaults={'score': score},
-        )
 
 # ---------------------------------------------------------------------------
 # Menu helpers
@@ -370,8 +195,80 @@ async def _step_listo_gate(user, text: str) -> dict:
 # Adaptive quiz
 # ---------------------------------------------------------------------------
 
+def _format_question(question) -> str:
+    """Format a QuizQuestion for display to the user."""
+    text = question.question_text
+    if question.format == 'multiple_choice' and question.options:
+        lines = [text]
+        for key in ['a', 'b', 'c', 'd']:
+            if key in question.options:
+                lines.append(f"  **{key})** {question.options[key]}")
+        lines.append('\n*(Not sure? Say "I don\'t know" - it\'s more useful than guessing)*')
+        return '\n'.join(lines)
+    return text
+
+
+async def _draw_question(skills: list, skill_idx: int, quiz_state: dict):
+    """Draw a question from skills[skill_idx], falling back to adjacent skills."""
+    asked = quiz_state.get('asked_question_ids', [])
+    for offset in [0, -1, 1, -2, 2]:
+        idx = skill_idx + offset
+        if idx < 0 or idx >= len(skills):
+            continue
+        skill = skills[idx]
+        question = await sync_to_async(
+            lambda s=skill: s.quiz_questions.filter(active=True).exclude(pk__in=asked).order_by('?').first()
+        )()
+        if question:
+            return question, idx
+    return None, skill_idx
+
+
+async def _conclude_quiz(user, session, quiz_state: dict, skills: list, uid: str) -> dict:
+    from learner.models import EvaluationProgress, Session
+    from .quiz_flow import quiz_derive_results
+    from .interests import seed_interests
+
+    results = quiz_derive_results(quiz_state, skills)
+    cefr = results['cefr_level']
+    skill_scores = results['skill_scores']
+
+    def _skill_label(skill_id):
+        parts = skill_id.split('_', 1)
+        return parts[1].replace('_', ' ').title() if len(parts) > 1 else skill_id.replace('_', ' ').title()
+
+    strong_items = [f"- {_skill_label(k)}" for k, v in skill_scores.items() if v >= 3]
+    weak_items   = [f"- {_skill_label(k)}" for k, v in skill_scores.items() if v <= 2]
+    focus_skills = [_skill_label(k) for k, v in skill_scores.items() if v <= 2]
+    focus = f"We'll start with {', '.join(focus_skills[:2])}." if focus_skills else "We'll build from your current level."
+
+    assessment_parts = [f"📊 **Your Spanish level: {cefr}**\n"]
+    if strong_items:
+        assessment_parts.append("✅ **Strong:**\n" + "\n".join(strong_items))
+    if weak_items:
+        assessment_parts.append("⚠️ **Needs work:**\n" + "\n".join(weak_items))
+    assessment_parts.append(f"🎯 **First sessions will focus on:** {focus}")
+    assessment = "\n\n".join(assessment_parts)
+
+    await sync_to_async(user.__class__.objects.filter(pk=user.pk).update)(
+        estimated_cefr_level=cefr,
+        onboarding_complete=True,
+    )
+    await seed_interests(user)
+    await sync_to_async(EvaluationProgress.objects.get_or_create)(user=user, phase='session1')
+    await sync_to_async(
+        lambda: Session.objects.filter(pk=session.pk).update(ended_at=timezone.now())
+    )()
+    log.info('[%s] quiz: complete — CEFR=%s questions=%d', uid, cefr, quiz_state['question_count'])
+
+    follow_up = POST_ASSESSMENT_ES if cefr in ('B1', 'B2', 'C1', 'C2') else POST_ASSESSMENT_EN
+    return {"text": assessment, "follow_up": follow_up, "audio_url": None, "session_ended": False}
+
+
 async def _step_adaptive_quiz(user, text: str) -> dict:
-    from learner.models import Session, SessionEvent, EvaluationProgress
+    from learner.models import Session, SessionEvent, Skill, SkillScore, QuizQuestion
+    from .quiz_flow import quiz_initial_state, quiz_select_skill_idx, quiz_update_state, quiz_is_done
+    from .quiz_evaluator import evaluate_answer
 
     uid = user.discord_id
     is_first = text == QUIZ_START_SENTINEL
@@ -388,19 +285,27 @@ async def _step_adaptive_quiz(user, text: str) -> dict:
         )
         log.info('[%s] quiz: session created — id=%s', uid, session.pk)
 
-    # Load all events so we can inspect meta/menu/redirect state
+    # Load all events for state inspection
     all_events = await sync_to_async(
         lambda: list(session.events.order_by('timestamp'))
     )()
     quiz_events = [e for e in all_events if e.event_type == 'quiz']
-    quiz_count = len(quiz_events)
 
     # --- Menu response state ---
     last_event = all_events[-1] if all_events else None
     if last_event and last_event.event_type == 'menu' and not last_event.user_response:
         return await _handle_menu_response(user, session, text, last_event, quiz_events)
 
-    prepend_reminder = False
+    # Load ordered skill ladder
+    skills = await sync_to_async(
+        lambda: list(Skill.objects.filter(active=True).order_by('order'))
+    )()
+
+    # Load or initialize quiz_state
+    quiz_state = session.quiz_state
+    if not quiz_state:
+        quiz_state = quiz_initial_state(len(skills))
+        log.info('[%s] quiz: initialized — step=%d skills=%d', uid, quiz_state['step_size'], len(skills))
 
     if not is_first:
         input_class = _classify_input(text)
@@ -414,7 +319,6 @@ async def _step_adaptive_quiz(user, text: str) -> dict:
         # Off-topic handling
         if input_class == 'off_topic':
             last_quiz_q = quiz_events[-1].content if quiz_events else ""
-            # Detect consecutive off-topic: was there a redirect with no quiz answer after it?
             last_redirect = next((e for e in reversed(all_events) if e.event_type == 'redirect'), None)
             if last_redirect:
                 redirect_idx = all_events.index(last_redirect)
@@ -425,11 +329,9 @@ async def _step_adaptive_quiz(user, text: str) -> dict:
                 consecutive = not quiz_after
             else:
                 consecutive = False
-
             if consecutive:
                 log.info('[%s] quiz: off-topic x2 → menu', uid)
                 return await _show_menu(session, uid)
-
             log.info('[%s] quiz: off-topic → redirect', uid)
             redirect_text = REDIRECT_MESSAGE.format(question=last_quiz_q)
             await sync_to_async(SessionEvent.objects.create)(
@@ -440,161 +342,68 @@ async def _step_adaptive_quiz(user, text: str) -> dict:
 
         # Record answer on last unanswered quiz event
         if quiz_events and not quiz_events[-1].user_response:
-            log.info('[%s] quiz: turn %d answer — %r', uid, quiz_count, text[:60])
+            log.info('[%s] quiz: Q%d answer — %r', uid, len(quiz_events), text[:60])
             await sync_to_async(
                 lambda: SessionEvent.objects.filter(pk=quiz_events[-1].pk).update(user_response=text)
             )()
             quiz_events[-1].user_response = text
-        else:
-            log.warning('[%s] quiz: turn %d — no unanswered event to record response', uid, quiz_count)
 
-        # Guessing reminder: 3+ shaky skill scores = consecutive wrong answers, not yet shown
-        reminder_shown = any(e.event_type == 'meta' and e.content == 'guessing_reminder_shown' for e in all_events)
-        if not reminder_shown:
-            from learner.models import SkillScore
-            shaky_count = await sync_to_async(
-                lambda: SkillScore.objects.filter(user=user, score=1).count()
-            )()
-            if shaky_count >= 3:
-                log.info('[%s] quiz: guessing reminder triggered (%d shaky scores)', uid, shaky_count)
-                await sync_to_async(SessionEvent.objects.create)(
-                    session=session, event_type='meta',
-                    content='guessing_reminder_shown', user_response='set',
+        # Evaluate and score the answer
+        current_question_id = quiz_state.get('current_question_id')
+        current_skill_idx = quiz_state.get('current_skill_idx')
+        if current_question_id is not None and current_skill_idx is not None:
+            try:
+                question = await sync_to_async(QuizQuestion.objects.get)(pk=current_question_id)
+                score = 1 if input_class == 'dont_know' else await evaluate_answer(question, text)
+                log.info('[%s] quiz: skill_idx=%d score=%d', uid, current_skill_idx, score)
+                quiz_state = quiz_update_state(quiz_state, current_skill_idx, score)
+                skill = skills[current_skill_idx]
+                await sync_to_async(SkillScore.objects.update_or_create)(
+                    user=user, skill=skill, mode='writing',
+                    defaults={'score': score, 'last_tested_at': timezone.now()},
                 )
-                prepend_reminder = True
+            except (QuizQuestion.DoesNotExist, IndexError):
+                log.warning('[%s] quiz: could not score — question_id=%s', uid, current_question_id)
 
-    # Build history from quiz events only
-    history_text = '\n'.join(
-        f"Q{i+1}: {e.content}\nA: {e.user_response or '(unanswered)'}"
-        for i, e in enumerate(quiz_events)
-    ) or '(none yet)'
+    # Check if quiz is complete
+    if quiz_is_done(quiz_state):
+        return await _conclude_quiz(user, session, quiz_state, skills, uid)
 
-    # Determine phase
-    if is_first:
-        phase = PHASE_FIRST_QUESTION
-        latest = '(quiz start)'
-        log.info('[%s] quiz: Q1 — binary search phase', uid)
-    elif quiz_count < 5:
-        phase = PHASE_BINARY_SEARCH
-        latest = f'"{text}"'
-        log.info('[%s] quiz: Q%d — binary search', uid, quiz_count + 1)
-    else:
-        phase = PHASE_BOUNDARY_PROBE
-        latest = f'"{text}"'
-        if quiz_count == 5:
-            log.info('[%s] quiz: Q%d — entering boundary probe', uid, quiz_count + 1)
-        else:
-            log.info('[%s] quiz: Q%d — boundary probe', uid, quiz_count + 1)
+    # Select next skill index and draw question
+    skill_idx = quiz_select_skill_idx(quiz_state)
+    question, chosen_idx = await _draw_question(skills, skill_idx, quiz_state)
 
-    english_mode = any(e.event_type == 'meta' and e.content == 'english_mode' for e in all_events)
-    english_mode_note = (
-        "ENGLISH MODE: All question instructions must be written in English. "
-        "Spanish answers are still expected where relevant."
-    ) if english_mode else ""
+    if question is None:
+        log.warning('[%s] quiz: no question available near idx=%d — concluding early', uid, skill_idx)
+        quiz_state['pass'] = 'done'
+        return await _conclude_quiz(user, session, quiz_state, skills, uid)
 
-    prompt = QUIZ_PROMPT.format(
-        quiz_count=quiz_count,
-        history=history_text,
-        latest=latest,
-        phase=phase,
-        english_mode_note=english_mode_note,
-    )
+    # Update state
+    quiz_state['current_question_id'] = question.pk
+    quiz_state['current_skill_idx'] = chosen_idx
+    quiz_state['asked_question_ids'] = list(quiz_state['asked_question_ids']) + [question.pk]
 
-    llm_response = await call_llm(
-        [{"role": "user", "content": prompt}],
-        user=None,
-        max_tokens=600,
-        system_override=QUIZ_SYSTEM,
-    )
-    log.debug('[%s] quiz: raw LLM response:\n%s', uid, llm_response)
+    # Guessing reminder: 3+ scores of 1 in state, not yet shown this quiz
+    prepend_reminder = False
+    reminder_shown = any(e.event_type == 'meta' and e.content == 'guessing_reminder_shown' for e in all_events)
+    if not reminder_shown and not is_first:
+        shaky_count = sum(1 for v in quiz_state['scores'].values() if v <= 1)
+        if shaky_count >= 3:
+            log.info('[%s] quiz: guessing reminder triggered (%d shaky scores)', uid, shaky_count)
+            await sync_to_async(SessionEvent.objects.create)(
+                session=session, event_type='meta',
+                content='guessing_reminder_shown', user_response='set',
+            )
+            prepend_reminder = True
 
-    parsed = _parse_quiz_response(llm_response)
-    skill_updates = parsed.get('SKILL_UPDATES', '')
-    if skill_updates and skill_updates.lower() != 'none':
-        log.info('[%s] quiz: skill updates — %s', uid, skill_updates)
-    await _save_skill_updates(user, skill_updates)
+    # Save state and record quiz event
+    await sync_to_async(Session.objects.filter(pk=session.pk).update)(quiz_state=quiz_state)
+    question_text = _format_question(question)
+    question_display = (GUESSING_REMINDER + question_text) if prepend_reminder else question_text
 
-    # --- CONCLUDE ---
-    if parsed['action'] == 'CONCLUDE':
-        cefr = parsed.get('CEFR_LEVEL', 'A2')
-        comment = parsed.get('COMMENT', '').strip()
-
-        skill_scores = {}
-        if skill_updates and skill_updates.lower() != 'none':
-            score_map = {'shaky': 1, 'developing': 2, 'confident': 3, 'mastered': 4}
-            for pair in skill_updates.split(','):
-                pair = pair.strip()
-                if ':' in pair:
-                    sid, _, sval = pair.partition(':')
-                    score = score_map.get(sval.strip())
-                    if score:
-                        skill_scores[sid.strip()] = score
-
-        def _skill_label(skill_id):
-            parts = skill_id.split('_', 1)
-            return parts[1].replace('_', ' ').title() if len(parts) > 1 else skill_id.replace('_', ' ').title()
-
-        strong_items = [f"- {_skill_label(k)}" for k, v in skill_scores.items() if v >= 3]
-        weak_items = [f"- {_skill_label(k)}" for k, v in skill_scores.items() if v <= 2]
-        focus_skills = [_skill_label(k) for k, v in skill_scores.items() if v <= 2]
-        focus = f"We'll start with {', '.join(focus_skills[:2])}." if focus_skills else "We'll build from your current level."
-
-        assessment_parts = [f"📊 **Your Spanish level: {cefr}**\n"]
-        if strong_items:
-            assessment_parts.append("✅ **Strong:**\n" + "\n".join(strong_items))
-        if weak_items:
-            assessment_parts.append("⚠️ **Needs work:**\n" + "\n".join(weak_items))
-        assessment_parts.append(f"🎯 **First sessions will focus on:** {focus}")
-        if comment:
-            assessment_parts.append(f"_{comment}_")
-        assessment = "\n\n".join(assessment_parts)
-
-        log.info('[%s] quiz: CONCLUDE after %d questions — CEFR=%s skills=%s', uid, quiz_count, cefr, skill_updates)
-
-        await sync_to_async(user.__class__.objects.filter(pk=user.pk).update)(
-            estimated_cefr_level=cefr,
-            onboarding_complete=True,
-        )
-        from .interests import seed_interests
-        await seed_interests(user)
-        await sync_to_async(EvaluationProgress.objects.get_or_create)(
-            user=user, phase='session1'
-        )
-        await sync_to_async(
-            lambda: Session.objects.filter(pk=session.pk).update(ended_at=timezone.now())
-        )()
-        log.info('[%s] quiz: onboarding complete', uid)
-
-        follow_up = POST_ASSESSMENT_ES if cefr in ('B1', 'B2', 'C1', 'C2') else POST_ASSESSMENT_EN
-
-        return {"text": assessment, "follow_up": follow_up, "audio_url": None, "session_ended": False}
-
-    # --- CONTINUE ---
-    next_q_raw = _fix_blanks(parsed.get('NEXT_QUESTION', ''))
-
-    # Silent retry if NEXT_QUESTION missing
-    if not next_q_raw:
-        log.warning('[%s] quiz: NEXT_QUESTION missing, retrying — raw:\n%s', uid, llm_response)
-        llm_response = await call_llm(
-            [{"role": "user", "content": prompt}],
-            user=None,
-            max_tokens=600,
-            system_override=QUIZ_SYSTEM,
-        )
-        parsed = _parse_quiz_response(llm_response)
-        next_q_raw = _fix_blanks(parsed.get('NEXT_QUESTION', ''))
-        if not next_q_raw:
-            log.error('[%s] quiz: NEXT_QUESTION missing after retry — raw:\n%s', uid, llm_response)
-            return {"text": "Lo siento, algo salió mal. 😅 Can you repeat that?", "audio_url": None, "session_ended": False}
-
-    next_q_display = (GUESSING_REMINDER + next_q_raw) if prepend_reminder else next_q_raw
-
-    log.info('[%s] quiz: Q%d sent — %r', uid, quiz_count + 1, next_q_raw[:80])
+    log.info('[%s] quiz: Q%d sent — skill_idx=%d %r', uid, len(quiz_events) + 1, chosen_idx, question_text[:80])
     await sync_to_async(SessionEvent.objects.create)(
-        session=session,
-        event_type='quiz',
-        dimension='writing',
-        content=next_q_raw,
-        user_response='',
+        session=session, event_type='quiz', dimension='writing',
+        content=question_text, user_response='',
     )
-    return {"text": next_q_display, "audio_url": None, "session_ended": False}
+    return {"text": question_display, "audio_url": None, "session_ended": False}
