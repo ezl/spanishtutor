@@ -195,7 +195,7 @@ async def _step_listo_gate(user, text: str) -> dict:
 # Adaptive quiz
 # ---------------------------------------------------------------------------
 
-def _format_question(question) -> str:
+def _format_question(question, cefr_level: str = 'A1') -> str:
     """Format a QuizQuestion for display to the user."""
     # Strip any options or 'don't know' footer the LLM may have embedded in question_text
     raw_lines = question.question_text.splitlines()
@@ -214,7 +214,10 @@ def _format_question(question) -> str:
         for key in ['a', 'b', 'c', 'd']:
             if key in question.options:
                 lines.append(f"  **{key})** {question.options[key]}")
-        lines.append('\n*(Not sure? Say "I don\'t know" — it\'s more useful than guessing)*')
+        if cefr_level in ('B1', 'B2', 'C1', 'C2'):
+            lines.append('\n*(¿No estás seguro? Di "no sé" — es más útil que adivinar)*')
+        else:
+            lines.append('\n*(Not sure? Say "I don\'t know" — it\'s more useful than guessing)*')
         return '\n'.join(lines)
     return text
 
@@ -462,7 +465,7 @@ async def _step_adaptive_quiz(user, text: str) -> dict:
 
     # Save state and record quiz event
     await sync_to_async(Session.objects.filter(pk=session.pk).update)(quiz_state=quiz_state)
-    question_text = _format_question(question)
+    question_text = _format_question(question, cefr_level=skills[chosen_idx].cefr_level)
     question_display = (GUESSING_REMINDER + question_text) if prepend_reminder else question_text
 
     log.info('[%s] quiz: Q%d sent — skill_idx=%d %r', uid, len(quiz_events) + 1, chosen_idx, question_text[:80])
