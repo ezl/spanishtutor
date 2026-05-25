@@ -466,11 +466,14 @@ async def _step_adaptive_quiz(user, text: str) -> dict:
     # Save state and record quiz event
     await sync_to_async(Session.objects.filter(pk=session.pk).update)(quiz_state=quiz_state)
     question_text = _format_question(question, cefr_level=skills[chosen_idx].cefr_level)
-    question_display = (GUESSING_REMINDER + question_text) if prepend_reminder else question_text
+    q_number = len(quiz_events) + 1
+    numbered_text = f"**Question {q_number}**\n\n{question_text}"
+    question_display = (GUESSING_REMINDER + numbered_text) if prepend_reminder else numbered_text
 
-    log.info('[%s] quiz: Q%d sent — skill_idx=%d %r', uid, len(quiz_events) + 1, chosen_idx, question_text[:80])
+    log.info('[%s] quiz: Q%d sent — skill_idx=%d %r', uid, q_number, chosen_idx, question_text[:80])
     await sync_to_async(SessionEvent.objects.create)(
         session=session, event_type='quiz', dimension='writing',
         skill_id=str(question.pk), content=question_text, user_response='',
     )
     return {"text": question_display, "audio_url": None, "session_ended": False}
+

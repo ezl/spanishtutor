@@ -58,6 +58,7 @@
       width: 14px; height: 14px; border-radius: 3px; flex-shrink: 0;
     }
     .dot.untested   { background: #2a2a2a; border: 1px solid #444; }
+    .dot.inferred   { background: rgba(20, 83, 45, 0.35); border: 1px dashed #2d5a3d; }
     .dot.shaky      { background: #7f1d1d; }
     .dot.developing { background: #78350f; }
     .dot.confident  { background: #1e3a5f; }
@@ -87,6 +88,15 @@
       line-height: 1.3;
     }
     thead th.skill-col { text-align: left; width: 220px; }
+    thead th.inactive-col { color: #383838; }
+    thead th.inactive-col .future-tag {
+      display: block;
+      font-size: 0.6rem;
+      color: #333;
+      font-weight: 400;
+      margin-top: 2px;
+      font-style: italic;
+    }
 
     tbody tr:hover { background: #161616; }
 
@@ -113,6 +123,8 @@
       border-radius: 4px;
     }
     .square.untested   { background: #1e1e1e; border: 1px solid #333; }
+    .square.inactive   { background: #161616; border: 1px solid #222; }
+    .square.inferred   { background: rgba(20, 83, 45, 0.35); border: 1px dashed #2d5a3d; }
     .square.shaky      { background: #7f1d1d; }
     .square.developing { background: #78350f; }
     .square.confident  { background: #1e3a5f; }
@@ -135,10 +147,10 @@
         <span class="level-badge">{{ user.estimated_cefr_level }}</span>
       {% endif %}
     </h1>
-    <p class="meta">{{ mastered_cells }} / {{ total_cells }} cells mastered</p>
+    <p class="meta">{{ skills_at_or_below }} of {{ total_skills }} skills at or below your level</p>
 
     <div class="mastery-bar-wrap">
-      <div class="mastery-label">Overall mastery — {{ mastery_pct }}%</div>
+      <div class="mastery-label">Level progress — {{ mastery_pct }}%</div>
       <div class="mastery-bar">
         <div class="mastery-fill" style="width: {{ mastery_pct }}%"></div>
       </div>
@@ -147,6 +159,7 @@
 
   <div class="legend">
     <div class="legend-item"><div class="dot untested"></div> Untested</div>
+    <div class="legend-item"><div class="dot inferred"></div> Inferred (below your level)</div>
     <div class="legend-item"><div class="dot shaky"></div> Shaky</div>
     <div class="legend-item"><div class="dot developing"></div> Developing</div>
     <div class="legend-item"><div class="dot confident"></div> Confident</div>
@@ -162,7 +175,9 @@
         <tr>
           <th class="skill-col"></th>
           {% for mode in modes %}
-          <th>{{ mode }}</th>
+          <th {% if not mode.active %}class="inactive-col"{% endif %}>
+            {{ mode.label }}{% if not mode.active %}<span class="future-tag">coming soon</span>{% endif %}
+          </th>
           {% endfor %}
         </tr>
       </thead>
@@ -176,7 +191,11 @@
           </td>
           {% for cell in row.cells %}
           <td class="cell">
+            {% if cell.active %}
             <span class="square {{ cell.css_class }}" title="{{ cell.css_class }}"></span>
+            {% else %}
+            <span class="square inactive" title="coming soon"></span>
+            {% endif %}
           </td>
           {% endfor %}
         </tr>

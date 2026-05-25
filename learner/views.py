@@ -1,8 +1,13 @@
 from django.shortcuts import render, get_object_or_404
 from .models import User, Skill, SkillScore
 
-MODES = ['listening', 'reading', 'spoken_interaction', 'spoken_production', 'writing']
-MODE_LABELS = ['Listening', 'Reading', 'Spoken\nInteraction', 'Spoken\nProduction', 'Writing']
+MODES = [
+    ('writing',              'Writing',            True),
+    ('listening',            'Listening',          False),
+    ('reading',              'Reading',            False),
+    ('spoken_interaction',   'Spoken\nInteraction', False),
+    ('spoken_production',    'Spoken\nProduction',  False),
+]
 SCORE_CLASSES = ['untested', 'shaky', 'developing', 'confident', 'mastered']
 SCORE_EMOJIS = ['⬜', '🟥', '🟨', '🟦', '🟩']
 CEFR_ORDER = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2']
@@ -34,37 +39,54 @@ def progress(request, discord_id=None):
     }
 
     grouped_skills = _load_skills()
+    cefr_rank = {level: i for i, level in enumerate(CEFR_ORDER)}
+    estimated_rank = cefr_rank.get(user.estimated_cefr_level, -1)
 
     # Build grid data
     levels = []
-    total_cells = 0
-    mastered_cells = 0
+    total_skills = 0
+    skills_at_or_below = 0
 
     for level in CEFR_ORDER:
-        skills = grouped_skills.get(level, [])
+        skill_list = grouped_skills.get(level, [])
+        level_rank = cefr_rank[level]
         rows = []
-        for skill in skills:
+        for skill in skill_list:
+            total_skills += 1
+            if level_rank <= estimated_rank:
+                skills_at_or_below += 1
             cells = []
-            for mode in MODES:
-                score = scores.get((skill['id'], mode), 0)
+            for mode_id, mode_label, mode_active in MODES:
+                if not mode_active:
+                    cells.append({'active': False})
+                    continue
+                score = scores.get((skill['id'], mode_id))
+                if score is not None:
+                    css_class = SCORE_CLASSES[score]
+                    emoji = SCORE_EMOJIS[score]
+                elif level_rank < estimated_rank:
+                    css_class = 'inferred'
+                    emoji = '🔷'
+                else:
+                    css_class = 'untested'
+                    emoji = '⬜'
                 cells.append({
+                    'active': True,
                     'score': score,
-                    'css_class': SCORE_CLASSES[score],
-                    'emoji': SCORE_EMOJIS[score],
+                    'css_class': css_class,
+                    'emoji': emoji,
                 })
-                total_cells += 1
-                if score == 4:
-                    mastered_cells += 1
             rows.append({'skill': skill, 'cells': cells})
         levels.append({'level': level, 'rows': rows})
 
-    mastery_pct = round(mastered_cells / total_cells * 100) if total_cells else 0
+    # Mastery % = fraction of the skill ladder at or below estimated CEFR level
+    mastery_pct = round(skills_at_or_below / total_skills * 100) if total_skills else 0
 
     return render(request, 'learner/progress.html', {
         'user': user,
         'levels': levels,
-        'modes': MODE_LABELS,
+        'modes': [{'label': label, 'active': active} for _, label, active in MODES],
         'mastery_pct': mastery_pct,
-        'mastered_cells': mastered_cells,
-        'total_cells': total_cells,
+        'skills_at_or_below': skills_at_or_below,
+        'total_skills': total_skills,
     })
