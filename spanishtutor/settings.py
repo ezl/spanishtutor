@@ -11,6 +11,9 @@ DEBUG = os.environ.get('DEBUG', 'true').lower() == 'true'
 _allowed = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1')
 ALLOWED_HOSTS = _allowed.split(',') + ['.up.railway.app']
 
+CSRF_TRUSTED_ORIGINS = ['https://*.up.railway.app']
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
