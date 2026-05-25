@@ -2,8 +2,10 @@
 Management command: generate_quiz_questions
 
 Generates QuizQuestion rows (active=False) for skills that have fewer than
-3 active questions. Operator reviews in Django admin and sets active=True
-before questions go live.
+--min-active active questions. Uses curriculum/question_framework.yaml to
+give the LLM precise, level-specific format and content constraints.
+
+Operator reviews in Django admin and sets active=True before questions go live.
 
 Usage:
     python manage.py generate_quiz_questions
@@ -11,10 +13,21 @@ Usage:
     python manage.py generate_quiz_questions --dry-run
 """
 import json
-import asyncio
+import os
+import yaml
+from pathlib import Path
 from django.core.management.base import BaseCommand
 from django.conf import settings
 import anthropic
+
+FRAMEWORK_PATH = Path(__file__).resolve().parents[3] / 'curriculum' / 'question_framework.yaml'
+
+VOCAB_MARKERS = {'_vocab_', '_greetings', '_numbers', '_dates', '_idiomatic', '_register_shifts'}
+
+
+def _skill_type(skill_id: str) -> str:
+    return 'vocab' if any(m in skill_id for m in VOCAB_MARKERS) else 'grammar'
+
 
 GENERATION_SYSTEM = (
     "You generate Spanish placement quiz questions. "
@@ -26,20 +39,34 @@ GENERATION_PROMPT = """Generate {count} placement quiz question(s) for the skill
   name: {skill_name}
   cefr_level: {cefr_level}
   description: {description}
+  skill_type: {skill_type}
 
-Format rules by level:
-  A1-A2 vocab: direct translation MC only ("What does X mean?") — never fill-in-blank.
-  A1-A2 grammar: short fill-in-blank or MC; all 4 options same grammatical category.
-  B1+: freeform_response encouraged (open-ended prompts anyone can answer — no personalization).
-  All MC distractors: same semantic/grammatical category as correct answer.
-  Missing accents treated as correct — do NOT penalize in rubric.
+=== FRAMEWORK RULES FOR THIS SKILL ({cefr_level} {skill_type}) ===
+Expected format: {expected_format}
+Prompt language: {prompt_language}
+{distractor_section}
+Guidance:
+{guidance}
+
+Sample questions at this quality level:
+{samples}
+
+=== GLOBAL RULES (apply to every question) ===
+- Missing accents are ALWAYS acceptable — never penalize for them in the rubric or correct_answer
+- Never embed the correct answer in the question stem
+- For multiple_choice: all 4 options must be real, valid Spanish (or English for English-prompt questions)
+- Vary grammatical subjects (yo, tú, él/ella, nosotros, ellos) across the question set — do not skew toward "yo"
+- Fill-in-blank questions: put ________ in question_text; store as format "freeform_word"
+- For freeform_response rubric: use pipe-separated target structures for the evaluator
+- For freeform_word rubric: comma-separated list of acceptable answer variants (accent-free ok)
+- For multiple_choice: rubric must be null
 
 Return a JSON array of {count} objects, each with:
   "format": one of "multiple_choice", "freeform_word", "freeform_response"
   "question_text": the question shown to the student
   "options": {{"a": ..., "b": ..., "c": ..., "d": ...}} for MC, null otherwise
-  "correct_answer": "a"/"b"/"c"/"d" for MC, word/phrase for freeform_word, exemplar sentence for freeform_response
-  "rubric": for freeform_response, list target structures; for freeform_word, list acceptable variants (accent-free ok); empty string for MC
+  "correct_answer": "a"/"b"/"c"/"d" for MC, word/phrase for freeform_word, exemplar for freeform_response
+  "rubric": pipe-separated structures for freeform_response; comma-separated variants for freeform_word; null for MC
 
 Output only the JSON array."""
 
@@ -56,6 +83,8 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         from learner.models import Skill, QuizQuestion
+
+        framework = yaml.safe_load(FRAMEWORK_PATH.read_text())
 
         skill_filter = options['skill']
         dry_run = options['dry_run']
@@ -80,24 +109,45 @@ class Command(BaseCommand):
                 skipped += 1
                 continue
 
-            self.stdout.write(f"  {skill.skill_id} ({skill.cefr_level}): {active_count} active → would generate {count}")
+            skill_type = _skill_type(skill.skill_id)
+            cell = framework.get(skill.cefr_level, {}).get(skill_type)
+            if cell is None:
+                self.stderr.write(
+                    f"  WARNING: no framework entry for {skill.cefr_level}/{skill_type} "
+                    f"(skill: {skill.skill_id}) — skipping"
+                )
+                continue
+
+            self.stdout.write(
+                f"  {skill.skill_id} ({skill.cefr_level}/{skill_type}): "
+                f"{active_count} active → generating {count}"
+            )
             if dry_run:
                 generated += count
                 continue
 
-            self.stdout.write(f"    generating {count} question(s)...")
+            distractor_section = ''
+            if cell.get('distractor_rule') and 'N/A' not in cell['distractor_rule']:
+                distractor_section = f"Distractor rule: {cell['distractor_rule'].strip()}"
+
             prompt = GENERATION_PROMPT.format(
                 count=count,
                 skill_id=skill.skill_id,
                 skill_name=skill.name,
                 cefr_level=skill.cefr_level,
                 description=skill.description or skill.name,
+                skill_type=skill_type,
+                expected_format=cell['format'],
+                prompt_language=cell['prompt_language'],
+                distractor_section=distractor_section,
+                guidance=cell['guidance'].strip(),
+                samples=cell['samples'].strip(),
             )
 
             try:
                 response = client.messages.create(
                     model='claude-sonnet-4-6',
-                    max_tokens=2000,
+                    max_tokens=3000,
                     system=GENERATION_SYSTEM,
                     messages=[{'role': 'user', 'content': prompt}],
                 )
@@ -114,7 +164,7 @@ class Command(BaseCommand):
                     question_text=q['question_text'],
                     options=q.get('options'),
                     correct_answer=q['correct_answer'],
-                    rubric=q.get('rubric', ''),
+                    rubric=q.get('rubric') or '',
                     active=False,
                 )
             generated += len(questions)

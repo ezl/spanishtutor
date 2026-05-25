@@ -1,0 +1,415 @@
+# question_framework.yaml
+#
+# Defines question format, prompt language, distractor rules, guidance, and sample questions
+# per CEFR level × skill type (vocab or grammar).
+#
+# Used by:
+#   manage.py generate_quiz_questions  — constructs per-skill LLM prompts
+#   manage.py review_quiz_questions    — validates generated questions against expected format
+#
+# Skill type detection (see _skill_type() helper):
+#   vocab   — skill_id contains: _vocab_, _greetings, _numbers, _dates, _gustar
+#   grammar — everything else
+
+A1:
+  vocab:
+    format: multiple_choice
+    prompt_language: english
+    distractor_rule: >
+      Same semantic field, same part of speech, same register and frequency band.
+      All 4 options must be real Spanish words. Never obviously wrong.
+    guidance: |
+      Recognition only at A1 — no production direction (active recall is A2+).
+      Template 1 (Recognize): "What does X mean?" with 4 English options — same semantic field, same frequency.
+      Template 2 (Single word): test one word at a time, not phrases or collocations.
+      Never test adjective agreement or noun gender — that is A2 territory.
+      Never embed the answer in the question stem.
+      End every question with: *(Not sure? Say "I don't know" — it's more useful than guessing)*
+    samples: |
+      Template 1 — Recognize (Spanish → English):
+        What does "el agua" mean?
+        a) water  b) fire  c) earth  d) air
+        *(Not sure? Say "I don't know" — it's more useful than guessing)*
+
+      Template 2 — Single word:
+        What does "roja" mean?
+        a) blue  b) green  c) red  d) yellow
+        *(Not sure? Say "I don't know" — it's more useful than guessing)*
+        (Test individual words, not phrases — adjective agreement is A2 territory)
+
+  grammar:
+    format: multiple_choice
+    prompt_language: english
+    distractor_rule: >
+      Valid conjugations of the same verb (different person, tense, or mood) OR near-miss
+      forms that a beginner might confuse. All 4 options must be real Spanish — never invented forms.
+    guidance: |
+      Template 1 (Which is correct): "Which sentence is correct?" — 1 correct sentence, 3 with specific errors.
+      Template 2 (MC fill-in-blank): short Spanish sentence with blank + English gloss in parens, 4 options all same grammatical category.
+      Vary grammatical subjects (yo, tú, él/ella, nosotros, ellos) across the question set for each skill.
+      Never embed the correct form in the question stem.
+      End every question with: *(Not sure? Say "I don't know" — it's more useful than guessing)*
+    samples: |
+      Template 1 — Which sentence is correct:
+        Which sentence is correct?
+        a) Yo soy cansado hoy.  b) Yo estoy cansado hoy.  c) Yo ser cansado hoy.  d) Yo está cansado hoy.
+        *(Not sure? Say "I don't know" — it's more useful than guessing)*
+
+      Template 2 — MC fill-in-blank:
+        Yo ________ cansado hoy. ("I am tired today")
+        a) soy  b) estoy  c) ser  d) es
+        *(Not sure? Say "I don't know" — it's more useful than guessing)*
+
+A2:
+  vocab:
+    format: multiple_choice
+    prompt_language: english
+    distractor_rule: >
+      Same semantic field, same part of speech, same register and frequency band.
+      All 4 options must be real Spanish. Never obviously wrong. For weather/multi-construction
+      vocab, distractors should be other weather expressions (same construction family where possible).
+    guidance: |
+      Both recognition (Spanish → English) AND production (English → Spanish) at A2.
+      Template 1 (Recognize): "What does X mean?" with 4 English options.
+      Template 2 (Produce): "How do you say X in Spanish?" with 4 Spanish options.
+      Template 3 (Context inference): short Spanish sentence as context, ask what it implies — tests
+        reading comprehension + vocabulary together. Good for weather, shopping, health vocabulary.
+      Distractors: same semantic field, plausible, all real words — never obviously wrong.
+      Never embed the answer in the question stem.
+      End every question with: *(Not sure? Say "I don't know" — it's more useful than guessing)*
+    samples: |
+      Template 1 — Recognize (Spanish → English):
+        What does "la estación de tren" mean?
+        a) train station  b) bus stop  c) airport  d) subway
+        *(Not sure? Say "I don't know" — it's more useful than guessing)*
+
+      Template 2 — Produce (English → Spanish):
+        How do you say "airport" in Spanish?
+        a) la estación  b) el aeropuerto  c) el autobús  d) el puerto
+        *(Not sure? Say "I don't know" — it's more useful than guessing)*
+
+      Template 3 — Context inference (weather example):
+        "No traje paraguas hoy." What does this imply about the weather?
+        a) It's sunny  b) It's raining  c) It's cold  d) It's windy
+        *(Not sure? Say "I don't know" — it's more useful than guessing)*
+
+  grammar:
+    format: freeform_word
+    prompt_language: english_with_spanish_sentence
+    distractor_rule: "N/A — fill-in-blank, not MC"
+    guidance: |
+      Fill-in-blank stored as freeform_word with ________ in question_text.
+      Always include English translation on a second line, blank filled in.
+      The translation clarifies meaning without revealing the Spanish form.
+      Never reveal the target word or root in the question stem.
+      Short sentences — one clause maximum.
+      Vary grammatical subjects (yo, tú, él/ella, nosotros, ellos) across the question set.
+
+      TWO SUB-TYPES — detect from skill name/description:
+
+      CONJUGATION SKILLS (stem changes, preterite, imperatives, reflexives, go-verbs):
+        Include infinitive hint: Ella ________ (hablar) con su amiga ayer.
+        The hint isolates the conjugation form — without it, multiple verbs fit the blank.
+        Also generate an MC variant: "Which is the correct [tense] form of [verb] for [person]?"
+          Distractors: valid forms of the same verb, different tense/person — all real Spanish.
+        Also generate a translation variant: "Translate: 'She spoke with el profesor yesterday.'"
+          The Spanish anchor word eliminates vocabulary as a variable.
+
+      STRUCTURAL PATTERN SKILLS (verb+infinitive patterns, pronoun placement, adjective
+      agreement, comparisons, gustar-type constructions):
+        NO infinitive hint — the pattern itself is what is tested.
+        Open fill-in-blank: Ella ________ más para el examen.
+          Any grammatically correct construction that uses the target pattern passes.
+        MC variant: "Which sentence is correct?" — tests the pattern with 4 options.
+          Distractors: versions with specific structural errors (wrong order, wrong form, etc.).
+        Translate with Spanish anchor: "Translate: 'I want to eat la pizza.'"
+          Spanish noun given to eliminate vocabulary as a variable.
+
+      GUSTAR-TYPE SKILLS (a2_gustar_like_verbs):
+        Test both pronoun selection AND verb agreement with singular/plural noun.
+        Include questions with plural objects (los libros) — the hardest combination for English speakers.
+        Fill-in-blank with infinitive hint AND translation.
+        MC: "Which sentence is correct?" testing pronoun+verb agreement together.
+        Translate with Spanish anchor forcing both variables.
+
+    samples: |
+      Conjugation — fill-in-blank with infinitive hint + translation:
+        Ella ________ (hablar) con su amiga ayer.
+        (Translation: She spoke with her friend yesterday.)
+
+      Conjugation — MC, pick correct form:
+        Which is the correct preterite form of "hablar" for "ella"?
+        a) habló  b) hablaba  c) habla  d) hablará
+        (Distractors: imperfect, present, future — all valid forms, wrong tense.)
+
+      Conjugation — translate with Spanish anchor:
+        Translate into Spanish: "She spoke with el profesor yesterday."
+        (Any -ar verb in preterite passes. Evaluator checks for correct -ó ending.)
+
+      Pattern — open fill-in-blank (no infinitive hint):
+        Ella ________ más para el examen.
+        (Any grammatically correct verb+infinitive construction passes: "necesita estudiar", "tiene que practicar", etc.)
+
+      Pattern — MC, pick correct structure:
+        Which sentence is correct?
+        a) Ella necesita estudiar más.  b) Ella necesita estudia más.
+        c) Ella necesitar estudiar más.  d) Ella necesitas estudiar más.
+
+      Pattern — translate with Spanish anchor:
+        Translate into Spanish: "I want to eat la pizza."
+        (Spanish noun given to eliminate vocabulary as a variable. Any valid verb+infinitive passes.)
+
+      Gustar — fill-in-blank + translation:
+        A mis amigos ________ (gustar) mucho el fútbol.
+        (Translation: My friends really like soccer.)
+        (Expected: "les gusta" — tests pronoun selection and verb agreement with singular noun.)
+
+      Gustar — translate with Spanish anchor (plural object):
+        Translate into Spanish: "She likes los libros."
+        (Expected: "Le gustan los libros." — tests pronoun selection AND plural verb agreement.)
+
+B1:
+  vocab:
+    format: freeform_word
+    prompt_language: bilingual
+    distractor_rule: "N/A — freeform, not MC"
+    guidance: |
+      Freeform_word: student types a single Spanish word or short phrase.
+      Questions in English; student answers in Spanish.
+      Template 1 (Direct translation): "What's the Spanish word for X?"
+      Template 2 (Definition prompt): "What's the Spanish word for [described concept]?"
+      Template 3 (Verb production): "What's the Spanish verb meaning X?"
+      Template 4 (Context production — harder, use freeform_response format): short Spanish
+        prompt asking student to produce a sentence using target vocabulary in context.
+      Rubric: comma-separated list of all acceptable variants including accent-free forms and
+        common synonyms. For verbs, accept any recognizable conjugated form.
+    samples: |
+      Template 1 — Direct translation, noun:
+        What's the Spanish word for "salary"?
+        (rubric: sueldo, salario)
+
+      Template 2 — Definition prompt, noun:
+        What's the Spanish word for the formal document you send when applying for a job?
+        (rubric: currículum, CV, hoja de vida)
+
+      Template 3 — Verb production:
+        What's the Spanish verb meaning "to resign from a job"?
+        (rubric: renunciar, dimitir — accept any recognizable conjugated form)
+
+      Template 4 — Context production (freeform_response):
+        En una oración, di qué harías si tu jefe te ofreciera un ascenso.
+        (rubric: look for work vocabulary — ascenso, aceptar, agradecer, sueldo — in a grammatically coherent sentence)
+
+  grammar:
+    format: freeform_word
+    prompt_language: spanish_with_english_translation
+    distractor_rule: "N/A — fill-in-blank, not MC"
+    guidance: |
+      Fill-in-blank with ________ in question_text, stored as freeform_word.
+      Always include infinitive hint for conjugation-testing skills (isolates the target form).
+      Template 1: Spanish sentence + infinitive hint + English translation.
+      Template 2: Same Spanish sentence + infinitive hint, NO translation (harder — student must
+        infer tense and meaning from Spanish context clues alone).
+      Template 3: Full production — "Translate: ..." with enough Spanish anchoring to force the
+        target construction.
+      Vary grammatical subjects (yo, tú, él/ella, nosotros, ellos) across the question set.
+        Nosotros and ellos forms are less drilled — include them explicitly.
+      For subjunctive skills: vary the trigger verb across questions
+        (querer, recomendar, necesitar, pedir, esperar, etc.).
+    samples: |
+      Template 1 — Fill-in-blank with translation:
+        Cuando era niño, mi familia ________ (cenar) juntos todos los domingos.
+        (Translation: When I was a child, my family used to have dinner together every Sunday.)
+
+      Template 2 — Fill-in-blank, no translation (harder):
+        Mi jefe quiere que nosotros ________ (terminar) el proyecto hoy.
+        (No translation. Student must read Spanish context and produce the subjunctive form.)
+
+      Template 3 — Full production, tú subject:
+        Translate: "I want you to call me tomorrow."
+        (Expected: "Quiero que me llames mañana." — tests trigger construction + correct person form.)
+
+      Template — Different trigger verb, ella subject:
+        El médico recomienda que ella ________ (descansar) más.
+        (Tests whether student has internalized the trigger pattern beyond "querer que".)
+
+B2:
+  vocab:
+    format: freeform_word
+    prompt_language: spanish
+    distractor_rule: "N/A — freeform, not MC"
+    guidance: |
+      Single-word or short-phrase production with Spanish prompts.
+      At B2, also use freeform_response for register awareness, collocations, and false friends
+      where word-level recall is insufficient to test the skill.
+      Rubric: comma-separated list of acceptable variants including accent-free forms.
+      Include common synonyms across regional varieties where relevant.
+
+      Additional freeform_response question types for advanced vocab skills:
+        Register shift: "Rewrite this informal sentence in formal register."
+        Register distinction: "What's the difference between X and Y? Give an example of each."
+        False friend: "What does X mean in Spanish? Is it the same as [similar English word]?"
+        Collocation: "Complete the expression: El director ________ a cargo del proyecto."
+    samples: |
+      Freeform_word — direct production:
+        ¿Cuál es la palabra en español para "to network" en un contexto profesional?
+        (rubric: hacer contactos, hacer networking, establecer contactos)
+
+      Freeform_response — register shift:
+        Reescribe esta frase en un registro más formal: "Mi jefe me dijo que tenía que terminar el trabajo."
+        (rubric: "mi superior me indicó/comunicó que debía finalizar...", "se me solicitó que...")
+
+      Freeform_response — false friend:
+        ¿Qué significa "actualmente" en español? ¿Es lo mismo que "actually" en inglés?
+        (rubric: "actualmente" = currently/nowadays ≠ "actually" = en realidad)
+
+      Freeform_response — collocation:
+        Completa la expresión: "El director ________ a cargo del proyecto."
+        (Expected: "estuvo" or "estaba" — tests "estar a cargo de" as a fixed collocation.)
+
+  grammar:
+    format: freeform_response
+    prompt_language: spanish
+    distractor_rule: "N/A — open response"
+    guidance: |
+      Natural embedding — NO explicit grammar instruction in the question.
+      The student with the target structure produces it naturally; one without reveals the gap.
+      Rubric states the target structure for the evaluator only — never shown to the student.
+      Universal prompts — any adult can answer without needing personal details.
+      Vary topics across the question set for the same skill.
+      Single open question in Spanish per question; no multi-part scaffolding.
+    samples: |
+      Question 1:
+        ¿Qué crees que es importante que haga una persona para tener éxito en el trabajo?
+        (rubric: look for "es importante/necesario/bueno que + subjunctive")
+
+      Question 2:
+        ¿Qué es necesario que haga un gobierno para proteger el medio ambiente?
+        (rubric: look for "es necesario/fundamental/urgente que + subjunctive")
+
+      Question 3 (past subjunctive):
+        Cuando eras niño, ¿qué esperabas que hicieran tus padres de manera diferente?
+        (rubric: look for imperfect subjunctive — "esperaba que...", "quería que...")
+
+      Question 4 (passive ser):
+        Describe cómo se construyó un edificio, monumento o ciudad que conoces.
+        (rubric: look for passive ser: "fue construido/a", "fueron diseñados/as", "fue inaugurado/a")
+
+C1:
+  vocab:
+    format: freeform_response
+    prompt_language: spanish
+    distractor_rule: "N/A — open response"
+    guidance: |
+      Three question types — passive recognition, active production, natural context deployment:
+      Type 1 (Passive recognition): "¿Qué significa X? Da un ejemplo de cuándo lo usarías."
+        Tests whether student understands the idiom/expression and its appropriate context.
+      Type 2 (Active production): "Usa la expresión X en una oración que muestre claramente su significado."
+        Tests whether student can deploy the expression correctly in natural context.
+      Type 3 (Natural deployment): give a scenario; ask what expression a native speaker would use.
+        Tests whether student can retrieve the right expression for a social context.
+      All questions in Spanish. Rubric states target expressions and acceptable interpretations.
+    samples: |
+      Type 1 — Passive recognition:
+        ¿Qué significa "no hay mal que por bien no venga"? Da un ejemplo de cuándo lo usarías.
+        (rubric: correct interpretation + plausible context — tests passive knowledge)
+
+      Type 2 — Active production:
+        Usa la expresión "meter la pata" en una oración que muestre claramente su significado.
+        (rubric: correct usage in natural context — tests active deployment)
+
+      Type 3 — Natural expression in context:
+        Alguien llega tarde y dice: "Lo siento, _______." ¿Qué expresión usaría un hablante nativo?
+        (rubric: "se me fue el tiempo", "se me hizo tarde", "no me di cuenta de la hora")
+
+  grammar:
+    format: freeform_response
+    prompt_language: spanish
+    distractor_rule: "N/A — open response"
+    guidance: |
+      No scaffold — NO explicit grammar instruction in the question.
+      Student must infer and deploy the target structure from natural context.
+      Three question types:
+      Type 1 (Implicit context): scenario that requires the target structure to express meaning correctly.
+        The temporal or logical context makes the target tense/structure the only natural choice.
+      Type 2 (Metalinguistic awareness): "¿Cuál es la diferencia entre X e Y? ¿Cuándo usarías cada uno?"
+        Tests whether student understands the functional distinction, not just form recall.
+      Type 3 (Free narrative): open prompt that elicits the target structure naturally without forcing it.
+      Rubric states target structures for evaluator only — never shown to student.
+      Vary grammatical subjects and topic contexts across the question set.
+    samples: |
+      Type 1 — Implicit context (pluperfect):
+        Cuando llegué al aeropuerto, mi vuelo ya _______. ¿Qué pasó después?
+        (rubric: "había salido/despegado" — pluperfect inferred from temporal context, not prompted)
+
+      Type 2 — Metalinguistic awareness:
+        ¿Cuál es la diferencia entre "hoy comí" y "hoy he comido"? ¿Cuándo usarías cada uno?
+        (rubric: tests understanding of perfect aspect — a genuine C1 distinction for English speakers)
+
+      Type 3 — Free narrative:
+        Cuenta una historia en la que algo importante ya había pasado cuando llegaste.
+        (No scaffold — student deploys pluperfect in natural narrative context)
+
+      Type 1 — Implicit context (subjunctive nuance, doubt frame):
+        ¿Crees que la inteligencia artificial va a cambiar fundamentalmente el trabajo en los próximos años? ¿Por qué?
+        (rubric: look for doubt triggers — "no creo que...", "dudo que...", "es posible que..." + subjunctive)
+
+      Type 1 — Implicit context (subjunctive nuance, negation/disbelief frame):
+        Tu amigo dice que aprendió español perfectamente en tres semanas. ¿Le crees? ¿Por qué o por qué no?
+        (rubric: look for denial/negation triggers — "no creo que haya...", "no es verdad que sea...", "es imposible que...")
+
+C2:
+  vocab:
+    format: freeform_response
+    prompt_language: spanish
+    distractor_rule: "N/A — open response"
+    guidance: |
+      Register adaptation and sociolinguistic awareness — not dialect-specific knowledge,
+      which would unfairly penalize students with exposure to only one variety.
+      Questions test awareness of how language varies by context, audience, and social register.
+      No explicit grammar or vocabulary instruction in the question.
+      Three question types:
+      Type 1 (Register adaptation): write the same message for two different audiences.
+      Type 2 (Sociolinguistic awareness): explain a regional/social variation and when it is natural.
+      Type 3 (Written vs. spoken register): rewrite formal text in colloquial Spanish.
+      Rubric states evaluation criteria for the evaluator only.
+    samples: |
+      Type 1 — Register adaptation:
+        Escribe el mismo mensaje de dos formas: una para un amigo cercano y otra para tu jefe. "Llegaré tarde a la reunión."
+        (rubric: clear register contrast — informal vs. formal vocabulary, tone, directness)
+
+      Type 2 — Sociolinguistic awareness:
+        ¿Por qué una persona podría decir "vos" en lugar de "tú"? ¿En qué contextos es natural?
+        (rubric: awareness that voseo is regional and social, not incorrect — tests sociolinguistic knowledge)
+
+      Type 3 — Written vs. spoken register:
+        Reescribe esta oración como si la dijeras en una conversación informal: "Me sería de gran utilidad recibir su respuesta a la brevedad posible."
+        (rubric: natural colloquial Spanish — "¿me puedes contestar pronto?", "necesito tu respuesta rápido")
+
+  grammar:
+    format: freeform_response
+    prompt_language: spanish
+    distractor_rule: "N/A — open response"
+    guidance: |
+      Stylistic range and sustained production — no scaffold, no stated target structure.
+      Three question types that generate sufficient evaluation signal without sentence count minimums:
+      Type 1 (Audience-aware writing): describe the same event for two different audiences — the
+        dual-register requirement naturally produces extended output.
+      Type 2 (Sustained argumentation with steelman): defend a position AND articulate the strongest
+        counter-argument — the steelman requirement adds a second analytical layer.
+      Type 3 (Guided narrative depth): narrative with embedded sub-questions (who/what/why) that
+        naturally extend the response without an arbitrary sentence count.
+      Rubric states evaluation dimensions for the evaluator: register control, argumentation
+      coherence, narrative development. Never shown to student.
+    samples: |
+      Type 1 — Audience-aware writing:
+        Describe el mismo evento dos veces: primero como si se lo contaras a un amigo, luego como si escribieras un artículo periodístico.
+        (rubric: clear register contrast — informal tone vs. formal register, vocabulary shift, structural difference)
+
+      Type 2 — Sustained argumentation with steelman:
+        ¿Crees que las redes sociales han sido buenas o malas para la sociedad? Defiende tu postura. ¿Cuál es el argumento más fuerte en contra de tu opinión?
+        (rubric: coherent thesis + supporting reasoning + genuine engagement with opposing argument)
+
+      Type 3 — Guided narrative depth:
+        Describe una situación difícil que hayas vivido. ¿Quiénes estaban involucrados? ¿Qué lo hizo difícil? ¿Qué hiciste y por qué?
+        (rubric: coherent narrative with at least three of: participants, source of difficulty, action taken, reasoning/reflection)
