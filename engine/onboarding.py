@@ -179,9 +179,8 @@ async def _step_collect_name(user, text: str) -> dict:
     await sync_to_async(user.__class__.objects.filter(pk=user.pk).update)(display_name=name)
     welcome = (
         f"Hola, **{name}**!\n\n"
-        f"👉 I'm going to ask you a few questions to get a sense of your current level.\n"
-        f"👉 If you aren't sure, just say \"I don't know\"\n\n"
-        f"When you're ready to get started, say **listo** (that means \"ready\" in Spanish 😊)"
+        f"I'll ask you a few questions to get a sense of your Spanish level. It should take 3–5 minutes.\n\n"
+        f"When you're ready, say **\"Listo\"** (\"Ready\" in Spanish 😊)"
     )
     return {"text": welcome, "audio_url": None, "session_ended": False}
 
