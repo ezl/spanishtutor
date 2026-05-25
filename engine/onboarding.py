@@ -8,6 +8,7 @@ questions from the QuizQuestion bank. LLM is used only for scoring answers
 import logging
 import re
 from asgiref.sync import sync_to_async
+from django.conf import settings
 from django.utils import timezone
 from .core import call_llm
 
@@ -197,13 +198,24 @@ async def _step_listo_gate(user, text: str) -> dict:
 
 def _format_question(question) -> str:
     """Format a QuizQuestion for display to the user."""
-    text = question.question_text
+    # Strip any options or 'don't know' footer the LLM may have embedded in question_text
+    raw_lines = question.question_text.splitlines()
+    stem_lines = []
+    for line in raw_lines:
+        stripped = line.strip()
+        if re.match(r'^\*?\*?[a-dA-D][.)]\*?\*?\s', stripped):
+            break
+        if "don't know" in stripped.lower() or "i don't know" in stripped.lower():
+            break
+        stem_lines.append(line)
+    text = '\n'.join(stem_lines).rstrip()
+
     if question.format == 'multiple_choice' and question.options:
         lines = [text]
         for key in ['a', 'b', 'c', 'd']:
             if key in question.options:
                 lines.append(f"  **{key})** {question.options[key]}")
-        lines.append('\n*(Not sure? Say "I don\'t know" - it\'s more useful than guessing)*')
+        lines.append('\n*(Not sure? Say "I don\'t know" — it\'s more useful than guessing)*')
         return '\n'.join(lines)
     return text
 
@@ -225,7 +237,7 @@ async def _draw_question(skills: list, skill_idx: int, quiz_state: dict):
 
 
 async def _conclude_quiz(user, session, quiz_state: dict, skills: list, uid: str) -> dict:
-    from learner.models import EvaluationProgress, Session
+    from learner.models import EvaluationProgress, Session, SessionEvent, QuizQuestion
     from .quiz_flow import quiz_derive_results
     from .interests import seed_interests
 
@@ -250,6 +262,42 @@ async def _conclude_quiz(user, session, quiz_state: dict, skills: list, uid: str
     assessment_parts.append(f"🎯 **First sessions will focus on:** {focus}")
     assessment = "\n\n".join(assessment_parts)
 
+    # Build per-question review summary
+    quiz_events = await sync_to_async(
+        lambda: list(SessionEvent.objects.filter(session=session, event_type='quiz').order_by('timestamp'))
+    )()
+    question_pks = [int(e.skill_id) for e in quiz_events if e.skill_id and e.skill_id.isdigit()]
+    questions_by_pk = {}
+    if question_pks:
+        qs = await sync_to_async(
+            lambda: {q.pk: q for q in QuizQuestion.objects.filter(pk__in=question_pks).select_related('skill')}
+        )()
+        questions_by_pk = qs
+
+    score_labels = {1: '🟥 miss', 2: '🟨 partial', 3: '🟦 good', 4: '🟩 correct'}
+    review_lines = ['---', '**Quiz review:**', '']
+    for i, event in enumerate(quiz_events, 1):
+        q = questions_by_pk.get(int(event.skill_id)) if event.skill_id and event.skill_id.isdigit() else None
+        score = event.score_delta
+        score_str = score_labels.get(score, '—') if score is not None else '—'
+        skill_name = q.skill.name if q else '—'
+
+        review_lines.append(f"**Q{i}** — {skill_name} ({score_str})")
+        review_lines.append(f"  You said: *{event.user_response or '(no answer)'}*")
+        if q:
+            if q.format == 'multiple_choice' and q.options:
+                correct_text = q.options.get(q.correct_answer, q.correct_answer)
+                review_lines.append(f"  Expected: **{q.correct_answer})** {correct_text}")
+            else:
+                review_lines.append(f"  Expected: **{q.correct_answer}**")
+                if q.rubric:
+                    review_lines.append(f"  Acceptable: {q.rubric}")
+        review_lines.append('')
+
+    grid_url = f"{settings.BASE_URL}/progress/"
+    review_lines.append(f"[View your full skill grid]({grid_url})")
+    review_summary = '\n'.join(review_lines)
+
     await sync_to_async(user.__class__.objects.filter(pk=user.pk).update)(
         estimated_cefr_level=cefr,
         onboarding_complete=True,
@@ -261,8 +309,9 @@ async def _conclude_quiz(user, session, quiz_state: dict, skills: list, uid: str
     )()
     log.info('[%s] quiz: complete — CEFR=%s questions=%d', uid, cefr, quiz_state['question_count'])
 
+    full_text = assessment + '\n\n' + review_summary
     follow_up = POST_ASSESSMENT_ES if cefr in ('B1', 'B2', 'C1', 'C2') else POST_ASSESSMENT_EN
-    return {"text": assessment, "follow_up": follow_up, "audio_url": None, "session_ended": False}
+    return {"text": full_text, "follow_up": follow_up, "audio_url": None, "session_ended": False}
 
 
 async def _step_adaptive_quiz(user, text: str) -> dict:
@@ -357,6 +406,11 @@ async def _step_adaptive_quiz(user, text: str) -> dict:
                 score = 1 if input_class == 'dont_know' else await evaluate_answer(question, text)
                 log.info('[%s] quiz: skill_idx=%d score=%d', uid, current_skill_idx, score)
                 quiz_state = quiz_update_state(quiz_state, current_skill_idx, score)
+                # Store score on the event so the completion summary can show it
+                if quiz_events:
+                    await sync_to_async(
+                        lambda s=score: SessionEvent.objects.filter(pk=quiz_events[-1].pk).update(score_delta=s)
+                    )()
                 skill = skills[current_skill_idx]
                 await sync_to_async(SkillScore.objects.update_or_create)(
                     user=user, skill=skill, mode='writing',
@@ -415,6 +469,6 @@ async def _step_adaptive_quiz(user, text: str) -> dict:
     log.info('[%s] quiz: Q%d sent — skill_idx=%d %r', uid, len(quiz_events) + 1, chosen_idx, question_text[:80])
     await sync_to_async(SessionEvent.objects.create)(
         session=session, event_type='quiz', dimension='writing',
-        content=question_text, user_response='',
+        skill_id=str(question.pk), content=question_text, user_response='',
     )
     return {"text": question_display, "audio_url": None, "session_ended": False}
