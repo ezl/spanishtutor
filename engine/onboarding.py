@@ -276,24 +276,39 @@ async def _conclude_quiz(user, session, quiz_state: dict, skills: list, uid: str
         )()
         questions_by_pk = qs
 
-    score_labels = {1: '🟥 miss', 2: '🟨 partial', 3: '🟦 good', 4: '🟩 correct'}
     review_lines = ['---', '**Quiz review:**', '']
     for i, event in enumerate(quiz_events, 1):
         q = questions_by_pk.get(int(event.skill_id)) if event.skill_id and event.skill_id.isdigit() else None
-        score = event.score_delta
-        score_str = score_labels.get(score, '—') if score is not None else '—'
+        score = event.score_delta or 1
+        user_raw = (event.user_response or '').strip() or '(no answer)'
         skill_name = q.skill.name if q else '—'
+        question_text = q.question_text if q else '—'
 
-        review_lines.append(f"**Q{i}** — {skill_name} ({score_str})")
-        review_lines.append(f"  You said: *{event.user_response or '(no answer)'}*")
-        if q:
-            if q.format == 'multiple_choice' and q.options:
-                correct_text = q.options.get(q.correct_answer, q.correct_answer)
-                review_lines.append(f"  Expected: **{q.correct_answer})** {correct_text}")
+        review_lines.append(f"**Q{i}.** {question_text}")
+
+        if q and q.format == 'multiple_choice' and q.options:
+            user_letter = user_raw.strip().lower().rstrip(').').lstrip('(')
+            user_text = q.options.get(user_letter)
+            user_display = f"{user_letter}) {user_text}" if user_text else user_raw
+            correct_letter = (q.correct_answer or '').lower()
+            correct_text = q.options.get(correct_letter, correct_letter)
+            correct_display = f"{correct_letter}) {correct_text}"
+            if score >= 3:
+                review_lines.append(f"You said **{user_display}** — ✅ correct!")
+            elif score == 2:
+                review_lines.append(f"You said **{user_display}** — close! The answer was **{correct_display}**.")
             else:
-                review_lines.append(f"  Expected: **{q.correct_answer}**")
-                if q.rubric:
-                    review_lines.append(f"  Acceptable: {q.rubric}")
+                review_lines.append(f"You said **{user_display}** — the answer was **{correct_display}**.")
+        else:
+            correct = (q.correct_answer or '—') if q else '—'
+            if score >= 3:
+                review_lines.append(f"You said *{user_raw}* — ✅ correct!")
+            elif score == 2:
+                review_lines.append(f"You said *{user_raw}* — close! We were looking for **{correct}**.")
+            else:
+                review_lines.append(f"You said *{user_raw}* — we were looking for **{correct}**.")
+
+        review_lines.append(f"*Testing: {skill_name}*")
         review_lines.append('')
 
     grid_url = f"{settings.BASE_URL}/progress/"
@@ -467,7 +482,7 @@ async def _step_adaptive_quiz(user, text: str) -> dict:
     await sync_to_async(Session.objects.filter(pk=session.pk).update)(quiz_state=quiz_state)
     question_text = _format_question(question, cefr_level=skills[chosen_idx].cefr_level)
     q_number = len(quiz_events) + 1
-    numbered_text = f"**Question {q_number}**\n\n{question_text}"
+    numbered_text = f"**Q{q_number}.**\n\n{question_text}"
     question_display = (GUESSING_REMINDER + numbered_text) if prepend_reminder else numbered_text
 
     log.info('[%s] quiz: Q%d sent — skill_idx=%d %r', uid, q_number, chosen_idx, question_text[:80])
