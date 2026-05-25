@@ -238,6 +238,41 @@ async def _draw_question(skills: list, skill_idx: int, quiz_state: dict):
     return None, skill_idx
 
 
+async def _explain_incorrect(items: list) -> dict:
+    """
+    One LLM call for all incorrect/partial answers.
+    items: list of dicts with keys: num, question_text, user_answer, correct_answer, skill_name, rubric
+    Returns {num: explanation_str}.
+    """
+    lines = []
+    for item in items:
+        lines.append(f"Q{item['num']} — Skill: {item['skill_name']}")
+        lines.append(f"Question: {item['question_text']}")
+        lines.append(f"Student answered: {item['user_answer']}")
+        lines.append(f"Correct answer: {item['correct_answer']}")
+        if item.get('rubric'):
+            lines.append(f"What we were looking for: {item['rubric']}")
+        lines.append('')
+
+    prompt = (
+        "For each Spanish quiz answer below, write ONE sentence explaining what went wrong "
+        "and what rule or pattern applies. Be specific and educational. "
+        "Output a JSON array: [{\"id\": N, \"why\": \"...\"}]\n\n"
+        + '\n'.join(lines)
+    )
+    try:
+        raw = await call_llm(
+            [{'role': 'user', 'content': prompt}],
+            system_override="You explain Spanish quiz mistakes concisely. Output JSON only — no prose, no markdown fences.",
+            max_tokens=600,
+        )
+        import json as _json
+        data = _json.loads(raw.strip())
+        return {entry['id']: entry['why'] for entry in data if 'id' in entry and 'why' in entry}
+    except Exception:
+        return {}
+
+
 async def _conclude_quiz(user, session, quiz_state: dict, skills: list, uid: str) -> dict:
     from learner.models import EvaluationProgress, Session, SessionEvent, QuizQuestion
     from .quiz_flow import quiz_derive_results
@@ -276,6 +311,24 @@ async def _conclude_quiz(user, session, quiz_state: dict, skills: list, uid: str
         )()
         questions_by_pk = qs
 
+    # Collect incorrect/partial answers for LLM explanation
+    to_explain = []
+    for i, event in enumerate(quiz_events, 1):
+        score = event.score_delta or 1
+        if score <= 2:
+            q = questions_by_pk.get(int(event.skill_id)) if event.skill_id and event.skill_id.isdigit() else None
+            if q:
+                to_explain.append({
+                    'num': i,
+                    'question_text': q.question_text,
+                    'user_answer': (event.user_response or '').strip() or '(no answer)',
+                    'correct_answer': q.correct_answer or '',
+                    'skill_name': q.skill.name,
+                    'rubric': q.rubric or '',
+                })
+
+    explanations = await _explain_incorrect(to_explain) if to_explain else {}
+
     review_lines = ['---', '**Quiz review:**', '']
     for i, event in enumerate(quiz_events, 1):
         q = questions_by_pk.get(int(event.skill_id)) if event.skill_id and event.skill_id.isdigit() else None
@@ -296,17 +349,20 @@ async def _conclude_quiz(user, session, quiz_state: dict, skills: list, uid: str
             if score >= 3:
                 review_lines.append(f"You said **{user_display}** — ✅ correct!")
             elif score == 2:
-                review_lines.append(f"You said **{user_display}** — close! The answer was **{correct_display}**.")
+                review_lines.append(f"You said **{user_display}** — 🟡 close! The answer was **{correct_display}**.")
             else:
-                review_lines.append(f"You said **{user_display}** — the answer was **{correct_display}**.")
+                review_lines.append(f"You said **{user_display}** — ❌ the answer was **{correct_display}**.")
         else:
             correct = (q.correct_answer or '—') if q else '—'
             if score >= 3:
                 review_lines.append(f"You said *{user_raw}* — ✅ correct!")
             elif score == 2:
-                review_lines.append(f"You said *{user_raw}* — close! We were looking for **{correct}**.")
+                review_lines.append(f"You said *{user_raw}* — 🟡 close! We were looking for **{correct}**.")
             else:
-                review_lines.append(f"You said *{user_raw}* — we were looking for **{correct}**.")
+                review_lines.append(f"You said *{user_raw}* — ❌ we were looking for **{correct}**.")
+
+        if score <= 2 and i in explanations:
+            review_lines.append(f"*Why: {explanations[i]}*")
 
         review_lines.append(f"*Testing: {skill_name}*")
         review_lines.append('')
