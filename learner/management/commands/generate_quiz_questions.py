@@ -60,6 +60,8 @@ Sample questions at this quality level:
 - For freeform_response rubric: use pipe-separated target structures for the evaluator
 - For freeform_word rubric: comma-separated list of acceptable answer variants (accent-free ok)
 - For multiple_choice: rubric must be null
+- Lines beginning with [NOTE:] in the samples are spec annotations — NEVER include them in question_text
+- (Translation: ...) lines in samples ARE student-facing — include them in question_text exactly as shown
 
 Return a JSON array of {count} objects, each with:
   "format": one of "multiple_choice", "freeform_word", "freeform_response"

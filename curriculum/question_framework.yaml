@@ -8,8 +8,13 @@
 #   manage.py review_quiz_questions    — validates generated questions against expected format
 #
 # Skill type detection (see _skill_type() helper):
-#   vocab   — skill_id contains: _vocab_, _greetings, _numbers, _dates, _gustar
+#   vocab   — skill_id contains: _vocab_, _greetings, _numbers, _dates, _idiomatic, _register_shifts
 #   grammar — everything else
+#
+# Sample annotation conventions:
+#   Lines beginning with [NOTE:] are spec annotations for the question designer — NEVER include
+#   them in question_text shown to the student.
+#   (Translation: ...) lines ARE student-facing — include them in question_text exactly as shown.
 
 A1:
   vocab:
@@ -35,7 +40,7 @@ A1:
         What does "roja" mean?
         a) blue  b) green  c) red  d) yellow
         *(Not sure? Say "I don't know" — it's more useful than guessing)*
-        (Test individual words, not phrases — adjective agreement is A2 territory)
+        [NOTE: Test individual words, not phrases — adjective agreement is A2 territory]
 
   grammar:
     format: multiple_choice
@@ -99,7 +104,9 @@ A2:
     distractor_rule: "N/A — fill-in-blank, not MC"
     guidance: |
       Fill-in-blank stored as freeform_word with ________ in question_text.
-      Always include English translation on a second line, blank filled in.
+      Each fill-in-blank question_text MUST begin with "Fill in the blank:" as the first line.
+      Always include English translation on a second line after the Spanish sentence, in the format:
+        (Translation: English meaning here.)
       The translation clarifies meaning without revealing the Spanish form.
       Never reveal the target word or root in the question stem.
       Short sentences — one clause maximum.
@@ -134,21 +141,23 @@ A2:
 
     samples: |
       Conjugation — fill-in-blank with infinitive hint + translation:
+        Fill in the blank:
         Ella ________ (hablar) con su amiga ayer.
         (Translation: She spoke with her friend yesterday.)
 
       Conjugation — MC, pick correct form:
         Which is the correct preterite form of "hablar" for "ella"?
         a) habló  b) hablaba  c) habla  d) hablará
-        (Distractors: imperfect, present, future — all valid forms, wrong tense.)
+        [NOTE: Distractors: imperfect, present, future — all valid forms, wrong tense.]
 
       Conjugation — translate with Spanish anchor:
         Translate into Spanish: "She spoke with el profesor yesterday."
-        (Any -ar verb in preterite passes. Evaluator checks for correct -ó ending.)
+        [NOTE: Any -ar verb in preterite passes. Evaluator checks for correct -ó ending.]
 
       Pattern — open fill-in-blank (no infinitive hint):
+        Fill in the blank:
         Ella ________ más para el examen.
-        (Any grammatically correct verb+infinitive construction passes: "necesita estudiar", "tiene que practicar", etc.)
+        [NOTE: Any grammatically correct verb+infinitive construction passes: "necesita estudiar", "tiene que practicar", etc.]
 
       Pattern — MC, pick correct structure:
         Which sentence is correct?
@@ -157,16 +166,17 @@ A2:
 
       Pattern — translate with Spanish anchor:
         Translate into Spanish: "I want to eat la pizza."
-        (Spanish noun given to eliminate vocabulary as a variable. Any valid verb+infinitive passes.)
+        [NOTE: Spanish noun eliminates vocabulary as a variable. Any valid verb+infinitive passes.]
 
       Gustar — fill-in-blank + translation:
+        Fill in the blank:
         A mis amigos ________ (gustar) mucho el fútbol.
         (Translation: My friends really like soccer.)
-        (Expected: "les gusta" — tests pronoun selection and verb agreement with singular noun.)
+        [NOTE: Expected: "les gusta" — tests pronoun selection and verb agreement with singular noun.]
 
       Gustar — translate with Spanish anchor (plural object):
         Translate into Spanish: "She likes los libros."
-        (Expected: "Le gustan los libros." — tests pronoun selection AND plural verb agreement.)
+        [NOTE: Expected: "Le gustan los libros." — tests pronoun selection AND plural verb agreement.]
 
 B1:
   vocab:
@@ -186,19 +196,19 @@ B1:
     samples: |
       Template 1 — Direct translation, noun:
         What's the Spanish word for "salary"?
-        (rubric: sueldo, salario)
+        [NOTE: rubric: sueldo, salario]
 
       Template 2 — Definition prompt, noun:
         What's the Spanish word for the formal document you send when applying for a job?
-        (rubric: currículum, CV, hoja de vida)
+        [NOTE: rubric: currículum, CV, hoja de vida]
 
       Template 3 — Verb production:
         What's the Spanish verb meaning "to resign from a job"?
-        (rubric: renunciar, dimitir — accept any recognizable conjugated form)
+        [NOTE: rubric: renunciar, dimitir — accept any recognizable conjugated form]
 
       Template 4 — Context production (freeform_response):
         En una oración, di qué harías si tu jefe te ofreciera un ascenso.
-        (rubric: look for work vocabulary — ascenso, aceptar, agradecer, sueldo — in a grammatically coherent sentence)
+        [NOTE: rubric: look for work vocabulary — ascenso, aceptar, agradecer, sueldo — in a grammatically coherent sentence]
 
   grammar:
     format: freeform_word
@@ -206,10 +216,12 @@ B1:
     distractor_rule: "N/A — fill-in-blank, not MC"
     guidance: |
       Fill-in-blank with ________ in question_text, stored as freeform_word.
+      Each fill-in-blank question_text MUST begin with "Completa la oración:" as the first line.
       Always include infinitive hint for conjugation-testing skills (isolates the target form).
-      Template 1: Spanish sentence + infinitive hint + English translation.
-      Template 2: Same Spanish sentence + infinitive hint, NO translation (harder — student must
-        infer tense and meaning from Spanish context clues alone).
+      Template 1: "Completa la oración:" + Spanish sentence + infinitive hint + English translation.
+        Format the translation as: (Translation: English meaning here.)
+      Template 2: "Completa la oración:" + same Spanish sentence + infinitive hint, NO translation
+        (harder — student must infer tense and meaning from Spanish context clues alone).
       Template 3: Full production — "Translate: ..." with enough Spanish anchoring to force the
         target construction.
       Vary grammatical subjects (yo, tú, él/ella, nosotros, ellos) across the question set.
@@ -218,20 +230,22 @@ B1:
         (querer, recomendar, necesitar, pedir, esperar, etc.).
     samples: |
       Template 1 — Fill-in-blank with translation:
+        Completa la oración:
         Cuando era niño, mi familia ________ (cenar) juntos todos los domingos.
         (Translation: When I was a child, my family used to have dinner together every Sunday.)
 
       Template 2 — Fill-in-blank, no translation (harder):
+        Completa la oración:
         Mi jefe quiere que nosotros ________ (terminar) el proyecto hoy.
-        (No translation. Student must read Spanish context and produce the subjunctive form.)
 
       Template 3 — Full production, tú subject:
         Translate: "I want you to call me tomorrow."
-        (Expected: "Quiero que me llames mañana." — tests trigger construction + correct person form.)
+        [NOTE: Expected: "Quiero que me llames mañana." — tests trigger construction + correct person form.]
 
       Template — Different trigger verb, ella subject:
+        Completa la oración:
         El médico recomienda que ella ________ (descansar) más.
-        (Tests whether student has internalized the trigger pattern beyond "querer que".)
+        [NOTE: Tests whether student has internalized the trigger pattern beyond "querer que".]
 
 B2:
   vocab:
@@ -253,19 +267,19 @@ B2:
     samples: |
       Freeform_word — direct production:
         ¿Cuál es la palabra en español para "to network" en un contexto profesional?
-        (rubric: hacer contactos, hacer networking, establecer contactos)
+        [NOTE: rubric: hacer contactos, hacer networking, establecer contactos]
 
       Freeform_response — register shift:
         Reescribe esta frase en un registro más formal: "Mi jefe me dijo que tenía que terminar el trabajo."
-        (rubric: "mi superior me indicó/comunicó que debía finalizar...", "se me solicitó que...")
+        [NOTE: rubric: "mi superior me indicó/comunicó que debía finalizar...", "se me solicitó que..."]
 
       Freeform_response — false friend:
         ¿Qué significa "actualmente" en español? ¿Es lo mismo que "actually" en inglés?
-        (rubric: "actualmente" = currently/nowadays ≠ "actually" = en realidad)
+        [NOTE: rubric: "actualmente" = currently/nowadays ≠ "actually" = en realidad]
 
       Freeform_response — collocation:
         Completa la expresión: "El director ________ a cargo del proyecto."
-        (Expected: "estuvo" or "estaba" — tests "estar a cargo de" as a fixed collocation.)
+        [NOTE: Expected: "estuvo" or "estaba" — tests "estar a cargo de" as a fixed collocation.]
 
   grammar:
     format: freeform_response
@@ -281,19 +295,19 @@ B2:
     samples: |
       Question 1:
         ¿Qué crees que es importante que haga una persona para tener éxito en el trabajo?
-        (rubric: look for "es importante/necesario/bueno que + subjunctive")
+        [NOTE: rubric: look for "es importante/necesario/bueno que + subjunctive"]
 
       Question 2:
         ¿Qué es necesario que haga un gobierno para proteger el medio ambiente?
-        (rubric: look for "es necesario/fundamental/urgente que + subjunctive")
+        [NOTE: rubric: look for "es necesario/fundamental/urgente que + subjunctive"]
 
       Question 3 (past subjunctive):
         Cuando eras niño, ¿qué esperabas que hicieran tus padres de manera diferente?
-        (rubric: look for imperfect subjunctive — "esperaba que...", "quería que...")
+        [NOTE: rubric: look for imperfect subjunctive — "esperaba que...", "quería que..."]
 
       Question 4 (passive ser):
         Describe cómo se construyó un edificio, monumento o ciudad que conoces.
-        (rubric: look for passive ser: "fue construido/a", "fueron diseñados/as", "fue inaugurado/a")
+        [NOTE: rubric: look for passive ser: "fue construido/a", "fueron diseñados/as", "fue inaugurado/a"]
 
 C1:
   vocab:
@@ -312,15 +326,15 @@ C1:
     samples: |
       Type 1 — Passive recognition:
         ¿Qué significa "no hay mal que por bien no venga"? Da un ejemplo de cuándo lo usarías.
-        (rubric: correct interpretation + plausible context — tests passive knowledge)
+        [NOTE: rubric: correct interpretation + plausible context — tests passive knowledge]
 
       Type 2 — Active production:
         Usa la expresión "meter la pata" en una oración que muestre claramente su significado.
-        (rubric: correct usage in natural context — tests active deployment)
+        [NOTE: rubric: correct usage in natural context — tests active deployment]
 
       Type 3 — Natural expression in context:
         Alguien llega tarde y dice: "Lo siento, _______." ¿Qué expresión usaría un hablante nativo?
-        (rubric: "se me fue el tiempo", "se me hizo tarde", "no me di cuenta de la hora")
+        [NOTE: rubric: "se me fue el tiempo", "se me hizo tarde", "no me di cuenta de la hora"]
 
   grammar:
     format: freeform_response
@@ -340,23 +354,23 @@ C1:
     samples: |
       Type 1 — Implicit context (pluperfect):
         Cuando llegué al aeropuerto, mi vuelo ya _______. ¿Qué pasó después?
-        (rubric: "había salido/despegado" — pluperfect inferred from temporal context, not prompted)
+        [NOTE: rubric: "había salido/despegado" — pluperfect inferred from temporal context, not prompted]
 
       Type 2 — Metalinguistic awareness:
         ¿Cuál es la diferencia entre "hoy comí" y "hoy he comido"? ¿Cuándo usarías cada uno?
-        (rubric: tests understanding of perfect aspect — a genuine C1 distinction for English speakers)
+        [NOTE: rubric: tests understanding of perfect aspect — a genuine C1 distinction for English speakers]
 
       Type 3 — Free narrative:
         Cuenta una historia en la que algo importante ya había pasado cuando llegaste.
-        (No scaffold — student deploys pluperfect in natural narrative context)
+        [NOTE: No scaffold — student deploys pluperfect in natural narrative context.]
 
       Type 1 — Implicit context (subjunctive nuance, doubt frame):
         ¿Crees que la inteligencia artificial va a cambiar fundamentalmente el trabajo en los próximos años? ¿Por qué?
-        (rubric: look for doubt triggers — "no creo que...", "dudo que...", "es posible que..." + subjunctive)
+        [NOTE: rubric: look for doubt triggers — "no creo que...", "dudo que...", "es posible que..." + subjunctive]
 
       Type 1 — Implicit context (subjunctive nuance, negation/disbelief frame):
         Tu amigo dice que aprendió español perfectamente en tres semanas. ¿Le crees? ¿Por qué o por qué no?
-        (rubric: look for denial/negation triggers — "no creo que haya...", "no es verdad que sea...", "es imposible que...")
+        [NOTE: rubric: look for denial/negation triggers — "no creo que haya...", "no es verdad que sea...", "es imposible que..."]
 
 C2:
   vocab:
@@ -376,15 +390,15 @@ C2:
     samples: |
       Type 1 — Register adaptation:
         Escribe el mismo mensaje de dos formas: una para un amigo cercano y otra para tu jefe. "Llegaré tarde a la reunión."
-        (rubric: clear register contrast — informal vs. formal vocabulary, tone, directness)
+        [NOTE: rubric: clear register contrast — informal vs. formal vocabulary, tone, directness]
 
       Type 2 — Sociolinguistic awareness:
         ¿Por qué una persona podría decir "vos" en lugar de "tú"? ¿En qué contextos es natural?
-        (rubric: awareness that voseo is regional and social, not incorrect — tests sociolinguistic knowledge)
+        [NOTE: rubric: awareness that voseo is regional and social, not incorrect — tests sociolinguistic knowledge]
 
       Type 3 — Written vs. spoken register:
         Reescribe esta oración como si la dijeras en una conversación informal: "Me sería de gran utilidad recibir su respuesta a la brevedad posible."
-        (rubric: natural colloquial Spanish — "¿me puedes contestar pronto?", "necesito tu respuesta rápido")
+        [NOTE: rubric: natural colloquial Spanish — "¿me puedes contestar pronto?", "necesito tu respuesta rápido"]
 
   grammar:
     format: freeform_response
@@ -404,12 +418,12 @@ C2:
     samples: |
       Type 1 — Audience-aware writing:
         Describe el mismo evento dos veces: primero como si se lo contaras a un amigo, luego como si escribieras un artículo periodístico.
-        (rubric: clear register contrast — informal tone vs. formal register, vocabulary shift, structural difference)
+        [NOTE: rubric: clear register contrast — informal tone vs. formal register, vocabulary shift, structural difference]
 
       Type 2 — Sustained argumentation with steelman:
         ¿Crees que las redes sociales han sido buenas o malas para la sociedad? Defiende tu postura. ¿Cuál es el argumento más fuerte en contra de tu opinión?
-        (rubric: coherent thesis + supporting reasoning + genuine engagement with opposing argument)
+        [NOTE: rubric: coherent thesis + supporting reasoning + genuine engagement with opposing argument]
 
       Type 3 — Guided narrative depth:
         Describe una situación difícil que hayas vivido. ¿Quiénes estaban involucrados? ¿Qué lo hizo difícil? ¿Qué hiciste y por qué?
-        (rubric: coherent narrative with at least three of: participants, source of difficulty, action taken, reasoning/reflection)
+        [NOTE: rubric: coherent narrative with at least three of: participants, source of difficulty, action taken, reasoning/reflection]
