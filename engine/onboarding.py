@@ -476,7 +476,8 @@ async def _step_adaptive_quiz(user, text: str) -> dict:
         if current_question_id is not None and current_skill_idx is not None:
             try:
                 question = await sync_to_async(QuizQuestion.objects.get)(pk=current_question_id)
-                score = 1 if input_class == 'dont_know' else await evaluate_answer(question, text)
+                skill = skills[current_skill_idx] if 0 <= current_skill_idx < len(skills) else None
+                score = 1 if input_class == 'dont_know' else await evaluate_answer(question, text, skill=skill)
                 log.info('[%s] quiz: skill_idx=%d score=%d', uid, current_skill_idx, score)
                 quiz_state = quiz_update_state(quiz_state, current_skill_idx, score)
                 # Store score on the event so the completion summary can show it

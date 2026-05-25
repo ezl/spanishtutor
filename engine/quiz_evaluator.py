@@ -17,27 +17,33 @@ EVALUATOR_SYSTEM = (
 _RUBRIC_LINE = "Rubric / target structures: {rubric}"
 
 _PROMPT = """\
+Skill being tested: {skill_name}
+Skill description: {skill_description}
+
 Question: {question_text}
 Format: {format}
 Correct answer: {correct_answer}
 {rubric_block}
 Student said: "{student_response}"
 
-Score 1-4:
-  4 = correct, natural, no meaningful errors (missing accent ok)
-  3 = correct meaning/structure, minor error only
-  2 = right idea, significant error (wrong form, key word missing)
-  1 = wrong, incomprehensible, or expressed not knowing
+Score 1-4 based on whether the student correctly demonstrates the skill being tested.
+Do not penalize for errors in grammar or vocabulary outside that specific skill.
+  4 = skill demonstrated correctly, no meaningful errors in the target area (missing accent ok)
+  3 = skill demonstrated, minor error in the target area only
+  2 = right idea for the skill, but significant error in how it's applied
+  1 = skill not demonstrated, wrong, incomprehensible, or expressed not knowing
 
 Multiple choice: 4 if correct option selected, 1 otherwise.
 
 SCORE: <1|2|3|4>"""
 
 
-async def evaluate_answer(question: QuizQuestion, student_response: str) -> int:
+async def evaluate_answer(question: QuizQuestion, student_response: str, skill=None) -> int:
     """Score a student's quiz answer. Returns 1–4; returns 1 on parse failure."""
     rubric_block = _RUBRIC_LINE.format(rubric=question.rubric) if question.rubric else ""
     prompt = _PROMPT.format(
+        skill_name=skill.name if skill else "Spanish",
+        skill_description=skill.description if skill else "",
         question_text=question.question_text,
         format=question.format,
         correct_answer=question.correct_answer,
