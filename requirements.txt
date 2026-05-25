@@ -8,6 +8,7 @@ python-dotenv==1.0.1
 pyyaml>=6.0
 audioop-lts
 gunicorn>=21.0.0
+whitenoise>=6.0.0
 pytest>=8.0.0
 pytest-django>=4.8.0
 pytest-asyncio>=0.23.0
