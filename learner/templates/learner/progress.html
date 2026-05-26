@@ -155,7 +155,7 @@
         <span class="level-badge">{{ user.estimated_cefr_level }}</span>
       {% endif %}
     </h1>
-    <p class="meta">{{ skills_at_or_below }} of {{ total_skills }} skills at or below your level</p>
+    <p class="meta">{{ skills_confident }} of {{ total_skills }} skills at confident level or above</p>
 
     <div class="mastery-bar-wrap">
       <div class="mastery-label">Level progress — {{ mastery_pct }}%</div>
@@ -167,7 +167,7 @@
 
   <div class="legend">
     <div class="legend-item"><div class="dot untested"></div> Untested</div>
-    <div class="legend-item"><div class="dot inferred"></div> Inferred (below your level)</div>
+    <div class="legend-item"><div class="dot confident inferred"></div> Inferred</div>
     <div class="legend-item"><div class="dot shaky"></div> Shaky</div>
     <div class="legend-item"><div class="dot developing"></div> Developing</div>
     <div class="legend-item"><div class="dot confident"></div> Confident</div>
