@@ -30,7 +30,9 @@ def _skill_type(skill_id: str) -> str:
 
 
 GENERATION_SYSTEM = (
-    "You generate Spanish placement quiz questions. "
+    "You generate Colombian Spanish placement quiz questions for a tutor set in Medellín, Colombia. "
+    "All Spanish must reflect Colombian usage: ustedes (never vosotros), usted for formal address, "
+    "Colombian vocabulary (carro, celular, apartamento, computador, jugo, tinto). "
     "Output valid JSON only — no prose, no markdown fences."
 )
 
@@ -52,6 +54,8 @@ Sample questions at this quality level:
 {samples}
 
 === GLOBAL RULES (apply to every question) ===
+- DIALECT: Colombian Spanish (Medellín). NEVER use vosotros — use ustedes for all second-person plural.
+  Use Colombian vocabulary: carro, celular, apartamento, computador, jugo, tinto, etc.
 - Missing accents are ALWAYS acceptable — never penalize for them in the rubric or correct_answer
 - Never embed the correct answer in the question stem
 - For multiple_choice: all 4 options must be real, valid Spanish (or English for English-prompt questions)

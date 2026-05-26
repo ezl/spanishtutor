@@ -3,6 +3,16 @@
 # Defines question format, prompt language, distractor rules, guidance, and sample questions
 # per CEFR level × skill type (vocab or grammar).
 #
+# DIALECT: Colombian Spanish — Medellín (paisa region)
+#   All questions must reflect Colombian Spanish exclusively.
+#   - NEVER use vosotros or any vosotros conjugations (habláis, tengáis, etc.) — this is Spain only.
+#   - For second-person plural, ALWAYS use ustedes.
+#   - For formal register, use usted (Colombians use usted even in informal family/friend contexts).
+#   - Prefer Colombian vocabulary and expressions over Castilian or other Latin American variants.
+#     Examples: carro (not coche), apartamento (not piso), computador (not ordenador),
+#     celular (not móvil), jugo (not zumo), tinto (black coffee).
+#   - Colombian expressions welcome: bacano, parce, chimba, ¡qué pena!, hagámosle, etc.
+#
 # Used by:
 #   manage.py generate_quiz_questions  — constructs per-skill LLM prompts
 #   manage.py review_quiz_questions    — validates generated questions against expected format
