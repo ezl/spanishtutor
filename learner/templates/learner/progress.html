@@ -64,30 +64,24 @@
     .dot.confident  { background: #1e3a5f; }
     .dot.mastered   { background: #14532d; }
 
-    .cefr-section { margin-bottom: 2.5rem; }
-    .cefr-heading {
-      font-size: 0.75rem;
-      font-weight: 700;
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-      color: #666;
-      margin-bottom: 0.75rem;
-      padding-bottom: 0.4rem;
-      border-bottom: 1px solid #222;
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
     }
-
-    table { width: 100%; border-collapse: collapse; }
+    col.skill-col { width: 220px; }
+    col.mode-col  { width: auto; }
 
     thead th {
       font-size: 0.7rem;
       font-weight: 500;
       color: #666;
       text-align: center;
-      padding: 0 0.25rem 0.5rem;
+      padding: 0 0.25rem 0.75rem;
       white-space: pre-line;
       line-height: 1.3;
     }
-    thead th.skill-col { text-align: left; width: 220px; }
+    thead th.skill-col { text-align: left; }
     thead th.inactive-col { color: #383838; }
     thead th.inactive-col .future-tag {
       display: block;
@@ -96,6 +90,16 @@
       font-weight: 400;
       margin-top: 2px;
       font-style: italic;
+    }
+
+    tr.cefr-heading-row td {
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #666;
+      padding: 2rem 0 0.4rem;
+      border-bottom: 1px solid #222;
     }
 
     tbody tr:hover { background: #161616; }
@@ -108,11 +112,15 @@
       font-size: 0.85rem;
       color: #ccc;
       padding-right: 1rem;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
     td.skill-name .desc {
       font-size: 0.72rem;
       color: #555;
       margin-top: 1px;
+      white-space: normal;
     }
     td.cell { text-align: center; }
 
@@ -166,44 +174,46 @@
     <div class="legend-item"><div class="dot mastered"></div> Mastered</div>
   </div>
 
-  {% for level in levels %}
-  <div class="cefr-section">
-    <div class="cefr-heading">{{ level.level }}</div>
-    <table>
-      {% if forloop.first %}
-      <thead>
-        <tr>
-          <th class="skill-col"></th>
-          {% for mode in modes %}
-          <th {% if not mode.active %}class="inactive-col"{% endif %}>
-            {{ mode.label }}{% if not mode.active %}<span class="future-tag">coming soon</span>{% endif %}
-          </th>
-          {% endfor %}
-        </tr>
-      </thead>
-      {% endif %}
-      <tbody>
-        {% for row in level.rows %}
-        <tr>
-          <td class="skill-name">
-            {{ row.skill.name }}
-            <div class="desc">{{ row.skill.description }}</div>
-          </td>
-          {% for cell in row.cells %}
-          <td class="cell">
-            {% if cell.active %}
-            <span class="square {{ cell.css_class }}" title="{{ cell.css_class }}"></span>
-            {% else %}
-            <span class="square inactive" title="coming soon"></span>
-            {% endif %}
-          </td>
-          {% endfor %}
-        </tr>
+  <table>
+    <colgroup>
+      <col class="skill-col">
+      {% for mode in modes %}<col class="mode-col">{% endfor %}
+    </colgroup>
+    <thead>
+      <tr>
+        <th class="skill-col"></th>
+        {% for mode in modes %}
+        <th {% if not mode.active %}class="inactive-col"{% endif %}>
+          {{ mode.label }}{% if not mode.active %}<span class="future-tag">coming soon</span>{% endif %}
+        </th>
         {% endfor %}
-      </tbody>
-    </table>
-  </div>
-  {% endfor %}
+      </tr>
+    </thead>
+    <tbody>
+    {% for level in levels %}
+      <tr class="cefr-heading-row">
+        <td colspan="{{ modes|length|add:1 }}">{{ level.level }}</td>
+      </tr>
+      {% for row in level.rows %}
+      <tr>
+        <td class="skill-name">
+          {{ row.skill.name }}
+          <div class="desc">{{ row.skill.description }}</div>
+        </td>
+        {% for cell in row.cells %}
+        <td class="cell">
+          {% if cell.active %}
+          <span class="square {{ cell.css_class }}" title="{{ cell.css_class }}"></span>
+          {% else %}
+          <span class="square inactive" title="coming soon"></span>
+          {% endif %}
+        </td>
+        {% endfor %}
+      </tr>
+      {% endfor %}
+    {% endfor %}
+    </tbody>
+  </table>
 
 {% endif %}
 </div>
