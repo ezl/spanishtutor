@@ -19,21 +19,39 @@ def _is_retryable_discord_error(exc) -> bool:
     return isinstance(exc, discord.DiscordServerError)
 
 
+_DISCORD_MAX = 1990
+
+
+def _chunk(text: str) -> list[str]:
+    """Split text into Discord-safe chunks, breaking on newlines where possible."""
+    chunks = []
+    while len(text) > _DISCORD_MAX:
+        split = text.rfind('\n', 0, _DISCORD_MAX)
+        if split == -1:
+            split = _DISCORD_MAX
+        chunks.append(text[:split])
+        text = text[split:].lstrip('\n')
+    if text:
+        chunks.append(text)
+    return chunks
+
+
 async def _send(channel, text: str) -> None:
-    """Send a message with one retry on transient Discord errors."""
-    last_exc = None
-    for attempt in range(DISCORD_RETRIES + 1):
-        try:
-            await channel.send(text)
-            return
-        except discord.DiscordServerError as exc:
-            last_exc = exc
-            if attempt < DISCORD_RETRIES:
-                logger.warning('Discord send failed (attempt %d/%d), retrying in %.0fs: %s',
-                               attempt + 1, DISCORD_RETRIES + 1, DISCORD_RETRY_DELAY, exc)
-                await asyncio.sleep(DISCORD_RETRY_DELAY)
-            else:
-                raise
+    """Send a message (chunked if needed) with one retry on transient Discord errors."""
+    for chunk in _chunk(text):
+        last_exc = None
+        for attempt in range(DISCORD_RETRIES + 1):
+            try:
+                await channel.send(chunk)
+                break
+            except discord.DiscordServerError as exc:
+                last_exc = exc
+                if attempt < DISCORD_RETRIES:
+                    logger.warning('Discord send failed (attempt %d/%d), retrying in %.0fs: %s',
+                                   attempt + 1, DISCORD_RETRIES + 1, DISCORD_RETRY_DELAY, exc)
+                    await asyncio.sleep(DISCORD_RETRY_DELAY)
+                else:
+                    raise
 
 
 intents = discord.Intents.default()
@@ -143,10 +161,7 @@ async def on_message(message: discord.Message):
                 result = await handle_message(user, text, list(attachments))
 
         if result.get('text'):
-            response = result['text']
-            while response:
-                await _send(message.channel, response[:1990])
-                response = response[1990:]
+            await _send(message.channel, result['text'])
 
         if result.get('follow_up'):
             await _send(message.channel, result['follow_up'])
