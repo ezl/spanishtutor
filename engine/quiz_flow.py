@@ -56,9 +56,11 @@ def quiz_select_skill_idx(state: dict) -> int:
         gap = gaps[gap_idx]
         lp = gap["last_pass_idx"]
         ff = gap["first_fail_idx"]
+        if ff - lp <= 1:
+            # Bisection converged to boundary pair; probe one beyond the first failure
+            # for the 3-consecutive guarantee. Top-of-ladder handled by _consecutive_window_done.
+            return ff + 1
         midpoint = (lp + ff) // 2
-        if midpoint == lp:
-            midpoint = lp + 1
         return midpoint
     raise ValueError(f"quiz_select_skill_idx called with pass='{p}' (should be 1, 2, or 3)")
 
@@ -122,7 +124,12 @@ def _pass2_update(state: dict, skill_idx: int, passed: bool) -> dict:
     gap_idx = state["current_gap_idx"]
     gap = state["gaps"][gap_idx]
 
-    if passed:
+    if skill_idx > gap["first_fail_idx"]:
+        # Extension probe above the known failure; only tighten the fail boundary on fail.
+        # On pass (non-monotonic), don't update gap — just let the score count toward the window.
+        if not passed:
+            gap["first_fail_idx"] = skill_idx
+    elif passed:
         gap["last_pass_idx"] = skill_idx
     else:
         gap["first_fail_idx"] = skill_idx
@@ -143,7 +150,10 @@ def _pass3_update(state: dict, skill_idx: int, passed: bool) -> dict:
     gap_idx = state["primary_border_gap_idx"]
     gap = state["gaps"][gap_idx]
 
-    if passed:
+    if skill_idx > gap["first_fail_idx"]:
+        if not passed:
+            gap["first_fail_idx"] = skill_idx
+    elif passed:
         gap["last_pass_idx"] = skill_idx
     else:
         gap["first_fail_idx"] = skill_idx
@@ -156,15 +166,17 @@ def _pass3_update(state: dict, skill_idx: int, passed: bool) -> dict:
 
 
 def _consecutive_window_done(state: dict, gap: dict) -> bool:
-    """True when 3 or 4 consecutive skill indices around the gap boundary have been scored."""
+    """True when 3+ consecutive skill indices around the gap boundary have been scored."""
     lp = gap["last_pass_idx"]
     ff = gap["first_fail_idx"]
-    # Count how many indices in the range [lp, ff] (inclusive) have been scored
     scored = state["scores"]
-    # The boundary region is the indices between lp and ff (inclusive)
-    count = sum(1 for i in range(max(0, lp), ff + 1) if str(i) in scored)
-    # ff - lp is the gap width; when <= 3 we have enough consecutive coverage
-    return count >= 3 or (ff - lp) <= 1
+    # Count scored in [lp, ff+1] inclusive — one step beyond the first failure,
+    # so the extension probe (ff+1) counts toward the window.
+    upper = min(ff + 2, state["skill_count"])
+    count = sum(1 for i in range(max(0, lp), upper) if str(i) in scored)
+    # At top of ladder we can't probe ff+1; accept the boundary pair as sufficient.
+    at_top = ff + 1 >= state["skill_count"] and ff - lp <= 1
+    return count >= 3 or at_top
 
 
 def _transition_to_pass_2(state: dict) -> dict:

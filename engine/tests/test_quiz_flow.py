@@ -129,13 +129,13 @@ def test_pass2_bisection_narrows_on_fail():
     state = quiz_update_state(state, mid, 1)   # FAIL
     assert state["gaps"][0]["first_fail_idx"] == mid
 
-def test_pass2_resolves_single_gap_then_transitions_to_pass3():
-    """After single gap is resolved in Pass 2, should move to Pass 3."""
+def test_pass2_resolves_single_gap_goes_to_done():
+    """After single gap is fully resolved in Pass 2, quiz goes to done (pass 3 skipped)."""
     state = _state_in_pass2(10, 13)
-    # Score 11 and 12 to get 3 consecutive around boundary
+    # Score 11 (lp→11) and 12 (ff→12); original score at 13 sits in window [11,14) → count=3
     state = quiz_update_state(state, 11, 4)
     state = quiz_update_state(state, 12, 1)
-    assert state["pass"] == 3
+    assert state["pass"] == "done"
 
 def test_pass2_advances_to_next_gap_when_multiple_gaps():
     state = quiz_initial_state(100)
@@ -153,8 +153,8 @@ def test_pass2_advances_to_next_gap_when_multiple_gaps():
     assert state["pass"] == 2
     assert state["current_gap_idx"] == 1
 
-def test_pass2_to_pass3_selects_gap_with_highest_first_fail():
-    # Use narrow gaps so they resolve quickly (ff - lp == 1 → done after 1 probe)
+def test_pass2_resolves_all_gaps_in_order():
+    """Pass 2 processes gaps sequentially; extension probe (ff+1) required before advancing."""
     state = quiz_initial_state(100)
     state["pass"] = 2
     state["gaps"] = [
@@ -164,14 +164,30 @@ def test_pass2_to_pass3_selects_gap_with_highest_first_fail():
     state["current_gap_idx"] = 0
     state["scores"] = {"5": 4, "7": 1, "40": 4, "42": 1}
     state["question_count"] = 4
-    # Resolve first gap: probe midpoint 6
-    state = quiz_update_state(state, 6, 4)   # gap becomes {lp:6, ff:7} → ff-lp=1 → done
+    # Resolve first gap: midpoint 6 narrows to ff-lp=1, then extension probe at 8
+    state = quiz_update_state(state, 6, 4)   # lp=6, gap=[6,7], ff-lp=1, need extension probe
+    assert state["current_gap_idx"] == 0     # not yet advanced
+    state = quiz_update_state(state, 8, 1)   # ff=8, window {6,7,8}=3 → resolved
     assert state["current_gap_idx"] == 1     # advanced to gap 1
-    # Resolve second gap: probe midpoint 41
-    state = quiz_update_state(state, 41, 4)  # gap becomes {lp:41, ff:42} → ff-lp=1 → done
-    # Now in pass 3; primary border should be gap index 1 (highest first_fail=42)
+    # Resolve second gap: midpoint 41 narrows to ff-lp=1, then extension probe at 43
+    state = quiz_update_state(state, 41, 4)  # lp=41, gap=[41,42], ff-lp=1
+    state = quiz_update_state(state, 43, 1)  # ff=43, window {41,42,43}=3 → done
+    assert state["pass"] == "done"
+
+
+def test_transition_to_pass3_selects_gap_with_highest_first_fail():
+    """_transition_to_pass_3 selects the gap with the highest first_fail_idx as primary border."""
+    from engine.quiz_flow import _transition_to_pass_3
+    state = quiz_initial_state(100)
+    state["gaps"] = [
+        {"last_pass_idx": 5,  "first_fail_idx": 7},   # resolved: {5,6,7} scored
+        {"last_pass_idx": 40, "first_fail_idx": 60},  # not resolved: only {40,60} scored
+    ]
+    state["scores"] = {"5": 4, "6": 4, "7": 1, "40": 4, "60": 1}
+    state["question_count"] = 5
+    state = _transition_to_pass_3(state)
     assert state["pass"] == 3
-    assert state["primary_border_gap_idx"] == 1
+    assert state["primary_border_gap_idx"] == 1  # gap 1 has highest ff=60
 
 
 # ── Pass 3 ────────────────────────────────────────────────────────────────────
