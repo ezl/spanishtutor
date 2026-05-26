@@ -122,8 +122,7 @@ A2:
         Also generate a translation variant: "Translate: 'She spoke with el profesor yesterday.'"
           The Spanish anchor word eliminates vocabulary as a variable.
 
-      STRUCTURAL PATTERN SKILLS (verb+infinitive patterns, pronoun placement, adjective
-      agreement, comparisons, gustar-type constructions):
+      STRUCTURAL PATTERN SKILLS (verb+infinitive patterns, adjective agreement, comparisons):
         NO infinitive hint — the pattern itself is what is tested.
         Open fill-in-blank: Ella ________ más para el examen.
           Any grammatically correct construction that uses the target pattern passes.
@@ -131,6 +130,19 @@ A2:
           Distractors: versions with specific structural errors (wrong order, wrong form, etc.).
         Translate with Spanish anchor: "Translate: 'I want to eat la pizza.'"
           Spanish noun given to eliminate vocabulary as a variable.
+
+      PRONOUN SKILLS (a2_direct_object_pronouns, a2_indirect_object_pronouns, a2_pronoun_order):
+        NEVER ask for a standalone pronoun translation ("How do you say 'them'?").
+          The answer depends on the referent's gender and number — the question is unanswerable without context.
+        ALWAYS provide a concrete referent. Three valid approaches:
+          (a) Fill-in-blank where the noun is visible in the sentence:
+              "María compró los libros. Juan ________ compró también."
+              (Translation: Maria bought the books. Juan bought them too.)
+          (b) MC: "Which sentence is correct?" — show the sentence rewritten with 4 different pronoun forms.
+          (c) Replacement prompt: "Rewrite using a pronoun: 'Voy a comprar los zapatos.'"
+              [NOTE: Expected: "Los voy a comprar." / "Voy a comprarlos."]
+        For pronoun order (a2_pronoun_order): use sentences with BOTH indirect and direct pronouns.
+          "Le doy el libro a ella" → test whether student can write "Se lo doy."
 
       GUSTAR-TYPE SKILLS (a2_gustar_like_verbs):
         Test both pronoun selection AND verb agreement with singular/plural noun.
@@ -228,6 +240,42 @@ B1:
         Nosotros and ellos forms are less drilled — include them explicitly.
       For subjunctive skills: vary the trigger verb across questions
         (querer, recomendar, necesitar, pedir, esperar, etc.).
+
+      FUTURE TENSE SKILLS (b1_future_regular, b1_future_irregular):
+        Two question types — conjugation drills and probability/conjecture:
+
+        TYPE 1 — Conjugation drill (fill-in-blank with explicit tense instruction):
+          The instruction "Usa el futuro simple:" MUST appear as the first line of question_text.
+          Without it, periphrastic future (va a comer) is equally valid Spanish and cannot be
+          scored as wrong. The explicit instruction removes that ambiguity.
+          Always include the infinitive hint to isolate conjugation from vocabulary.
+          If a student ignores the instruction and produces periphrastic future, score 1 —
+          they did not demonstrate the target conjugation. Do not award partial credit.
+            Usa el futuro simple:
+            Ella ________ (comer) con nosotros mañana.
+            (Translation: She will eat with us tomorrow.)
+
+        TYPE 2 — Probability/conjecture (no instruction needed):
+          Simple future is the ONLY natural form for expressing probability or speculation
+          about a present state. Periphrastic future cannot substitute here.
+          Use questions like: "¿Dónde estará X ahora?" / "¿Cuántos años tendrá?"
+          No explicit tense instruction needed — the meaning forces simple future.
+          Rubric: any simple future form expressing conjecture passes.
+            ¿Dónde ________ (estar) María ahora? Hace horas que no la vemos.
+            (Translation: Where could María be right now? We haven't seen her in hours.)
+
+        Vary subject persons across both types (yo, tú, él/ella, nosotros, ellos).
+
+      PERIPHRASTIC FUTURE SKILL (b1_future_periphrastic):
+        Questions should use context of plans, intentions, or near-future decisions —
+        contexts where ir+a+infinitive is the natural and expected form.
+        NEVER use conjecture/probability contexts — those force simple future, not periphrastic.
+        If a student produces simple future instead, score 2 — communicates future but
+        did not demonstrate the ir+a+infinitive construction being tested.
+        Always include the ir+a hint or use a context that makes the construction obvious:
+          Completa la oración:
+          Esta tarde, nosotros ________ (cenar) juntos.
+          (Translation: This afternoon, we are going to have dinner together.)
     samples: |
       Template 1 — Fill-in-blank with translation:
         Completa la oración:
