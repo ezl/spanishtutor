@@ -183,6 +183,10 @@ def _transition_to_pass_3(state: dict) -> dict:
         return state
     # Primary border = gap with the highest first_fail_idx
     primary_idx = max(range(len(state["gaps"])), key=lambda i: state["gaps"][i]["first_fail_idx"])
+    # If the primary gap is already resolved (ff - lp <= 1), no further probing needed
+    if _consecutive_window_done(state, state["gaps"][primary_idx]):
+        state["pass"] = "done"
+        return state
     state["pass"] = 3
     state["primary_border_gap_idx"] = primary_idx
     return state
