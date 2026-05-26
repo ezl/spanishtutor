@@ -12,6 +12,8 @@ DISCORD_RETRIES = 1
 DISCORD_RETRY_DELAY = 2.0
 USER_ERROR_MESSAGE = "Lo siento, tuve un problema. 😅 Try again in a moment!"
 
+_user_locks: dict[str, asyncio.Lock] = {}
+
 
 def _is_retryable_discord_error(exc) -> bool:
     return isinstance(exc, discord.DiscordServerError)
@@ -124,16 +126,21 @@ async def on_message(message: discord.Message):
         await message.channel.send(menu)
         return
 
+    uid = str(message.author.id)
+    if uid not in _user_locks:
+        _user_locks[uid] = asyncio.Lock()
+
     try:
-        async with message.channel.typing():
-            user, is_new = await get_or_create_user(message.author)
+        async with _user_locks[uid]:
+            async with message.channel.typing():
+                user, is_new = await get_or_create_user(message.author)
 
-            if is_new:
-                await _send(message.channel, FIRST_MESSAGE)
-                return
+                if is_new:
+                    await _send(message.channel, FIRST_MESSAGE)
+                    return
 
-            from engine.core import handle_message
-            result = await handle_message(user, text, list(attachments))
+                from engine.core import handle_message
+                result = await handle_message(user, text, list(attachments))
 
         if result.get('text'):
             response = result['text']
