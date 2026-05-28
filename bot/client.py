@@ -36,8 +36,17 @@ def _chunk(text: str) -> list[str]:
     return chunks
 
 
+def _discord_safe(text: str) -> str:
+    """Replace fill-in-blank underscores with a Discord-safe equivalent.
+    Eight underscores in a row are eaten by Discord's markdown parser (rendered as invisible underline).
+    Using a visible dash sequence avoids this without changing the visual meaning."""
+    import re
+    return re.sub(r'_{4,}', '―――――', text)
+
+
 async def _send(channel, text: str) -> None:
     """Send a message (chunked if needed) with one retry on transient Discord errors."""
+    text = _discord_safe(text)
     for chunk in _chunk(text):
         last_exc = None
         for attempt in range(DISCORD_RETRIES + 1):
