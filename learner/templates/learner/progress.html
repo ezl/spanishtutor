@@ -57,15 +57,18 @@
     .dot {
       width: 14px; height: 14px; border-radius: 3px; flex-shrink: 0;
     }
-    .dot.untested              { background: #2a2a2a; border: 1px solid #444; }
-    .dot.shaky                 { background: #7f1d1d; }
-    .dot.developing            { background: #78350f; }
-    .dot.confident             { background: #1e3a5f; }
-    .dot.mastered              { background: #14532d; }
-    .dot.shaky.inferred        { background: #fecaca; }
-    .dot.developing.inferred   { background: #fed7aa; }
-    .dot.confident.inferred    { background: #bfdbfe; }
-    .dot.mastered.inferred     { background: #bbf7d0; }
+    .dot.untested   { background: #2a2a2a; border: 1px solid #444; }
+    .dot.shaky      { background: #7f1d1d; }
+    .dot.developing { background: #78350f; }
+    .dot.confident  { background: #1e3a5f; }
+    .dot.mastered   { background: #14532d; }
+    .dot.inferred   {
+      background-image: repeating-linear-gradient(
+        -45deg,
+        transparent 0px, transparent 4px,
+        rgba(255,255,255,0.22) 4px, rgba(255,255,255,0.22) 6px
+      );
+    }
 
     table {
       width: 100%;
@@ -133,16 +136,19 @@
       height: 28px;
       border-radius: 4px;
     }
-    .square.untested              { background: #1e1e1e; border: 1px solid #333; }
-    .square.inactive              { background: #161616; border: 1px solid #222; }
-    .square.shaky                 { background: #7f1d1d; }
-    .square.developing            { background: #78350f; }
-    .square.confident             { background: #1e3a5f; }
-    .square.mastered              { background: #14532d; }
-    .square.shaky.inferred        { background: #fecaca; }
-    .square.developing.inferred   { background: #fed7aa; }
-    .square.confident.inferred    { background: #bfdbfe; }
-    .square.mastered.inferred     { background: #bbf7d0; }
+    .square.untested   { background: #1e1e1e; border: 1px solid #333; }
+    .square.inactive   { background: #161616; border: 1px solid #222; }
+    .square.shaky      { background: #7f1d1d; }
+    .square.developing { background: #78350f; }
+    .square.confident  { background: #1e3a5f; }
+    .square.mastered   { background: #14532d; }
+    .square.inferred   {
+      background-image: repeating-linear-gradient(
+        -45deg,
+        transparent 0px, transparent 4px,
+        rgba(255,255,255,0.22) 4px, rgba(255,255,255,0.22) 6px
+      );
+    }
 
     .no-user { text-align: center; color: #666; margin-top: 4rem; font-size: 1.1rem; }
   </style>
@@ -173,7 +179,7 @@
 
   <div class="legend">
     <div class="legend-item"><div class="dot untested"></div> Untested</div>
-    <div class="legend-item"><div class="dot mastered inferred"></div> Inferred (estimated)</div>
+    <div class="legend-item"><div class="dot mastered inferred"></div> Inferred</div>
     <div class="legend-item"><div class="dot shaky"></div> Shaky</div>
     <div class="legend-item"><div class="dot developing"></div> Developing</div>
     <div class="legend-item"><div class="dot confident"></div> Confident</div>
