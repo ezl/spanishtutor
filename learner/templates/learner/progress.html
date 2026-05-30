@@ -98,6 +98,7 @@
       font-style: italic;
     }
 
+    tr.cefr-heading-row { cursor: pointer; user-select: none; }
     tr.cefr-heading-row td {
       font-size: 0.75rem;
       font-weight: 700;
@@ -107,6 +108,15 @@
       padding: 2rem 0 0.4rem;
       border-bottom: 1px solid #222;
     }
+    tr.cefr-heading-row:hover td { color: #999; }
+    tr.cefr-heading-row .toggle-icon {
+      float: right;
+      font-style: normal;
+      font-size: 0.8em;
+      transition: transform 0.15s ease;
+    }
+    tr.cefr-heading-row.collapsed .toggle-icon { transform: rotate(-90deg); }
+    tr.skill-row.hidden { display: none; }
 
     tbody tr:hover { background: #161616; }
 
@@ -203,11 +213,11 @@
     </thead>
     <tbody>
     {% for level in levels %}
-      <tr class="cefr-heading-row">
-        <td colspan="{{ modes|length|add:1 }}">{{ level.level }}</td>
+      <tr class="cefr-heading-row" data-level="{{ level.level }}" onclick="toggleLevel(this)">
+        <td colspan="{{ modes|length|add:1 }}">{{ level.level }}<span class="toggle-icon">▾</span></td>
       </tr>
       {% for row in level.rows %}
-      <tr>
+      <tr class="skill-row" data-level="{{ level.level }}">
         <td class="skill-name">
           {{ row.skill.name }}
           <div class="desc">{{ row.skill.description }}</div>
@@ -229,5 +239,14 @@
 
 {% endif %}
 </div>
+<script>
+  function toggleLevel(row) {
+    const level = row.dataset.level;
+    const collapsed = row.classList.toggle('collapsed');
+    document.querySelectorAll('tr.skill-row[data-level="' + level + '"]').forEach(function(r) {
+      r.classList.toggle('hidden', collapsed);
+    });
+  }
+</script>
 </body>
 </html>
