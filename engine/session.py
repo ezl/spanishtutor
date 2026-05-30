@@ -98,7 +98,7 @@ GUIDED_PRACTICE_GRAMMAR_SUFFIX = """CURRENT PHASE: Guided Practice — {skill_na
 Your job: run ONE drill targeting {skill_name}. Then after the student responds, briefly confirm or correct and give the next drill.
 
 Drill format by level:
-- A1-A2: fill-in-the-blank (use ―――――  as the blank marker, followed by the infinitive in parentheses — e.g. "Ayer ――――― (hacer) el desayuno.")
+- A1-A2: fill-in-the-blank (use ________ as the blank marker, followed by the infinitive in parentheses — e.g. "Ayer ________ (hacer) el desayuno.")
 - B1-B2: transformation (give a sentence, ask them to rewrite it using {skill_name})
 - C1+: translation or production with a specific constraint
 

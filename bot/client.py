@@ -41,7 +41,7 @@ def _discord_safe(text: str) -> str:
     Eight underscores in a row are eaten by Discord's markdown parser (rendered as invisible underline).
     Using a visible dash sequence avoids this without changing the visual meaning."""
     import re
-    return re.sub(r'_{4,}', '―――――', text)
+    return re.sub(r'_{4,}', r'\_\_\_\_\_\_\_\_', text)
 
 
 async def _send(channel, text: str) -> None:
