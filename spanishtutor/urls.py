@@ -16,7 +16,7 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path
-from learner.views import landing, progress, auth_link
+from learner.views import landing, progress, auth_link, privacy
 from messenger.views import webhook as messenger_webhook
 
 urlpatterns = [
@@ -25,4 +25,5 @@ urlpatterns = [
     path('auth/<str:token>/', auth_link, name='auth-link'),
     path('progress/', progress, name='progress'),
     path('webhook/messenger/', messenger_webhook, name='messenger-webhook'),
+    path('privacy/', privacy, name='privacy'),
 ]

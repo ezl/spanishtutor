@@ -57,6 +57,10 @@ def landing(request):
     return render(request, 'learner/landing.html')
 
 
+def privacy(request):
+    return render(request, 'learner/privacy.html')
+
+
 def auth_link(request, token):
     user_pk = validate_progress_token(token)
     if user_pk is None:
