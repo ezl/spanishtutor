@@ -77,6 +77,17 @@ def webhook(request):
             psid = sender.get('id', '')
             if not psid:
                 continue
+
+            # Get Started button tap
+            postback = event.get('postback', {})
+            if postback.get('payload') == 'GET_STARTED':
+                try:
+                    user, is_new = _get_or_create_user(psid, sender.get('name', ''))
+                    send_message(psid, FIRST_MESSAGE)
+                except Exception:
+                    logger.exception('Error processing GET_STARTED from %s', psid)
+                continue
+
             # Ignore echo events (messages sent by the page itself)
             if event.get('message', {}).get('is_echo'):
                 continue
