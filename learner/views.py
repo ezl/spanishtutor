@@ -1,5 +1,6 @@
-from django.shortcuts import render, get_object_or_404
+from django.shortcuts import render, redirect, get_object_or_404
 from .models import User, Skill, SkillScore
+from .auth import validate_progress_token
 
 MODES = [
     ('writing',              'Writing',            True),
@@ -56,13 +57,19 @@ def landing(request):
     return render(request, 'learner/landing.html')
 
 
-def progress(request, discord_id=None):
-    if discord_id:
-        user = get_object_or_404(User, discord_id=discord_id)
-    else:
-        user = User.objects.order_by('created_at').first()
-        if not user:
-            return render(request, 'learner/progress.html', {'no_user': True})
+def auth_link(request, token):
+    user_pk = validate_progress_token(token)
+    if user_pk is None:
+        return render(request, 'learner/link_expired.html', status=403)
+    request.session['progress_user_pk'] = user_pk
+    return redirect('progress')
+
+
+def progress(request):
+    user_pk = request.session.get('progress_user_pk')
+    if not user_pk:
+        return render(request, 'learner/link_expired.html', status=403)
+    user = get_object_or_404(User, pk=user_pk)
 
     all_skills = _load_skills()
     skill_ids = [s.skill_id for s in all_skills]

@@ -135,15 +135,17 @@ async def on_message(message: discord.Message):
 
     if text.lower() == '!menu':
         from learner.models import User
+        from learner.auth import make_progress_token
         import django.conf
         user_obj = await sync_to_async(User.objects.filter(discord_id=str(message.author.id)).first)()
         base_url = django.conf.settings.BASE_URL
-        discord_id = str(message.author.id)
-        grid_url = f"{base_url}/progress/{discord_id}/"
+        token = make_progress_token(user_obj.pk) if user_obj else None
+        grid_url = f"{base_url}/auth/{token}/" if token else None
         level = f"**{user_obj.estimated_cefr_level}**" if user_obj and user_obj.estimated_cefr_level else "not yet assessed"
+        grid_line = f"**Skill grid (valid 1 hr):** {grid_url}\n" if grid_url else ""
         menu = (
             f"**Current level:** {level}\n"
-            f"**Skill grid:** {grid_url}\n\n"
+            f"{grid_line}\n"
             f"**Commands:**\n"
             f"`!retest` - retake the placement quiz\n"
             f"`!english` - force English instructions\n"
