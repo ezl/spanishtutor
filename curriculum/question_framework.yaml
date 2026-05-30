@@ -251,6 +251,19 @@ B1:
       For subjunctive skills: vary the trigger verb across questions
         (querer, recomendar, necesitar, pedir, esperar, etc.).
 
+      PRESENT PROGRESSIVE SKILL (b1_pattern_present_progressive):
+        NEVER use fill-in-blank (freeform_word) format. The construction requires TWO words
+        (estar conjugated + gerund) — a single blank implies a single-word answer and creates
+        ambiguity about whether the student should write one word or two.
+        Use freeform_response or translation format instead.
+        Exception: multiple_choice questions testing the gerund form in isolation (e.g. "Which
+        is the correct gerund of dormir?") are acceptable — they test one decision.
+        For production questions, use translation or open prompt so the two-word answer is natural:
+          Translate: "She is reading a really interesting novel right now."
+          [NOTE: rubric: está leyendo — accept any valid estar conjugation + correct gerund]
+          Describe what you are doing right now in two sentences. Use the present progressive.
+          [NOTE: rubric: look for estar + gerund construction, correct agreement]
+
       FUTURE TENSE SKILLS (b1_future_regular, b1_future_irregular):
         Two question types — conjugation drills and probability/conjecture:
 
