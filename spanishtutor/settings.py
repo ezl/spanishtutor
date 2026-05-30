@@ -24,6 +24,7 @@ INSTALLED_APPS = [
     'learner',
     'engine',
     'bot',
+    'messenger',
 ]
 
 MIDDLEWARE = [
@@ -91,6 +92,11 @@ OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY', '')
 
 BASE_URL = os.environ.get('BASE_URL', 'https://spanish.up.railway.app')
 DEV_MODE = os.environ.get('DEV_MODE', 'true').lower() == 'true'
+
+# Messenger
+MESSENGER_VERIFY_TOKEN = os.environ.get('MESSENGER_VERIFY_TOKEN', '')
+MESSENGER_PAGE_ACCESS_TOKEN = os.environ.get('MESSENGER_PAGE_ACCESS_TOKEN', '')
+MESSENGER_APP_SECRET = os.environ.get('MESSENGER_APP_SECRET', '')
 
 # Bot config
 INACTIVITY_TIMEOUT_MINUTES = int(os.environ.get('INACTIVITY_TIMEOUT_MINUTES', '15'))

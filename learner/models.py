@@ -2,7 +2,8 @@ from django.db import models
 
 
 class User(models.Model):
-    discord_id = models.CharField(max_length=64, unique=True)
+    discord_id = models.CharField(max_length=64, unique=True, null=True, blank=True)
+    messenger_psid = models.CharField(max_length=64, unique=True, null=True, blank=True)
     display_name = models.CharField(max_length=128, blank=True)
     native_language = models.CharField(max_length=64, blank=True)
     interests = models.TextField(blank=True)
