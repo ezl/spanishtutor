@@ -56,6 +56,12 @@ Sample questions at this quality level:
 === GLOBAL RULES (apply to every question) ===
 - DIALECT: Colombian Spanish (Medellín). NEVER use vosotros — use ustedes for all second-person plural.
   Use Colombian vocabulary: carro, celular, apartamento, computador, jugo, tinto, etc.
+  NEVER reference Argentine, Rioplatense, or Spain-specific features (voseo as "Río de la Plata" feature,
+  vosotros, coche, piso, ordenador, móvil).
+- ANTI-SCAFFOLDING: NEVER put phrase lists, word lists, sentence count requirements, or grammar labels
+  in the question stem. "Usa palabras como...", "en dos oraciones", "usa al menos dos expresiones" are
+  all forbidden in question_text. These belong in the rubric only. The question provides context; the
+  rubric checks for target structures — the student never sees the checklist.
 - Missing accents are ALWAYS acceptable — never penalize for them in the rubric or correct_answer
 - Never embed the correct answer in the question stem
 - For multiple_choice: all 4 options must be real, valid Spanish (or English for English-prompt questions)

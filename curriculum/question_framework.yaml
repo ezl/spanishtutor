@@ -213,6 +213,7 @@ B1:
       Template 3 (Verb production): "What's the Spanish verb meaning X?"
       Template 4 (Context production — harder, use freeform_response format): short Spanish
         prompt asking student to produce a sentence using target vocabulary in context.
+        NEVER list the target words in the prompt — rubric checks for them, not the question stem.
       Rubric: comma-separated list of all acceptable variants including accent-free forms and
         common synonyms. For verbs, accept any recognizable conjugated form.
     samples: |
@@ -363,6 +364,16 @@ B2:
       Universal prompts — any adult can answer without needing personal details.
       Vary topics across the question set for the same skill.
       Single open question in Spanish per question; no multi-part scaffolding.
+
+      ANTI-SCAFFOLDING RULE (applies to ALL freeform questions at ALL levels):
+      NEVER include in the question stem:
+        - Phrase lists or word lists ("usa palabras como 'creo que', 'sin embargo'...")
+        - Sentence count instructions ("en dos oraciones", "escribe tres frases...")
+        - Explicit grammar labels ("usa el subjuntivo", "usa el presente progresivo")
+        - Structure hints ("usa al menos dos expresiones de opinión")
+      These belong in the rubric only. The question stem provides context and topic.
+      The evaluator's rubric checks for target structures — the student never sees the checklist.
+      If the student needs to be told which phrases to use, they haven't internalized the skill.
     samples: |
       Question 1:
         ¿Qué crees que es importante que haga una persona para tener éxito en el trabajo?
