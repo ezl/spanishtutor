@@ -63,9 +63,29 @@ async def handle_message(user, text: str, attachments: list = None) -> dict:
         "session_ended": bool,
     }
     """
-    from learner.models import Session, SessionEvent
     from .onboarding import handle_onboarding
     from .session import handle_session
+    from .translate import handle_translate, _in_translate_mode
+
+    if _in_translate_mode(user):
+        return await handle_translate(user, text)
+
+    if user.translate_mode_entered_at is not None:
+        # Mode expired — clear field and return termination notice.
+        # The user's next message will resume normal session routing.
+        from asgiref.sync import sync_to_async
+        from learner.models import User as _User
+        await sync_to_async(_User.objects.filter(pk=user.pk).update)(translate_mode_entered_at=None)
+        user.translate_mode_entered_at = None
+        return {
+            "text": (
+                "Translation session ended.\n"
+                "To start another, use `!translate`.\n"
+                "To start a lesson, just send me a message!"
+            ),
+            "audio_url": None,
+            "session_ended": False,
+        }
 
     if not user.onboarding_complete:
         return await handle_onboarding(user, text, attachments)
