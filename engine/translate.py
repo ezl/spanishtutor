@@ -1,6 +1,5 @@
 from asgiref.sync import sync_to_async
 from django.utils import timezone
-from .core import call_llm
 
 TRANSLATE_TIMEOUT_MINUTES = 10
 
@@ -28,6 +27,7 @@ def _in_translate_mode(user) -> bool:
 async def handle_translate(user, text: str) -> dict:
     """Translate user input (EN↔ES) and refresh the sliding timeout."""
     from learner.models import User
+    from .core import call_llm
 
     now = timezone.now()
     await sync_to_async(

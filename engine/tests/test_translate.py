@@ -63,7 +63,7 @@ async def test_handle_translate_refreshes_timestamp(make_user):
     )
     user.translate_mode_entered_at = old_ts
 
-    with patch('engine.translate.call_llm', new=AsyncMock(return_value='el perro')):
+    with patch('engine.core.call_llm', new=AsyncMock(return_value='el perro')):
         await handle_translate(user, 'the dog')
 
     refreshed = await sync_to_async(User.objects.get)(pk=user.pk)
@@ -78,7 +78,7 @@ async def test_handle_translate_returns_llm_text(make_user):
 
     user = await sync_to_async(make_user)(discord_id='u_tr2')
 
-    with patch('engine.translate.call_llm', new=AsyncMock(return_value='la casa')):
+    with patch('engine.core.call_llm', new=AsyncMock(return_value='la casa')):
         result = await handle_translate(user, 'the house')
 
     assert result['text'] == 'la casa'
@@ -100,7 +100,7 @@ async def test_handle_translate_uses_system_override(make_user):
         captured['system_override'] = system_override
         return 'quiero ir a la tienda'
 
-    with patch('engine.translate.call_llm', new=mock_llm):
+    with patch('engine.core.call_llm', new=mock_llm):
         await handle_translate(user, 'I want to go to the store')
 
     assert captured.get('system_override') is not None
