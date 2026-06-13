@@ -147,12 +147,45 @@ async def on_message(message: discord.Message):
             f"**Current level:** {level}\n"
             f"{grid_line}\n"
             f"**Commands:**\n"
+            f"`!translate` - translate between English and Spanish (times out after 10 min)\n"
             f"`!retest` - retake the placement quiz\n"
             f"`!english` - force English instructions\n"
             f"`!spanish` - force Spanish instructions\n"
             f"`!reset` - wipe everything and start over\n"
         )
         await message.channel.send(menu)
+        return
+
+    if text.lower() == '!translate':
+        uid = str(message.author.id)
+        if uid not in _user_locks:
+            _user_locks[uid] = asyncio.Lock()
+        async with _user_locks[uid]:
+            from learner.models import User
+            from django.utils import timezone
+            user_obj = await sync_to_async(User.objects.filter(discord_id=uid).first)()
+            if not user_obj:
+                await message.channel.send("Start a session first before using translate mode!")
+                return
+            # Close any active session silently
+            from learner.models import Session
+            active_session = await sync_to_async(
+                lambda: Session.objects.filter(user=user_obj, ended_at__isnull=True)
+                                       .exclude(session_type='onboarding')
+                                       .first()
+            )()
+            if active_session:
+                from engine.session import _close_session_record
+                await _close_session_record(active_session, user_obj)
+            # Enter translate mode
+            now = timezone.now()
+            await sync_to_async(
+                User.objects.filter(pk=user_obj.pk).update
+            )(translate_mode_entered_at=now)
+        await message.channel.send(
+            "Translation mode on. Send me anything in English and I'll give you the Spanish, "
+            "or Spanish and I'll give you the English. Times out after 10 minutes of inactivity."
+        )
         return
 
     uid = str(message.author.id)
