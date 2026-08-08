@@ -11,6 +11,16 @@ from .curriculum import LEVEL_ORDER, get_skill, next_new_skill, next_new_vocab_s
 GOODBYE_WORDS = {'bye', 'adiós', 'adios', 'chao', 'hasta luego', 'goodbye', 'ciao', 'nos vemos'}
 INACTIVITY_TIMEOUT_MINUTES = 60
 
+LESSON_COMPLETE_MARKER = '<<LESSON_COMPLETE>>'
+CHUNKED_LESSON_MAX_TURNS = 8  # Safety cap: force lesson_complete after N chunked turns.
+
+
+def _strip_lesson_complete_marker(text: str) -> tuple:
+    """Return (cleaned_text, marker_present)."""
+    if LESSON_COMPLETE_MARKER in text:
+        return text.replace(LESSON_COMPLETE_MARKER, '').rstrip(), True
+    return text, False
+
 # ── Phase control constants ────────────────────────────────────────────────────
 
 GRAMMAR_PHASE_TURNS = {'guided_practice': 4, 'free_production': 3, 'reinforcement': 4, 'assessment': 3}
@@ -58,14 +68,23 @@ Skill description: {skill_description}
 Student level: {cefr_level}
 Student interests: {interests}
 
-Write the lesson content now. Include ALL of the following in this exact order:
+Write the OPENING turn of the lesson. This is the FIRST of possibly several bite-sized teaching turns. Working memory is the constraint — keep it processable.
 
-1. Rule — what this is and when to use it. 1-2 sentences, plain language.
-2. Paradigm — the complete conjugation table or pattern structure. Format it so it scans fast.
-3. Examples — 2-3 natural sentences using the student's interests. Label each ✓
-4. Wrong example — one common mistake with this skill, corrected. Format: ❌ [wrong] → ✓ [correct] — one line explaining why.
+Structure for this turn:
+1. One-sentence framing — what this is and when to use it.
+2. If the skill has a shared pattern (endings, spelling rule, conjugation frame), teach that pattern here in a compact form. It counts as ONE item.
+3. Introduce at most 1-3 additional memorizable items. Pair items by shared structure where possible (e.g. two verbs that share a stem).
+4. ONE natural example that uses an item from step 3. Draw from student interests where natural.
 
-200-300 words total. Chat style, not textbook. No bold headers. Stop after the wrong example — the system appends a follow-up prompt after your message."""
+End the message with EXACTLY one of the following, on its own line:
+- If more items remain to teach for {skill_name}: end with the literal line: Ready for the next piece?
+- If EVERYTHING for {skill_name} fits in this single turn (rare — only for very small skills): end with the literal marker: <<LESSON_COMPLETE>>
+
+Rules:
+- MAXIMUM 3 new memorizable items in this turn (counting the shared pattern from step 2 as one). Fewer is better.
+- 120 words MAX. Chat style, no bold headers, no textbook tone.
+- Do not preview upcoming chunks. Do not summarize.
+- Do not write past this first turn — subsequent chunks come as separate messages."""
 
 VOCAB_PRESENT_PROMPT = """You are teaching {skill_name} to a Spanish student.
 
@@ -83,15 +102,34 @@ Write the lesson content now. Include ALL of the following in this exact order:
 
 # ── Phase system suffixes (injected into system prompt for continuation turns) ─
 
-QUESTIONS_PHASE_SUFFIX = """CURRENT PHASE: Questions about {skill_name}
+QUESTIONS_PHASE_SUFFIX = """CURRENT PHASE: Chunked teaching + questions about {skill_name}
 
-The lesson you just taught is in the conversation above. The student may ask questions.
+The lesson may still be in progress (delivered in bite-sized chunks) or fully taught. Read the conversation history to determine which.
 
-Your job:
-- Answer questions about {skill_name} or how it compares to other Spanish grammar or vocabulary
-- After every answer, end with exactly: "Anything else, or shall we start?"
-- If the question is completely off-topic (not about Spanish language learning), say briefly: "I'm here to answer questions about {skill_name} right now — anything else, or shall we start?"
-- Do NOT run drills. Do NOT move to practice on your own. Wait for the student to say they are ready."""
+You know the lesson is COMPLETE if the previous assistant message ended with <<LESSON_COMPLETE>>. Otherwise, more items remain to teach.
+
+Branch A — Student signals "next", "ready", "continue", "sí", "dale", "yes", "ok", "listo", "good", "got it":
+- If the lesson is NOT yet complete: teach the next 1-3 items for {skill_name} in a compact chunk.
+  - Pair items by shared structure where possible.
+  - Include ONE natural example (use student interests where natural).
+  - 120 words MAX.
+  - End with the literal line "Ready for the next piece?" if items still remain after this chunk.
+  - End with the literal marker <<LESSON_COMPLETE>> if this is the FINAL teaching chunk (all items for {skill_name} now covered).
+- If the lesson IS already complete: end with the literal marker <<LESSON_COMPLETE>>. Nothing else.
+
+Branch B — Student asks a genuine question about {skill_name} (or how it compares to other Spanish grammar/vocab):
+- Answer in 2-4 sentences.
+- End with "Ready for the next piece?" if the lesson is incomplete, or "Anything else, or shall we start?" if complete.
+
+Branch C — Student says "start quizzing", "no questions", "start drills", or otherwise unambiguously "let's move on":
+- If lesson is complete: emit the literal marker <<LESSON_COMPLETE>> only. Nothing else.
+- If lesson is incomplete: briefly say you still have more to cover and continue with the next chunk (as in Branch A).
+
+Off-topic questions: "I'm here to answer questions about {skill_name} right now — anything else, or shall we start?"
+
+Do NOT run drills. Do NOT move to practice on your own.
+Do NOT emit <<LESSON_COMPLETE>> unless all items are actually covered.
+The marker <<LESSON_COMPLETE>>, when emitted, must be on its own line at the very end."""
 
 GUIDED_PRACTICE_GRAMMAR_SUFFIX = """CURRENT PHASE: Guided Practice — {skill_name}
 
@@ -713,7 +751,14 @@ async def _open_session(user, text: str) -> dict:
                     cefr_level=level, interests=interests,
                 )
                 opening = await call_llm([{"role": "user", "content": prompt}], user=user)
-                opening = opening + "\n\n" + CLARIFYING_QUESTIONS_STRING
+                opening, lesson_complete = _strip_lesson_complete_marker(opening)
+                if lesson_complete:
+                    opening = opening + "\n\n" + CLARIFYING_QUESTIONS_STRING
+                    await sync_to_async(
+                        lambda: Session.objects.filter(pk=session.pk).update(
+                            quiz_state={'lesson_complete': True}
+                        )
+                    )()
                 initial_phase = 'questions'
             else:
                 prompt = VOCAB_PRESENT_PROMPT.format(
@@ -962,10 +1007,14 @@ async def _continue_new_skill(user, session, text: str) -> dict:
 
     # ── Keyword-exit phases ──
     if phase == 'questions':
-        if _is_no_questions(text):
+        lesson_complete = bool((session.quiz_state or {}).get('lesson_complete'))
+        # Only advance to drills once the chunked lesson has actually finished.
+        # Between chunks the student may say "ready" meaning "ready for the next piece",
+        # which we hand off to the LLM below rather than skipping past teaching.
+        if lesson_complete and _is_no_questions(text):
             await _set_phase(session, 'guided_practice', 0)
             phase = 'guided_practice'
-        # else: stay in questions, generate answer below
+        # else: stay in questions — LLM may teach next chunk or answer a question
 
     elif phase == 'reinforcement_check':
         if _wants_quiz(text):
@@ -985,6 +1034,30 @@ async def _continue_new_skill(user, session, text: str) -> dict:
     # ── Generate response for current phase ──
     suffix = _get_phase_suffix(phase, skill, stype, events)
     response_text = await call_llm(history, user=user, system_suffix=suffix)
+
+    # ── Chunked lesson: detect completion marker, gate advancement ──
+    if phase == 'questions':
+        response_text, marker_seen = _strip_lesson_complete_marker(response_text)
+        state = dict(session.quiz_state or {})
+        already_complete = bool(state.get('lesson_complete'))
+
+        # Safety cap: force-complete after N chunked teaching turns to prevent loops.
+        chunk_count = state.get('chunk_count', 0) + 1
+        state['chunk_count'] = chunk_count
+        force_complete = chunk_count >= CHUNKED_LESSON_MAX_TURNS
+
+        if not already_complete and (marker_seen or force_complete):
+            state['lesson_complete'] = True
+            # Add the clarifying-questions prompt only on the transition,
+            # so the student knows the teaching phase is done.
+            if response_text.strip():
+                response_text = response_text + "\n\n" + CLARIFYING_QUESTIONS_STRING
+            else:
+                response_text = CLARIFYING_QUESTIONS_STRING
+
+        await sync_to_async(
+            lambda: session.__class__.objects.filter(pk=session.pk).update(quiz_state=state)
+        )()
 
     # ── Advance turn count for counted phases ──
     if phase != 'questions':
