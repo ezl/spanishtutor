@@ -68,21 +68,29 @@ Skill description: {skill_description}
 Student level: {cefr_level}
 Student interests: {interests}
 
-Write the OPENING turn of the lesson. This is the FIRST of possibly several bite-sized teaching turns. Working memory is the constraint — keep it processable.
+Write the OPENING turn of the lesson. This is the FIRST of several bite-sized teaching turns. Working memory is the constraint — keep it small and processable.
 
-Structure for this turn:
-1. One-sentence framing — what this is and when to use it.
-2. If the skill has a shared pattern (endings, spelling rule, conjugation frame), teach that pattern here in a compact form. It counts as ONE item.
-3. Introduce at most 1-3 additional memorizable items. Pair items by shared structure where possible (e.g. two verbs that share a stem).
-4. ONE natural example that uses an item from step 3. Draw from student interests where natural.
+Structure for this opening turn:
+1. Outcome-framing (1-2 sentences) — tell the student what they'll be able to DO after learning this, illustrated with 1-2 concrete example target sentences in Spanish (with English translation in parens). Example style: "You'll learn to talk about things that happened in the past — sentences like 'Ayer fui al cine' (I went to the movies yesterday) or 'No pude ir al gimnasio' (I couldn't go to the gym)."
+2. If the skill has a shared pattern (endings, spelling rule, conjugation frame), teach that pattern here in compact form.
+3. Introduce EXACTLY ONE stem/verb/item — unless multiple items share the identical paradigm (e.g. ser/ir both conjugate as fui/fuiste/fue/...), in which case teach that natural pair as one item.
+4. Show the full paradigm ONE LINE PER PERSON:
+     Yo tuve
+     Tú tuviste
+     Él/ella/usted tuvo
+     Nosotros tuvimos
+     Ellos/ellas/ustedes tuvieron
+   (Latin American Spanish — skip vosotros.) Never inline comma-separated.
+5. ONE natural example sentence using the item just introduced. Draw from student interests where natural.
 
 End the message with EXACTLY one of the following, on its own line:
 - If more items remain to teach for {skill_name}: end with the literal line: Ready for the next piece?
-- If EVERYTHING for {skill_name} fits in this single turn (rare — only for very small skills): end with the literal marker: <<LESSON_COMPLETE>>
+- If EVERYTHING for {skill_name} fits in this single turn (very rare): end with the literal marker: <<LESSON_COMPLETE>>
+
+Chunk sizing rule (critical): each verb = ~5 productions to memorize (yo/tú/él/nosotros/ellos). ONE stem per chunk is the ceiling. Two items are ONLY allowed when they share the exact same conjugated forms.
 
 Rules:
-- MAXIMUM 3 new memorizable items in this turn (counting the shared pattern from step 2 as one). Fewer is better.
-- 120 words MAX. Chat style, no bold headers, no textbook tone.
+- Chat style, no bold headers, no textbook tone.
 - Do not preview upcoming chunks. Do not summarize.
 - Do not write past this first turn — subsequent chunks come as separate messages."""
 
@@ -108,13 +116,22 @@ The lesson may still be in progress (delivered in bite-sized chunks) or fully ta
 
 You know the lesson is COMPLETE if the previous assistant message ended with <<LESSON_COMPLETE>>. Otherwise, more items remain to teach.
 
+Chunk sizing rule (critical): each verb = ~5 productions to memorize (yo/tú/él/nosotros/ellos). ONE stem per chunk is the ceiling. Two items are ONLY allowed when they share the exact same conjugated forms (e.g. ser/ir → fui/fuiste/fue).
+
+Paradigm formatting (critical): when teaching a conjugation, show it ONE LINE PER PERSON:
+    Yo tuve
+    Tú tuviste
+    Él/ella/usted tuvo
+    Nosotros tuvimos
+    Ellos/ellas/ustedes tuvieron
+(Latin American — skip vosotros.) Never use inline comma-separated lists like "tuve, tuviste, tuvo, tuvimos, tuvieron".
+
 Branch A — Student signals "next", "ready", "continue", "sí", "dale", "yes", "ok", "listo", "good", "got it":
-- If the lesson is NOT yet complete: teach the next 1-3 items for {skill_name} in a compact chunk.
-  - Pair items by shared structure where possible.
+- If the lesson is NOT yet complete: teach the next ONE item (or a shared-paradigm pair) for {skill_name}.
+  - Show the full paradigm one line per person.
   - Include ONE natural example (use student interests where natural).
-  - 120 words MAX.
   - End with the literal line "Ready for the next piece?" if items still remain after this chunk.
-  - End with the literal marker <<LESSON_COMPLETE>> if this is the FINAL teaching chunk (all items for {skill_name} now covered).
+  - End with the literal marker <<LESSON_COMPLETE>> if this is the FINAL teaching chunk.
 - If the lesson IS already complete: end with the literal marker <<LESSON_COMPLETE>>. Nothing else.
 
 Branch B — Student asks a genuine question about {skill_name} (or how it compares to other Spanish grammar/vocab):
@@ -886,7 +903,14 @@ async def _handle_check_in(user, session, text: str) -> dict:
                     cefr_level=level, interests=interests,
                 )
                 opening = await call_llm([{"role": "user", "content": prompt}], user=user)
-                opening = opening + "\n\n" + CLARIFYING_QUESTIONS_STRING
+                opening, lesson_complete = _strip_lesson_complete_marker(opening)
+                if lesson_complete:
+                    opening = opening + "\n\n" + CLARIFYING_QUESTIONS_STRING
+                    await sync_to_async(
+                        lambda: Session.objects.filter(pk=session.pk).update(
+                            quiz_state={'lesson_complete': True}
+                        )
+                    )()
                 initial_phase = 'questions'
             else:
                 prompt = VOCAB_PRESENT_PROMPT.format(
