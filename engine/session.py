@@ -576,13 +576,36 @@ def _is_goodbye(text: str) -> bool:
     return text.strip().lower() in GOODBYE_WORDS
 
 
-async def _check_inactivity(user, session) -> bool:
+async def _check_inactivity(user, session) -> tuple:
+    """Return (is_stale, idle_minutes)."""
     last_event = await sync_to_async(
         lambda: session.events.order_by('-timestamp').first()
     )()
     if not last_event:
-        return False
-    return (timezone.now() - last_event.timestamp).total_seconds() > INACTIVITY_TIMEOUT_MINUTES * 60
+        return False, 0
+    idle_seconds = (timezone.now() - last_event.timestamp).total_seconds()
+    return idle_seconds > INACTIVITY_TIMEOUT_MINUTES * 60, int(idle_seconds // 60)
+
+
+def build_idle_notice(user, idle_minutes: int) -> str:
+    """Message shown when a stale session is auto-closed. User must send another
+    message to start a new session — the notice does not itself open one."""
+    if idle_minutes >= 1440:
+        span = f"{idle_minutes // 1440} día{'s' if idle_minutes // 1440 != 1 else ''}" if _is_advanced(user) else f"{idle_minutes // 1440} day{'s' if idle_minutes // 1440 != 1 else ''}"
+    elif idle_minutes >= 60:
+        span = f"{idle_minutes // 60} hora{'s' if idle_minutes // 60 != 1 else ''}" if _is_advanced(user) else f"{idle_minutes // 60} hour{'s' if idle_minutes // 60 != 1 else ''}"
+    else:
+        span = f"{idle_minutes} minutos" if _is_advanced(user) else f"{idle_minutes} minutes"
+
+    if _is_advanced(user):
+        return (
+            f"Llevas {span} sin escribir, así que cierro esta sesión. "
+            f"Cuando estés listo/a para empezar una nueva, mándame un mensaje."
+        )
+    return (
+        f"You've been idle for {span}, so I'm closing this session. "
+        f"To start a new one, just let me know when you're ready."
+    )
 
 
 async def handle_session(user, text: str, attachments: list = None) -> dict:
@@ -598,9 +621,15 @@ async def handle_session(user, text: str, attachments: list = None) -> dict:
                                .first()
     )()
 
-    if session and await _check_inactivity(user, session):
-        await _close_session_record(session, user)
-        session = None
+    if session:
+        stale, idle_min = await _check_inactivity(user, session)
+        if stale:
+            await _close_session_record(session, user)
+            return {
+                "text": build_idle_notice(user, idle_min),
+                "audio_url": None,
+                "session_ended": True,
+            }
 
     if not session:
         return await _open_session(user, text)
