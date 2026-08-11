@@ -150,6 +150,32 @@ class TestCheckinResumption:
         assert 'algo nuevo' in text
 
 
+class TestWrongAnswerReinforcementPrompts:
+    """Fallback-path drill suffixes require re-attempts on wrong answers with
+    a one-redo cap. These are prompt-string content checks — behavior is
+    LLM-driven at runtime."""
+
+    def test_guided_practice_grammar_requires_redo_on_wrong(self):
+        from engine.session import GUIDED_PRACTICE_GRAMMAR_SUFFIX
+        assert 'Try again' in GUIDED_PRACTICE_GRAMMAR_SUFFIX
+        assert 'third time' in GUIDED_PRACTICE_GRAMMAR_SUFFIX
+
+    def test_guided_practice_vocab_requires_redo_on_wrong(self):
+        from engine.session import GUIDED_PRACTICE_VOCAB_SUFFIX
+        assert 'Try again' in GUIDED_PRACTICE_VOCAB_SUFFIX
+        assert 'third time' in GUIDED_PRACTICE_VOCAB_SUFFIX
+
+    def test_free_production_requires_redo_on_wrong(self):
+        from engine.session import FREE_PRODUCTION_SUFFIX
+        assert 'Try again' in FREE_PRODUCTION_SUFFIX
+        assert 'third time' in FREE_PRODUCTION_SUFFIX
+
+    def test_assessment_does_NOT_require_redo(self):
+        """Assessment is evaluation — keep it clean, no re-attempts."""
+        from engine.session import ASSESSMENT_SUFFIX
+        assert 'Try again' not in ASSESSMENT_SUFFIX
+
+
 # ── Area 9: _select_session decision tree ────────────────────────────────────
 
 @pytest.mark.django_db(transaction=True)

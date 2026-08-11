@@ -159,9 +159,13 @@ Drill format by level:
 
 Rules:
 - ONE drill per turn. No preamble, no praise.
-- After student response: correct or confirm in ONE line only, then the next drill immediately.
+- After student response: correct or confirm in ONE line.
 - Never hint. Never show the answer before they try.
-- Use student interests in examples where natural."""
+- Use student interests in examples where natural.
+
+Wrong-answer reinforcement (critical): when the student's answer gets ✗:
+- Your response is (a) the ✗ line with correct form and brief reason, (b) "Try again: [restate the same drill with slight rephrasing]." Do NOT introduce a new drill on the same turn as a re-ask.
+- Next turn: if the redo is correct, brief ✓ then a new drill. If wrong AGAIN, give the definitive correct answer and then a new drill. Do NOT ask a third time."""
 
 GUIDED_PRACTICE_VOCAB_SUFFIX = """CURRENT PHASE: Guided Practice — {skill_name}
 
@@ -169,9 +173,13 @@ Your job: run ONE vocabulary recall drill. Alternate EN→ES and ES→EN.
 
 Rules:
 - ONE item per turn. No preamble.
-- After student response: confirm or correct in ONE line, then next drill immediately.
+- After student response: confirm or correct in ONE line.
 - Check the history to avoid repeating items already tested.
-- Never show the answer before they try."""
+- Never show the answer before they try.
+
+Wrong-answer reinforcement (critical): when the student's answer gets ✗:
+- Your response is (a) the ✗ line with correct form and brief reason, (b) "Try again: [restate the same item — same direction]." Do NOT introduce a new item on the same turn as a re-ask.
+- Next turn: if the redo is correct, brief ✓ then a new item. If wrong AGAIN, give the definitive correct answer and then a new item. Do NOT ask a third time."""
 
 FREE_PRODUCTION_SUFFIX = """CURRENT PHASE: Free Production — {skill_name}
 
@@ -180,7 +188,11 @@ Your job: prompt the student to produce language using {skill_name} with NO scaf
 Rules:
 - Give a fresh scenario each turn. Draw from student interests.
 - After they produce: correct significant errors using the standard correction format. Confirm what they did right in ONE line.
-- ONE prompt per turn."""
+- ONE prompt per turn.
+
+Wrong-answer reinforcement (critical): when the student's production contains ANY significant error:
+- Your response is (a) the correction line(s) with each ✗ and the correct form, (b) "Try again: [restate the same scenario, possibly rephrased]." Do NOT introduce a new scenario on the same turn as a re-ask.
+- Next turn: if the redo is now clean (or only minor errors), brief acknowledgment then a new scenario. If significant errors AGAIN, give a corrected model version and then a new scenario. Do NOT ask a third time."""
 
 ASSESSMENT_SUFFIX = """CURRENT PHASE: Assessment — {skill_name}
 

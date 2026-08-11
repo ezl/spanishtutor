@@ -479,3 +479,114 @@ async def test_every_unit_drilled_at_least_twice_before_completion(make_user, ma
     # Invariant: every taught unit has ≥2 drills.
     for uid in state["taught"]:
         assert len(state["drills"][uid]) >= 2, f"Unit {uid} has {len(state['drills'][uid])} drills"
+
+
+# ── REDO_PENDING marker: wrong-answer reinforcement ──────────────────────────
+
+class TestRedoPendingMarker:
+    def test_strip_marker_present(self):
+        from engine.teach_drill import _strip_redo_pending_marker
+        cleaned, present = _strip_redo_pending_marker(
+            "✗ tuvieste — correct is tuviste.\nTry again: ...\n<<REDO_PENDING>>"
+        )
+        assert present is True
+        assert "<<REDO_PENDING>>" not in cleaned
+        assert "Try again" in cleaned
+
+    def test_strip_marker_absent(self):
+        from engine.teach_drill import _strip_redo_pending_marker
+        cleaned, present = _strip_redo_pending_marker("regular response, no marker")
+        assert present is False
+        assert cleaned == "regular response, no marker"
+
+    def test_continuation_suffix_documents_the_marker(self):
+        """The suffix must instruct the LLM about when to emit <<REDO_PENDING>>."""
+        from engine.teach_drill import TEACH_DRILL_CONTINUATION_SUFFIX
+        assert "<<REDO_PENDING>>" in TEACH_DRILL_CONTINUATION_SUFFIX
+        # And explains the wrong-answer reinforcement rule.
+        assert "Try again" in TEACH_DRILL_CONTINUATION_SUFFIX
+        # And caps at one redo (no third try).
+        assert "third time" in TEACH_DRILL_CONTINUATION_SUFFIX
+
+
+@pytest.mark.asyncio
+@pytest.mark.django_db(transaction=True)
+async def test_redo_pending_defers_state_advancement(make_user, make_skill):
+    """When the LLM emits <<REDO_PENDING>>, the code must NOT mark the planned
+    next_unit as taught. Next turn the same unit is picked again for teaching."""
+    from asgiref.sync import sync_to_async
+    from unittest.mock import patch, AsyncMock
+    from engine.teach_drill import handle_teach_drill_turn
+    from learner.models import Session
+
+    user = await sync_to_async(make_user)(discord_id='td_redo1', cefr_level='B1')
+    skill = await sync_to_async(make_skill)(skill_id='sk_td_redo1')
+    session = await sync_to_async(Session.objects.create)(
+        user=user, session_type='new_skill', target_skill=skill,
+        current_phase='teach_drill',
+        quiz_state={"teach_drill": {
+            "units": [{"id": "tener", "label": "tener", "note": "tuv-"},
+                      {"id": "hacer", "label": "hacer", "note": "hic-"}],
+            "taught": ["tener"], "drills": {"tener": ["yo"]},
+            "turn_count": 1, "lesson_complete": False,
+        }},
+    )
+
+    # Simulate the LLM doing a redo instead of teaching the next unit.
+    redo_response = "✗ tuvieste — correct is tuviste.\nTry again: how would you say 'you had a son'?\n<<REDO_PENDING>>"
+    with patch('engine.teach_drill.call_llm', new=AsyncMock(return_value=redo_response)):
+        result = await handle_teach_drill_turn(user, session, text="tuvieste un hijo")
+
+    # Marker should be stripped from visible text.
+    assert "<<REDO_PENDING>>" not in result["text"]
+
+    session = await sync_to_async(
+        lambda: Session.objects.select_related('target_skill').get(pk=session.pk)
+    )()
+    state = session.quiz_state["teach_drill"]
+
+    # State must NOT have advanced: hacer stays un-taught, tener's drill count unchanged.
+    assert state["taught"] == ["tener"], "next_unit should NOT be marked taught on a redo turn"
+    assert state["drills"] == {"tener": ["yo"]}, "no new drills should be recorded on a redo turn"
+
+    # But turn_count DOES advance (safety cap remains meaningful).
+    assert state["turn_count"] == 2
+
+    # And lesson_complete stays False.
+    assert state["lesson_complete"] is False
+
+
+@pytest.mark.asyncio
+@pytest.mark.django_db(transaction=True)
+async def test_next_turn_after_redo_teaches_the_deferred_unit(make_user, make_skill):
+    """After a redo turn, the next turn should teach the unit that was deferred."""
+    from asgiref.sync import sync_to_async
+    from unittest.mock import patch, AsyncMock
+    from engine.teach_drill import handle_teach_drill_turn
+    from learner.models import Session
+
+    user = await sync_to_async(make_user)(discord_id='td_redo2', cefr_level='B1')
+    skill = await sync_to_async(make_skill)(skill_id='sk_td_redo2')
+    session = await sync_to_async(Session.objects.create)(
+        user=user, session_type='new_skill', target_skill=skill,
+        current_phase='teach_drill',
+        quiz_state={"teach_drill": {
+            "units": [{"id": "tener", "label": "tener", "note": "tuv-"},
+                      {"id": "hacer", "label": "hacer", "note": "hic-"}],
+            # State AFTER a redo turn just happened: hacer is still un-taught.
+            "taught": ["tener"], "drills": {"tener": ["yo"]},
+            "turn_count": 2, "lesson_complete": False,
+        }},
+    )
+
+    # Now the LLM responds normally (no redo marker) — it should teach hacer.
+    with patch('engine.teach_drill.call_llm', new=AsyncMock(return_value="teaches hacer + drills")):
+        await handle_teach_drill_turn(user, session, text="tuviste un hijo")
+
+    session = await sync_to_async(
+        lambda: Session.objects.select_related('target_skill').get(pk=session.pk)
+    )()
+    state = session.quiz_state["teach_drill"]
+    # Now hacer should be marked taught and drilled.
+    assert "hacer" in state["taught"]
+    assert "hacer" in state["drills"]

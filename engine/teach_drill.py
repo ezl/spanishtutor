@@ -9,6 +9,19 @@ import re
 from .core import call_llm
 
 
+REDO_PENDING_MARKER = '<<REDO_PENDING>>'
+
+
+def _strip_redo_pending_marker(text: str) -> tuple:
+    """Return (cleaned_text, marker_present). Mirrors LESSON_COMPLETE handling.
+    Emitted by the LLM when it deferred teaching a new unit in order to do a
+    re-attempt of a wrong answer — code uses this to skip state advancement
+    for that turn."""
+    if REDO_PENDING_MARKER in text:
+        return text.replace(REDO_PENDING_MARKER, '').rstrip(), True
+    return text, False
+
+
 UNIT_EXTRACTION_PROMPT = """You are decomposing a Spanish grammar skill into teachable units for a chunked lesson.
 
 Skill name: {skill_name}
@@ -193,9 +206,17 @@ Paradigm formatting (critical): when showing a conjugation, render it ONE LINE P
 
 Chunk sizing (critical): teach EXACTLY ONE unit per turn, unless the instruction explicitly names a shared-paradigm pair.
 
-If evaluating a student's prior response: one line per response — either "✓" plus a short confirmation, or "✗" plus the correct form and a brief reason. No praise, no excess.
+Evaluation format: one line per response — "✓" plus short confirmation, or "✗" plus the correct form and a brief reason. No praise, no excess.
 
-The marker <<LESSON_COMPLETE>>, if the instruction asks you to emit it, goes on its own line at the very end of the message with nothing after it. Never emit it otherwise.
+Wrong-answer reinforcement (critical): when ANY of the student's answers this turn get ✗, you MUST do a re-attempt instead of teaching new content:
+  1. Write the ✗ line(s) with correct form and brief reason (same as normal evaluation).
+  2. For each ✗ answer, add a line: "Try again: [restate that question with slight rephrasing]" — the redo must be about the SAME grammar item they just missed, not a new one.
+  3. Do NOT teach a new unit and do NOT ask any new drill questions this turn — the instruction's teach/drill steps are DEFERRED.
+  4. End the message with the literal marker on its own line: <<REDO_PENDING>>
+On the FOLLOWING turn: evaluate the redo attempt(s). If correct, briefly acknowledge (✓ one line) and THEN follow the normal per-turn instruction (teach + drill). If the redo is wrong AGAIN, give the definitive correct answer in ONE line and THEN follow the normal instruction — do NOT ask a third time (avoid frustration spirals).
+
+The marker <<LESSON_COMPLETE>>, if the instruction asks you to emit it, goes on its own line at the very end. Never emit it otherwise.
+The marker <<REDO_PENDING>>, when emitted, goes on its own line at the very end. Never emit BOTH markers in the same message.
 
 Chat style, no bold headers."""
 
@@ -356,18 +377,24 @@ async def handle_teach_drill_turn(user, session, text: str) -> dict:
     suffix = TEACH_DRILL_CONTINUATION_SUFFIX.format(skill_name=skill_name)
     response = await call_llm(history, user=user, system_suffix=suffix)
 
-    # Strip marker.
+    # Strip markers.
     response, marker_seen = _strip_lesson_complete_marker(response)
+    response, redo_pending = _strip_redo_pending_marker(response)
 
     # Update state.
-    if next_unit is not None:
-        mark_taught(state, next_unit["id"])
-        mark_drilled(state, next_unit["id"], person_new)
-        if retrieval is not None and person_retrieve is not None:
+    # If the LLM emitted <<REDO_PENDING>>, it deferred teaching to do a re-attempt.
+    # Skip the taught/drilled updates for THIS turn — the same next_unit/retrieval
+    # will be picked again next turn (after the redo is resolved) and taught then.
+    # turn_count still advances so the safety cap remains meaningful.
+    if not redo_pending:
+        if next_unit is not None:
+            mark_taught(state, next_unit["id"])
+            mark_drilled(state, next_unit["id"], person_new)
+            if retrieval is not None and person_retrieve is not None:
+                mark_drilled(state, retrieval["id"], person_retrieve)
+        elif retrieval is not None and person_retrieve is not None:
+            # Retrieval-only turn: still record the drill.
             mark_drilled(state, retrieval["id"], person_retrieve)
-    elif retrieval is not None and person_retrieve is not None:
-        # Retrieval-only turn: still record the drill.
-        mark_drilled(state, retrieval["id"], person_retrieve)
     state["turn_count"] += 1
     if marker_seen or force_complete or (next_unit is None and all_units_drilled):
         mark_complete(state)
