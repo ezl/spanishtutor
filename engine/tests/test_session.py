@@ -76,9 +76,9 @@ class TestSrsBuildSchedule:
 # ── Area 8: Phase flow helpers ────────────────────────────────────────────────
 
 class TestPhaseFlow:
-    def test_grammar_present_advances_to_questions(self):
+    def test_grammar_teach_drill_next_phase_is_guided_practice(self):
         from engine.session import _next_phase
-        assert _next_phase('present', 'grammar') == 'questions'
+        assert _next_phase('teach_drill', 'grammar') == 'guided_practice'
 
     def test_vocab_present_skips_to_guided_practice(self):
         """Vocab has no questions phase — goes straight to guided_practice."""
@@ -163,3 +163,132 @@ async def test_select_session_conversation_after_prior_sessions(make_user, make_
 
     session_type, _, _ = await _select_session(user)
     assert session_type == 'conversation'
+
+
+@pytest.mark.asyncio
+@pytest.mark.django_db(transaction=True)
+async def test_grammar_new_skill_uses_teach_drill_phase(make_user, make_skill):
+    """When a grammar new_skill session opens, it enters teach_drill phase
+    with a unit list extracted by the LLM."""
+    from unittest.mock import patch, AsyncMock
+    from asgiref.sync import sync_to_async
+    from engine.session import handle_session
+    from learner.models import Session
+
+    user = await sync_to_async(make_user)(discord_id='td_open1', cefr_level='B1')
+    skill = await sync_to_async(make_skill)(
+        skill_id='b1_preterite_test',
+        name='Preterite test',
+        description='ser, ir, estar',
+        cefr_level='B1',
+    )
+
+    # Mock the unit extraction and the teach LLM call.
+    units_json = '[{"id":"ser_ir","label":"ser/ir","note":"share fui"},{"id":"estar","label":"estar","note":"estuv-"}]'
+    with patch('engine.teach_drill.call_llm', new=AsyncMock(return_value=units_json)):
+        with patch('engine.session.call_llm', new=AsyncMock(return_value="TEACH TURN 1")):
+            # Ensure _select_session picks this skill (only one exists).
+            with patch('engine.session._select_session',
+                       new=AsyncMock(return_value=('new_skill', {'skill': {'id': skill.skill_id}}, []))):
+                result = await handle_session(user, "hola")
+
+    # Check that a session was created in teach_drill phase with units populated.
+    session = await sync_to_async(
+        lambda: Session.objects.filter(user=user, ended_at__isnull=True).first()
+    )()
+    assert session is not None
+    assert session.current_phase == 'teach_drill'
+    assert session.quiz_state["teach_drill"]["units"][0]["id"] == "ser_ir"
+
+
+@pytest.mark.asyncio
+@pytest.mark.django_db(transaction=True)
+async def test_teach_drill_phase_delegates_to_handler(make_user, make_skill):
+    """When a session is in teach_drill phase, _continue_new_skill calls the handler."""
+    from unittest.mock import patch, AsyncMock
+    from asgiref.sync import sync_to_async
+    from engine.session import _continue_new_skill
+    from learner.models import Session
+
+    user = await sync_to_async(make_user)(discord_id='td_cont1', cefr_level='B1')
+    skill = await sync_to_async(make_skill)(skill_id='sk_td_cont1', name='Test')
+    session = await sync_to_async(Session.objects.create)(
+        user=user, session_type='new_skill', target_skill=skill,
+        current_phase='teach_drill',
+        quiz_state={"teach_drill": {
+            "units": [{"id": "tener", "label": "tener", "note": ""}],
+            "taught": [], "drills": {}, "turn_count": 0, "lesson_complete": False,
+        }},
+    )
+
+    fake_handler_result = {"text": "TEACH", "audio_url": None,
+                           "session_ended": False, "advance_to_assessment": False}
+    with patch('engine.teach_drill.handle_teach_drill_turn',
+               new=AsyncMock(return_value=fake_handler_result)) as mock_handler:
+        result = await _continue_new_skill(user, session, "listo")
+
+    mock_handler.assert_called_once()
+    assert result["text"] == "TEACH"
+
+
+@pytest.mark.asyncio
+@pytest.mark.django_db(transaction=True)
+async def test_teach_drill_advance_to_assessment_transitions_phase(make_user, make_skill):
+    """When handler returns advance_to_assessment=True, phase transitions to 'assessment'."""
+    from unittest.mock import patch, AsyncMock
+    from asgiref.sync import sync_to_async
+    from engine.session import _continue_new_skill
+    from learner.models import Session
+
+    user = await sync_to_async(make_user)(discord_id='td_cont2', cefr_level='B1')
+    skill = await sync_to_async(make_skill)(skill_id='sk_td_cont2', name='Test')
+    session = await sync_to_async(Session.objects.create)(
+        user=user, session_type='new_skill', target_skill=skill,
+        current_phase='teach_drill',
+        quiz_state={"teach_drill": {
+            "units": [{"id": "a", "label": "a", "note": ""}],
+            "taught": ["a"], "drills": {"a": ["yo", "tú"]},
+            "turn_count": 3, "lesson_complete": True,
+        }},
+    )
+
+    fake_handler_result = {"text": "", "audio_url": None,
+                           "session_ended": False, "advance_to_assessment": True}
+    with patch('engine.teach_drill.handle_teach_drill_turn',
+               new=AsyncMock(return_value=fake_handler_result)):
+        # Also mock call_llm since the assessment turn will call it.
+        with patch('engine.session.call_llm', new=AsyncMock(return_value="ASSESSMENT Q1")):
+            result = await _continue_new_skill(user, session, "ok")
+
+    await sync_to_async(session.refresh_from_db)()
+    assert session.current_phase == 'assessment'
+    assert session.phase_turns_completed == 0
+
+
+@pytest.mark.asyncio
+@pytest.mark.django_db(transaction=True)
+async def test_grammar_new_skill_falls_back_when_unit_extraction_fails(make_user, make_skill):
+    """When extract_units returns [], session lands in the legacy questions phase
+    with a dense lesson (not stuck in teach_drill or advanced to complete)."""
+    from unittest.mock import patch, AsyncMock
+    from asgiref.sync import sync_to_async
+    from engine.session import handle_session
+    from learner.models import Session
+
+    user = await sync_to_async(make_user)(discord_id='td_fallback1', cefr_level='B1')
+    skill = await sync_to_async(make_skill)(skill_id='b1_fallback_test', name='Fallback test', description='desc', cefr_level='B1')
+
+    # extract_units returns [] (LLM parse failure); the legacy path's call_llm returns a lesson.
+    with patch('engine.teach_drill.call_llm', new=AsyncMock(return_value="not json — parse fails")):
+        with patch('engine.session.call_llm', new=AsyncMock(return_value="LEGACY LESSON TEXT")):
+            with patch('engine.session._select_session',
+                       new=AsyncMock(return_value=('new_skill', {'skill': {'id': skill.skill_id}}, []))):
+                await handle_session(user, "hola")
+
+    session = await sync_to_async(
+        lambda: Session.objects.filter(user=user, ended_at__isnull=True).first()
+    )()
+    assert session is not None
+    assert session.current_phase == 'questions'  # legacy fallback path
+    # quiz_state should NOT have teach_drill sub-dict (fallback never entered teach_drill)
+    assert not session.quiz_state or 'teach_drill' not in (session.quiz_state or {})

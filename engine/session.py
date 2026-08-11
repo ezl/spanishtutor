@@ -26,7 +26,7 @@ def _strip_lesson_complete_marker(text: str) -> tuple:
 GRAMMAR_PHASE_TURNS = {'guided_practice': 4, 'free_production': 3, 'reinforcement': 4, 'assessment': 3}
 VOCAB_PHASE_TURNS   = {'guided_practice': 5, 'free_production': 2, 'reinforcement': 5, 'assessment': 3}
 
-GRAMMAR_PHASE_FLOW = ['present', 'questions', 'guided_practice', 'free_production', 'reinforcement_check', 'assessment', 'complete']
+GRAMMAR_PHASE_FLOW = ['teach_drill', 'guided_practice', 'free_production', 'reinforcement_check', 'assessment', 'complete']
 VOCAB_PHASE_FLOW   = ['present', 'guided_practice', 'free_production', 'reinforcement_check', 'assessment', 'complete']
 
 CLARIFYING_QUESTIONS_STRING = (
@@ -791,21 +791,49 @@ async def _open_session(user, text: str) -> dict:
         else:
             stype = _skill_type(target_skill_obj)
             if stype == 'grammar':
-                prompt = GRAMMAR_PRESENT_PROMPT.format(
+                from .teach_drill import extract_units, save_state, EMPTY_STATE
+                units = await extract_units(
                     skill_name=target_skill_obj.name,
                     skill_description=target_skill_obj.description,
-                    cefr_level=level, interests=interests,
+                    cefr_level=level,
                 )
-                opening = await call_llm([{"role": "user", "content": prompt}], user=user)
-                opening, lesson_complete = _strip_lesson_complete_marker(opening)
-                if lesson_complete:
-                    opening = opening + "\n\n" + CLARIFYING_QUESTIONS_STRING
-                    await sync_to_async(
-                        lambda: Session.objects.filter(pk=session.pk).update(
-                            quiz_state={'lesson_complete': True}
-                        )
-                    )()
-                initial_phase = 'questions'
+                if units:
+                    # Enter teach_drill phase with the extracted units.
+                    fresh_state = {**EMPTY_STATE, "units": units,
+                                   "taught": [], "drills": {}}
+                    await save_state(session, fresh_state)
+                    initial_phase = 'teach_drill'
+                    # Generate the opening framing turn — TEACH_DRILL_OPENING_PROMPT
+                    # is a scripted framing message; the first actual teaching turn
+                    # happens on the student's next reply.
+                    from .teach_drill import TEACH_DRILL_OPENING_PROMPT
+                    prompt = TEACH_DRILL_OPENING_PROMPT.format(
+                        skill_name=target_skill_obj.name,
+                        cefr_level=level, interests=interests,
+                    )
+                    opening = await call_llm([{"role": "user", "content": prompt}], user=user)
+                else:
+                    # Fallback: LLM failed to enumerate units. Use the legacy dense lesson.
+                    import logging
+                    logging.getLogger(__name__).warning(
+                        "extract_units returned empty for skill %s; falling back to dense lesson",
+                        target_skill_obj.name,
+                    )
+                    prompt = GRAMMAR_PRESENT_PROMPT.format(
+                        skill_name=target_skill_obj.name,
+                        skill_description=target_skill_obj.description,
+                        cefr_level=level, interests=interests,
+                    )
+                    opening = await call_llm([{"role": "user", "content": prompt}], user=user)
+                    opening, lesson_complete = _strip_lesson_complete_marker(opening)
+                    if lesson_complete:
+                        opening = opening + "\n\n" + CLARIFYING_QUESTIONS_STRING
+                        await sync_to_async(
+                            lambda: Session.objects.filter(pk=session.pk).update(
+                                quiz_state={'lesson_complete': True}
+                            )
+                        )()
+                    initial_phase = 'questions'
             else:
                 prompt = VOCAB_PRESENT_PROMPT.format(
                     skill_name=target_skill_obj.name,
@@ -927,20 +955,43 @@ async def _handle_check_in(user, session, text: str) -> dict:
         if skill:
             stype = _skill_type(skill)
             if stype == 'grammar':
-                prompt = GRAMMAR_PRESENT_PROMPT.format(
-                    skill_name=skill.name, skill_description=skill.description,
-                    cefr_level=level, interests=interests,
+                from .teach_drill import extract_units, save_state, EMPTY_STATE
+                units = await extract_units(
+                    skill_name=skill.name,
+                    skill_description=skill.description,
+                    cefr_level=level,
                 )
-                opening = await call_llm([{"role": "user", "content": prompt}], user=user)
-                opening, lesson_complete = _strip_lesson_complete_marker(opening)
-                if lesson_complete:
-                    opening = opening + "\n\n" + CLARIFYING_QUESTIONS_STRING
-                    await sync_to_async(
-                        lambda: Session.objects.filter(pk=session.pk).update(
-                            quiz_state={'lesson_complete': True}
-                        )
-                    )()
-                initial_phase = 'questions'
+                if units:
+                    fresh_state = {**EMPTY_STATE, "units": units,
+                                   "taught": [], "drills": {}}
+                    await save_state(session, fresh_state)
+                    initial_phase = 'teach_drill'
+                    from .teach_drill import TEACH_DRILL_OPENING_PROMPT
+                    prompt = TEACH_DRILL_OPENING_PROMPT.format(
+                        skill_name=skill.name,
+                        cefr_level=level, interests=interests,
+                    )
+                    opening = await call_llm([{"role": "user", "content": prompt}], user=user)
+                else:
+                    import logging
+                    logging.getLogger(__name__).warning(
+                        "extract_units returned empty for skill %s; falling back to dense lesson",
+                        skill.name,
+                    )
+                    prompt = GRAMMAR_PRESENT_PROMPT.format(
+                        skill_name=skill.name, skill_description=skill.description,
+                        cefr_level=level, interests=interests,
+                    )
+                    opening = await call_llm([{"role": "user", "content": prompt}], user=user)
+                    opening, lesson_complete = _strip_lesson_complete_marker(opening)
+                    if lesson_complete:
+                        opening = opening + "\n\n" + CLARIFYING_QUESTIONS_STRING
+                        await sync_to_async(
+                            lambda: Session.objects.filter(pk=session.pk).update(
+                                quiz_state={'lesson_complete': True}
+                            )
+                        )()
+                    initial_phase = 'questions'
             else:
                 prompt = VOCAB_PRESENT_PROMPT.format(
                     skill_name=skill.name, skill_description=skill.description,
@@ -1041,6 +1092,28 @@ async def _continue_new_skill(user, session, text: str) -> dict:
     # Auto-close when assessment is complete
     if phase == 'complete':
         return await _close_session(user, explicit=False)
+
+    if phase == 'teach_drill':
+        from .teach_drill import handle_teach_drill_turn
+        result = await handle_teach_drill_turn(user, session, text)
+        if result["advance_to_assessment"]:
+            await _set_phase(session, 'assessment', 0)
+            # Immediately generate the first assessment question so the student
+            # doesn't sit staring at an empty response.
+            suffix = _get_phase_suffix('assessment', skill, stype, [])
+            # Load fresh event history for the LLM.
+            events = await sync_to_async(
+                lambda: list(session.events.order_by('timestamp')[:40])
+            )()
+            history = _build_new_skill_history(events)
+            first_q = await call_llm(history, user=user, system_suffix=suffix)
+            await sync_to_async(SessionEvent.objects.create)(
+                session=session, event_type='conversation',
+                content=first_q, user_response='',
+            )
+            return {"text": first_q, "audio_url": None, "session_ended": False}
+        return {"text": result["text"], "audio_url": result["audio_url"],
+                "session_ended": result["session_ended"]}
 
     # Load events
     events = await sync_to_async(
