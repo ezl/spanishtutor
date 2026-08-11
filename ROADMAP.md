@@ -54,6 +54,7 @@ See V1 tickets below.
 - Live STT streaming, real-time response
 - Pronunciation scoring
 - Replaces voice message approximation from V1
+- **Multi-modal SRS reinforcement**: after a skill is scored in one mode (writing), schedule subsequent reviews to test the same skill in a *different* mode (listening, spoken_interaction, spoken_production). Blocks on voice being available. Currently `_select_session` and `next_new_skill` in `engine/session.py`/`engine/curriculum.py` only look at `mode='writing'` scores — expand to consider the full skill × mode grid once voice input/output is wired up.
 
 ---
 

@@ -26,8 +26,8 @@ def _strip_lesson_complete_marker(text: str) -> tuple:
 GRAMMAR_PHASE_TURNS = {'guided_practice': 4, 'free_production': 3, 'reinforcement': 4, 'assessment': 3}
 VOCAB_PHASE_TURNS   = {'guided_practice': 5, 'free_production': 2, 'reinforcement': 5, 'assessment': 3}
 
-GRAMMAR_PHASE_FLOW = ['teach_drill', 'guided_practice', 'free_production', 'reinforcement_check', 'assessment', 'complete']
-VOCAB_PHASE_FLOW   = ['present', 'guided_practice', 'free_production', 'reinforcement_check', 'assessment', 'complete']
+GRAMMAR_PHASE_FLOW = ['teach_drill', 'guided_practice', 'free_production', 'reinforcement_check', 'reinforcement', 'assessment', 'complete']
+VOCAB_PHASE_FLOW   = ['present', 'guided_practice', 'free_production', 'reinforcement_check', 'reinforcement', 'assessment', 'complete']
 
 CLARIFYING_QUESTIONS_STRING = (
     'What questions do you have about this, if any? '
@@ -446,6 +446,11 @@ def _build_checkin(user, session_type: str, last_snippet: str, context: dict, ta
 
     elif session_type == 'new_skill':
         name = target_name or ('algo nuevo' if advanced else 'something new')
+        is_resumption = context.get('is_resumption', False)
+        if is_resumption:
+            if advanced:
+                return f"¡Hola! Última vez: {snippet}. Ya empezamos con {name} antes pero no lo terminamos, así que vamos a retomarlo. ¿Listo/a?"
+            return f"Hey! Last time: {snippet}. We started {name} together before but didn't fully finish it — let's pick it back up. Ready?"
         if advanced:
             return f"¡Hola! Última vez: {snippet}. Hoy quiero avanzar con algo nuevo: {name}. ¿Listo/a?"
         return f"Hey! Last time: {snippet}. Today I want to push forward with something new: {name}. Ready to dive in?"
@@ -754,6 +759,15 @@ async def _open_session(user, text: str) -> dict:
         raw = last_session.summary or ''
         last_snippet = (raw[:80] + '…') if len(raw) > 80 else raw
         target_name = target_skill_obj.name if target_skill_obj else None
+        # Detect resumption: any prior new_skill session for this user × target_skill
+        # means we're picking it back up, not introducing it as new.
+        if session_type == 'new_skill' and target_skill_obj:
+            prior_count = await sync_to_async(
+                lambda: Session.objects.filter(
+                    user=user, session_type='new_skill', target_skill=target_skill_obj,
+                ).exclude(pk=session.pk).count()
+            )()
+            context['is_resumption'] = prior_count > 0
         checkin_text = _build_checkin(user, session_type, last_snippet, context, target_name)
         await sync_to_async(SessionEvent.objects.create)(
             session=session, event_type='conversation',

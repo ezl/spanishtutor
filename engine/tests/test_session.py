@@ -89,6 +89,16 @@ class TestPhaseFlow:
         from engine.session import _next_phase
         assert _next_phase('assessment', 'grammar') == 'complete'
 
+    def test_grammar_reinforcement_advances_to_assessment(self):
+        """Reinforcement must advance to assessment — was silently landing in
+        'complete' because 'reinforcement' was missing from GRAMMAR_PHASE_FLOW."""
+        from engine.session import _next_phase
+        assert _next_phase('reinforcement', 'grammar') == 'assessment'
+
+    def test_vocab_reinforcement_advances_to_assessment(self):
+        from engine.session import _next_phase
+        assert _next_phase('reinforcement', 'vocab') == 'assessment'
+
     def test_phase_max_turns_grammar(self):
         from engine.session import _phase_max_turns, GRAMMAR_PHASE_TURNS
         for phase, expected in GRAMMAR_PHASE_TURNS.items():
@@ -97,6 +107,47 @@ class TestPhaseFlow:
     def test_phase_max_turns_unknown_returns_zero(self):
         from engine.session import _phase_max_turns
         assert _phase_max_turns('nonexistent_phase', 'grammar') == 0
+
+
+class TestCheckinResumption:
+    """_build_checkin frames new_skill sessions differently when the user is
+    picking up a skill they've started before but not finished."""
+
+    def _user(self, cefr='B1'):
+        class U:
+            estimated_cefr_level = cefr
+        return U()
+
+    def test_new_skill_resumption_uses_pickup_framing_spanish(self):
+        from engine.session import _build_checkin
+        text = _build_checkin(self._user('B1'), 'new_skill', 'previous session',
+                              {'is_resumption': True}, target_name='Preterite')
+        assert 'Preterite' in text
+        assert 'retomarlo' in text
+        # Must NOT use the "algo nuevo" framing.
+        assert 'algo nuevo' not in text
+
+    def test_new_skill_resumption_uses_pickup_framing_english(self):
+        from engine.session import _build_checkin
+        text = _build_checkin(self._user('A2'), 'new_skill', 'previous session',
+                              {'is_resumption': True}, target_name='Preterite')
+        assert 'Preterite' in text
+        assert 'pick it back up' in text.lower()
+        assert 'push forward with something new' not in text.lower()
+
+    def test_new_skill_fresh_uses_original_framing(self):
+        from engine.session import _build_checkin
+        text = _build_checkin(self._user('B1'), 'new_skill', 'previous session',
+                              {}, target_name='Preterite')
+        assert 'algo nuevo' in text
+        assert 'retomarlo' not in text
+
+    def test_new_skill_default_is_not_resumption(self):
+        """Missing is_resumption key defaults to False (not resumption)."""
+        from engine.session import _build_checkin
+        text = _build_checkin(self._user('B1'), 'new_skill', 'previous session',
+                              {'skill': {'id': 'foo'}}, target_name='Preterite')
+        assert 'algo nuevo' in text
 
 
 # ── Area 9: _select_session decision tree ────────────────────────────────────
