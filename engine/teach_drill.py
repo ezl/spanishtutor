@@ -91,13 +91,20 @@ def next_teach_unit(units: list[dict], taught_ids: list[str]) -> dict | None:
     return None
 
 
-def select_retrieval_unit(taught_ids: list[str], drills: dict) -> str | None:
+def select_retrieval_unit(taught_ids: list[str], drills: dict,
+                          skip_most_recent: bool = False) -> str | None:
     """Pick a previously-taught unit for spaced retrieval.
-    Least-drilled wins; ties break by earlier-taught (index in taught_ids)."""
+    Least-drilled wins; ties break by earlier-taught (index in taught_ids).
+    If skip_most_recent=True, exclude the most-recently-taught unit when there
+    are alternatives — improves spacing between teach and retrieval of the
+    same unit. Falls back to including it if it's the only option."""
     if not taught_ids:
         return None
+    candidates = taught_ids[:-1] if (skip_most_recent and len(taught_ids) > 1) else taught_ids
+    if not candidates:
+        return None
     return min(
-        taught_ids,
+        candidates,
         key=lambda uid: (len(drills.get(uid, [])), taught_ids.index(uid)),
     )
 
@@ -123,6 +130,7 @@ EMPTY_STATE = {
     "drills": {},
     "turn_count": 0,
     "lesson_complete": False,
+    "last_turn_type": None,  # "teach" | "retrieval" | None — drives Option-B alternation
 }
 
 
@@ -141,6 +149,7 @@ def get_state(session) -> dict:
         "drills": {k: list(v) for k, v in td.get("drills", {}).items()},
         "turn_count": int(td.get("turn_count", 0)),
         "lesson_complete": bool(td.get("lesson_complete", False)),
+        "last_turn_type": td.get("last_turn_type"),
     }
 
 
@@ -185,7 +194,7 @@ This is the FIRST turn. Write ONLY the opening framing — do NOT teach any spec
 
 Structure (2-4 short sentences total):
 1. Outcome-framing — tell the student what they'll be able to DO after this lesson, with 1-2 concrete example target sentences in Spanish (translations in parens). Example: "You'll learn to talk about things that happened in the past — sentences like 'Ayer fui al cine' (I went to the movies)."
-2. Explain that you'll teach one piece at a time and drill each piece immediately, so it locks in.
+2. Explain the pattern: you'll teach one verb, drill it with ONE question, then on the next turn ask ONE recall question about an earlier verb. Bite-sized — one thing at a time.
 3. End with the literal line: Ready to start?
 
 Chat style. No headers, no bullet points, no textbook tone.
@@ -206,19 +215,43 @@ Paradigm formatting (critical): when showing a conjugation, render it ONE LINE P
 
 Chunk sizing (critical): teach EXACTLY ONE unit per turn, unless the instruction explicitly names a shared-paradigm pair.
 
+One-question-per-turn (critical): each turn asks EXACTLY ONE production question — never two. Whether the instruction is a teach turn or a retrieval turn, the last thing you write to the student is a single question.
+
 Evaluation format: one line per response — "✓" plus short confirmation, or "✗" plus the correct form and a brief reason. No praise, no excess.
 
-Wrong-answer reinforcement (critical): when ANY of the student's answers this turn get ✗, you MUST do a re-attempt instead of teaching new content:
-  1. Write the ✗ line(s) with correct form and brief reason (same as normal evaluation).
-  2. For each ✗ answer, add a line: "Try again: [restate that question with slight rephrasing]" — the redo must be about the SAME grammar item they just missed, not a new one.
-  3. Do NOT teach a new unit and do NOT ask any new drill questions this turn — the instruction's teach/drill steps are DEFERRED.
-  4. End the message with the literal marker on its own line: <<REDO_PENDING>>
-On the FOLLOWING turn: evaluate the redo attempt(s). If correct, briefly acknowledge (✓ one line) and THEN follow the normal per-turn instruction (teach + drill). If the redo is wrong AGAIN, give the definitive correct answer in ONE line and THEN follow the normal instruction — do NOT ask a third time (avoid frustration spirals).
+Wrong-answer reinforcement (CRITICAL — strictly enforced): when the student's answer gets ✗, your ENTIRE response this turn is limited to EXACTLY these parts, in this order, and nothing else:
+  1. The ✗ line with correct form and brief reason (one line).
+  2. "Try again: [restate the SAME question with slight rephrasing]" (one line).
+  3. The literal marker on its own line at the end: <<REDO_PENDING>>
+
+Forbidden on a redo turn (any of these = pattern violation):
+  - Paradigms of ANY verb (no conjugation tables)
+  - Introducing a new verb by name
+  - Phrases like "let me show you", "here's the paradigm", "Aquí está", "Hablando de X"
+  - Any new drill or production question
+  - Any teaching content, even brief
+
+If the student's answer used a different but grammatically valid verb (e.g. they used estar when you asked for ser): STILL just say the ✗ line ("that's estar; for ser use fui"), the try-again line, and the marker. Do NOT teach the other verb — that's a separate lesson.
+
+On the FOLLOWING turn: evaluate the redo attempt in ONE line. If correct, briefly ✓ acknowledge and THEN follow the normal per-turn instruction. If wrong AGAIN, give the definitive correct answer in ONE line and THEN follow the normal instruction — do NOT ask a third time.
 
 The marker <<LESSON_COMPLETE>>, if the instruction asks you to emit it, goes on its own line at the very end. Never emit it otherwise.
 The marker <<REDO_PENDING>>, when emitted, goes on its own line at the very end. Never emit BOTH markers in the same message.
 
 Chat style, no bold headers."""
+
+
+CUE_SELECTION_RULES = """CUE SELECTION (critical): the English cue MUST have exactly one natural Spanish translation using the target verb. Before writing the cue, verify: could a native Spanish speaker translate this English sentence naturally using a DIFFERENT verb (estar/ser/hacer/tener/etc.)? If yes, the cue is ambiguous — pick a different one.
+
+Common traps to AVOID:
+- For ser: NEVER use "I was at [location]" or "I was [tired/happy/hungry]" — those are estar, not ser. Use identity cues like "I was a student", "It was 3pm", "She was from Medellín".
+- For ir: use motion cues like "I went to X", "We went to the party".
+- For estar: use location or state cues like "I was at Y", "You were tired".
+- For tener: use possession or obligation cues like "I had a headache", "You had to work".
+- For hacer: use actions like "What did you do yesterday", "I made breakfast".
+- For poder: use ability/managed-to cues like "I couldn't finish", "She was able to leave early". Note preterite meaning is "managed to" not just "could".
+- For querer: use "tried to / meant to" cues, not just "wanted" (preterite meaning shift).
+- For saber: use "found out / learned" cues, not just "knew" (preterite meaning shift)."""
 
 
 def build_retrieval_only_instruction(retrieval: dict, person_retrieve: str) -> str:
@@ -227,23 +260,21 @@ def build_retrieval_only_instruction(retrieval: dict, person_retrieve: str) -> s
         f"1) Evaluate the student's previous response in ONE line if it contained an answer (✓/✗ format).\n\n"
         f"2) Do NOT teach any new content — this is a review turn.\n\n"
         f"3) Ask ONE production question testing **{retrieval['label']}** in the "
-        f"**{person_retrieve}** form. English cue that requires the target form. "
-        f"Brief context ('quick review:' or similar) is fine, but no paradigms.\n\n"
+        f"**{person_retrieve}** form. Brief context ('quick review:' or similar) is fine, "
+        f"but no paradigms.\n\n"
+        f"{CUE_SELECTION_RULES}\n\n"
         f"4) End with a natural line inviting the student to answer. Do NOT emit <<LESSON_COMPLETE>>."
     )
 
 
-def build_teach_instruction(unit: dict, retrieval: dict | None,
-                            person_new: str, person_retrieve: str | None,
-                            is_final: bool) -> str:
-    """Assemble the per-turn instruction telling the LLM exactly what to do."""
+def build_teach_instruction(unit: dict, person_new: str, is_final: bool) -> str:
+    """Instruction for a teach turn: teach one unit + ONE production question about it.
+    No retrieval on teach turns — retrieval happens on its own alternating turn."""
     parts = []
 
-    # If we're evaluating a prior response, the LLM sees the response in the
-    # conversation history (the previous user turn). It should evaluate first.
     parts.append(
-        f"1) If the student's previous message contained answer attempts, evaluate them "
-        f"in ONE LINE EACH before doing anything else. Use ✓/✗ format."
+        f"1) If the student's previous message contained an answer attempt, evaluate it "
+        f"in ONE LINE (✓/✗ format) before doing anything else."
     )
 
     label = unit["label"]
@@ -256,25 +287,19 @@ def build_teach_instruction(unit: dict, retrieval: dict | None,
     )
 
     parts.append(
-        f"3) Immediately ask ONE production question testing **{label}** in the "
-        f"**{person_new}** form. Give an English cue that requires the student to "
-        f"produce the target form (e.g. 'How would you say _she had a great time_?')."
+        f"3) Ask EXACTLY ONE production question testing **{label}** in the "
+        f"**{person_new}** form. English cue that requires the student to produce the target form."
     )
 
-    if retrieval is not None and person_retrieve is not None:
-        parts.append(
-            f"4) Then ask ONE production question testing a PRIOR unit: "
-            f"**{retrieval['label']}** in the **{person_retrieve}** form. "
-            f"Again, English cue that requires the target form."
-        )
+    parts.append(CUE_SELECTION_RULES)
 
     if is_final:
         parts.append(
-            f"5) End the message with the literal marker on its own line: <<LESSON_COMPLETE>>"
+            f"4) End the message with the literal marker on its own line: <<LESSON_COMPLETE>>"
         )
     else:
         parts.append(
-            f"5) End the message with a natural line inviting the student to answer "
+            f"4) End with a natural line inviting the student to answer "
             f"(no ceremony — just wait for their reply). Do NOT emit <<LESSON_COMPLETE>>."
         )
 
@@ -319,7 +344,7 @@ async def handle_teach_drill_turn(user, session, text: str) -> dict:
     taught_ids = state["taught"]
     drills = state["drills"]
 
-    # Pick next unit (or None if all taught).
+    # Pick next un-taught unit (or None if all taught).
     next_unit = next_teach_unit(units, taught_ids)
 
     # Force completion at safety cap.
@@ -328,43 +353,61 @@ async def handle_teach_drill_turn(user, session, text: str) -> dict:
     # Every taught unit has been drilled at least twice (invariant target for completion).
     all_units_drilled = all(len(drills.get(uid, [])) >= 2 for uid in taught_ids)
 
-    if next_unit is None:
-        if all_units_drilled or force_complete:
-            # Wrap-up turn: no drill, emit marker.
-            retrieval = None
-            person_new = "yo"  # unused
-            person_retrieve = None
-            is_final = True
-        else:
-            # Retrieval-only turn: drill an under-drilled prior unit; do not teach anything new.
-            retrieval_id = select_retrieval_unit(taught_ids, drills)
-            retrieval = next((u for u in units if u["id"] == retrieval_id), None) if retrieval_id else None
-            person_new = "yo"  # unused when next_unit is None
-            person_retrieve = select_person(retrieval["id"], drills) if retrieval else None
-            is_final = False
-    else:
-        retrieval_id = select_retrieval_unit(taught_ids, drills)
-        retrieval = next((u for u in units if u["id"] == retrieval_id), None) if retrieval_id else None
-        person_new = select_person(next_unit["id"], drills)
-        person_retrieve = select_person(retrieval["id"], drills) if retrieval else None
-        # is_final: this is the last unit AND after this turn every unit will have >=2 drills.
-        will_have_2 = len(drills.get(next_unit["id"], [])) + 1 >= 2 and all(
-            len(drills.get(uid, [])) >= 2 for uid in taught_ids if uid != next_unit["id"]
-        )
-        is_final = force_complete or (
-            len(taught_ids) == len(units) - 1 and will_have_2
-        )
+    # Decide turn type: teach | retrieval | wrap_up. Alternate teach/retrieval so
+    # each turn asks exactly ONE question — teach turns teach + drill new unit;
+    # retrieval turns drill a prior unit (no new content).
+    last_type = state.get("last_turn_type")
 
-    # Build message history using session events + append the per-turn instruction.
-    history = _build_new_skill_history(events)
-    if next_unit is not None:
-        instruction = build_teach_instruction(
-            next_unit, retrieval, person_new, person_retrieve, is_final,
-        )
-    elif retrieval is not None:
-        instruction = build_retrieval_only_instruction(retrieval, person_retrieve)
+    if next_unit is None and (all_units_drilled or force_complete):
+        turn_type = "wrap_up"
+    elif next_unit is None:
+        # No new units, but some under-drilled — do retrieval to reach ≥2 drills.
+        turn_type = "retrieval"
+    elif last_type == "teach" and len(taught_ids) >= 1:
+        # Just taught; alternate to retrieval of a prior unit.
+        turn_type = "retrieval"
     else:
-        # Wrap-up turn: just ask for a brief recap and the marker.
+        # First turn OR just did retrieval — teach the next unit.
+        turn_type = "teach"
+
+    # Resolve unit/person for the chosen turn type.
+    teach_unit = None
+    teach_person = None
+    retrieval_unit = None
+    retrieval_person = None
+
+    if turn_type == "teach":
+        teach_unit = next_unit
+        teach_person = select_person(next_unit["id"], drills)
+        # is_final: this is the last unit AND after this turn all units drilled ≥2.
+        # In Option B, "final teach" isn't necessarily the final TURN — there may still
+        # be retrieval turns needed after. Only emit <<LESSON_COMPLETE>> on a true wrap-up.
+        is_final = False
+    elif turn_type == "retrieval":
+        # Skip the most-recently-taught only while we still have units to teach
+        # (improves spacing). Once teaching is done and we're filling in drills
+        # to hit ≥2 per unit, drill the actually-under-drilled unit regardless.
+        skip_recent = (next_unit is not None)
+        retrieval_id = select_retrieval_unit(taught_ids, drills, skip_most_recent=skip_recent)
+        retrieval_unit = next((u for u in units if u["id"] == retrieval_id), None) if retrieval_id else None
+        retrieval_person = select_person(retrieval_unit["id"], drills) if retrieval_unit else None
+        is_final = False
+        # Edge case: retrieval was chosen but no candidate found (shouldn't happen
+        # given the logic above, but safety net) — fall back to teach.
+        if retrieval_unit is None and next_unit is not None:
+            turn_type = "teach"
+            teach_unit = next_unit
+            teach_person = select_person(next_unit["id"], drills)
+    else:  # wrap_up
+        is_final = True
+
+    # Build message history and per-turn instruction.
+    history = _build_new_skill_history(events)
+    if turn_type == "teach":
+        instruction = build_teach_instruction(teach_unit, teach_person, is_final)
+    elif turn_type == "retrieval":
+        instruction = build_retrieval_only_instruction(retrieval_unit, retrieval_person)
+    else:  # wrap_up
         instruction = (
             "1) Evaluate the student's previous response in ONE line if it contained an answer.\n\n"
             "2) Briefly recap the units taught in ONE sentence, no lists.\n\n"
@@ -382,21 +425,21 @@ async def handle_teach_drill_turn(user, session, text: str) -> dict:
     response, redo_pending = _strip_redo_pending_marker(response)
 
     # Update state.
-    # If the LLM emitted <<REDO_PENDING>>, it deferred teaching to do a re-attempt.
-    # Skip the taught/drilled updates for THIS turn — the same next_unit/retrieval
-    # will be picked again next turn (after the redo is resolved) and taught then.
-    # turn_count still advances so the safety cap remains meaningful.
+    # If the LLM emitted <<REDO_PENDING>>, it deferred teach/retrieval to do a
+    # re-attempt. Skip mark_taught/mark_drilled and last_turn_type updates — the
+    # same turn will replay next call (after the redo is resolved). turn_count
+    # still advances so the safety cap remains meaningful.
     if not redo_pending:
-        if next_unit is not None:
-            mark_taught(state, next_unit["id"])
-            mark_drilled(state, next_unit["id"], person_new)
-            if retrieval is not None and person_retrieve is not None:
-                mark_drilled(state, retrieval["id"], person_retrieve)
-        elif retrieval is not None and person_retrieve is not None:
-            # Retrieval-only turn: still record the drill.
-            mark_drilled(state, retrieval["id"], person_retrieve)
+        if turn_type == "teach":
+            mark_taught(state, teach_unit["id"])
+            mark_drilled(state, teach_unit["id"], teach_person)
+            state["last_turn_type"] = "teach"
+        elif turn_type == "retrieval" and retrieval_unit is not None:
+            mark_drilled(state, retrieval_unit["id"], retrieval_person)
+            state["last_turn_type"] = "retrieval"
+        # wrap_up doesn't update taught/drilled; marker or force_complete handles completion.
     state["turn_count"] += 1
-    if marker_seen or force_complete or (next_unit is None and all_units_drilled):
+    if marker_seen or force_complete or (turn_type == "wrap_up"):
         mark_complete(state)
 
     await save_state(session, state)

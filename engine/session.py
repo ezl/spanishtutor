@@ -616,12 +616,12 @@ def build_idle_notice(user, idle_minutes: int) -> str:
 
     if _is_advanced(user):
         return (
-            f"Llevas {span} sin escribir, así que cierro esta sesión. "
-            f"Cuando estés listo/a para empezar una nueva, mándame un mensaje."
+            f"Llevas {span} sin escribir, así que paré nuestra clase. "
+            f"Escríbeme cuando estés listo/a para seguir."
         )
     return (
-        f"You've been idle for {span}, so I'm closing this session. "
-        f"To start a new one, just let me know when you're ready."
+        f"You've been idle for {span}, so I stopped our lesson. "
+        f"Just say 'listo' when you're ready to continue."
     )
 
 
@@ -641,7 +641,14 @@ async def handle_session(user, text: str, attachments: list = None) -> dict:
     if session:
         stale, idle_min = await _check_inactivity(user, session)
         if stale:
+            from learner.models import User as UserModel
             await _close_session_record(session, user)
+            # Mark user as resuming so the next message skips the redundant
+            # check-in ("¿Listo?") — the idle notice already asked that.
+            await sync_to_async(
+                lambda: UserModel.objects.filter(pk=user.pk).update(resume_pending=True)
+            )()
+            user.resume_pending = True
             return {
                 "text": build_idle_notice(user, idle_min),
                 "audio_url": None,
@@ -766,8 +773,18 @@ async def _open_session(user, text: str) -> dict:
             await sync_to_async(SessionSkill.objects.get_or_create)(session=session, skill=target_skill_obj)
 
     # ── Check-in for returning users ──────────────────────────────────────────
+    # Skip when the user is resuming from an idle-close: the idle notice
+    # already asked them to signal readiness, so an additional scripted
+    # check-in is redundant.
+    skip_checkin = user.resume_pending
+    if skip_checkin:
+        from learner.models import User as UserModel
+        await sync_to_async(
+            lambda: UserModel.objects.filter(pk=user.pk).update(resume_pending=False)
+        )()
+        user.resume_pending = False
 
-    if last_session and not win_state:
+    if last_session and not win_state and not skip_checkin:
         raw = last_session.summary or ''
         last_snippet = (raw[:80] + '…') if len(raw) > 80 else raw
         target_name = target_skill_obj.name if target_skill_obj else None

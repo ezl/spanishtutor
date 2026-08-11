@@ -114,7 +114,8 @@ class TestState:
         class FakeSession:
             quiz_state = None
         state = get_state(FakeSession())
-        assert state == {"units": [], "taught": [], "drills": {}, "turn_count": 0, "lesson_complete": False}
+        assert state == {"units": [], "taught": [], "drills": {}, "turn_count": 0,
+                         "lesson_complete": False, "last_turn_type": None}
 
     def test_get_state_returns_existing_teach_drill_subdict(self):
         from engine.teach_drill import get_state
@@ -175,38 +176,31 @@ async def test_save_state_persists_to_session_quiz_state(make_user, make_skill):
 
 
 class TestPromptBuilding:
-    def test_build_teach_instruction_new_unit_only(self):
-        """First turn: teach a new unit, drill it in one person, no retrieval yet."""
+    def test_build_teach_instruction_teaches_and_drills_one_unit(self):
+        """Teach turn: teach the unit, one production question. No retrieval."""
         from engine.teach_drill import build_teach_instruction
         unit = {"id": "tener", "label": "tener", "note": "stem tuv-"}
-        instr = build_teach_instruction(unit, retrieval=None,
-                                        person_new="yo", person_retrieve=None,
-                                        is_final=False)
+        instr = build_teach_instruction(unit, person_new="yo", is_final=False)
         assert "tener" in instr
         assert "tuv-" in instr
         assert "yo" in instr.lower()
-        # No retrieval instructions if none passed.
-        assert "previously-taught" not in instr.lower() and "prior" not in instr.lower()
-
-    def test_build_teach_instruction_with_retrieval(self):
-        """Subsequent turn: teach new + retrieve prior."""
-        from engine.teach_drill import build_teach_instruction
-        new = {"id": "hacer", "label": "hacer", "note": "stem hic-; hizo in él"}
-        retr = {"id": "tener", "label": "tener", "note": "stem tuv-"}
-        instr = build_teach_instruction(new, retrieval=retr,
-                                        person_new="tú", person_retrieve="nosotros",
-                                        is_final=False)
-        assert "hacer" in instr and "tú" in instr.lower()
-        assert "tener" in instr and "nosotros" in instr.lower()
+        # Teach turn asks EXACTLY ONE question — the instruction must specify singular.
+        assert "EXACTLY ONE" in instr
 
     def test_build_teach_instruction_final_turn_asks_for_marker(self):
-        """Final teaching turn instructs the LLM to emit <<LESSON_COMPLETE>>."""
         from engine.teach_drill import build_teach_instruction
         unit = {"id": "saber", "label": "saber", "note": "sup-"}
-        instr = build_teach_instruction(unit, retrieval=None,
-                                        person_new="yo", person_retrieve=None,
-                                        is_final=True)
+        instr = build_teach_instruction(unit, person_new="yo", is_final=True)
         assert "<<LESSON_COMPLETE>>" in instr
+
+    def test_build_teach_instruction_includes_cue_selection_rules(self):
+        """Cue selection guardrails must be in every teach instruction."""
+        from engine.teach_drill import build_teach_instruction
+        unit = {"id": "ser", "label": "ser", "note": ""}
+        instr = build_teach_instruction(unit, person_new="yo", is_final=False)
+        assert "CUE SELECTION" in instr
+        # Must warn about the ser/estar location trap specifically.
+        assert "I was at" in instr
 
     def test_opening_prompt_contains_skill_name_and_outcome_framing_directive(self):
         from engine.teach_drill import TEACH_DRILL_OPENING_PROMPT
@@ -257,8 +251,9 @@ class TestHandleTeachDrillTurn:
 
     @pytest.mark.asyncio
     @pytest.mark.django_db(transaction=True)
-    async def test_second_turn_interleaves_retrieval(self, make_user, make_skill):
-        """On the second turn, teach next unit + retrieve first unit."""
+    async def test_after_teach_turn_next_is_retrieval(self, make_user, make_skill):
+        """Option B alternation: after a teach turn, the next turn is retrieval
+        (drill prior unit) — NOT teach + retrieval piggybacked."""
         from engine.teach_drill import handle_teach_drill_turn
         from learner.models import Session
 
@@ -270,20 +265,54 @@ class TestHandleTeachDrillTurn:
             quiz_state={"teach_drill": {
                 "units": [{"id": "tener", "label": "tener", "note": "tuv-"},
                           {"id": "hacer", "label": "hacer", "note": "hic-"}],
+                # Last turn was a teach of tener → next should be retrieval.
                 "taught": ["tener"], "drills": {"tener": ["yo"]},
                 "turn_count": 1, "lesson_complete": False,
+                "last_turn_type": "teach",
             }},
         )
 
-        with patch('engine.teach_drill.call_llm', new=AsyncMock(return_value="TURN 2")):
-            result = await handle_teach_drill_turn(user, session, text="tuve un buen día")
+        with patch('engine.teach_drill.call_llm', new=AsyncMock(return_value="RETRIEVAL Q")):
+            await handle_teach_drill_turn(user, session, text="tuve un buen día")
 
         await sync_to_async(session.refresh_from_db)()
         state = session.quiz_state["teach_drill"]
-        # Second unit taught + drilled in yo; first unit gets a retrieval drill in tú.
-        assert state["taught"] == ["tener", "hacer"]
-        assert state["drills"]["hacer"] == ["yo"]
-        assert state["drills"]["tener"] == ["yo", "tú"]  # retrieval added tú
+        # hacer must NOT be taught this turn — retrieval turn only.
+        assert "hacer" not in state["taught"]
+        assert "hacer" not in state["drills"]
+        # tener gets an additional drill from the retrieval.
+        assert len(state["drills"]["tener"]) == 2
+        assert state["last_turn_type"] == "retrieval"
+
+    @pytest.mark.asyncio
+    @pytest.mark.django_db(transaction=True)
+    async def test_after_retrieval_turn_next_is_teach(self, make_user, make_skill):
+        """After a retrieval turn, the next turn teaches a new unit."""
+        from engine.teach_drill import handle_teach_drill_turn
+        from learner.models import Session
+
+        user = await sync_to_async(make_user)(discord_id='td_h2b', cefr_level='B1')
+        skill = await sync_to_async(make_skill)(skill_id='sk_td_h2b')
+        session = await sync_to_async(Session.objects.create)(
+            user=user, session_type='new_skill', target_skill=skill,
+            current_phase='teach_drill',
+            quiz_state={"teach_drill": {
+                "units": [{"id": "tener", "label": "tener", "note": "tuv-"},
+                          {"id": "hacer", "label": "hacer", "note": "hic-"}],
+                "taught": ["tener"], "drills": {"tener": ["yo", "tú"]},
+                "turn_count": 2, "lesson_complete": False,
+                "last_turn_type": "retrieval",
+            }},
+        )
+
+        with patch('engine.teach_drill.call_llm', new=AsyncMock(return_value="TEACH HACER")):
+            await handle_teach_drill_turn(user, session, text="tuviste")
+
+        await sync_to_async(session.refresh_from_db)()
+        state = session.quiz_state["teach_drill"]
+        assert "hacer" in state["taught"]
+        assert "hacer" in state["drills"]
+        assert state["last_turn_type"] == "teach"
 
     @pytest.mark.asyncio
     @pytest.mark.django_db(transaction=True)

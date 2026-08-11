@@ -176,6 +176,72 @@ class TestWrongAnswerReinforcementPrompts:
         assert 'Try again' not in ASSESSMENT_SUFFIX
 
 
+class TestIdleNoticeCopy:
+    """The idle notice framing was updated to say 'stopped our lesson' and
+    prompt with 'listo' — collapses the previous idle+checkin double-prompt."""
+
+    def _user(self, cefr='B1'):
+        class U:
+            estimated_cefr_level = cefr
+        return U()
+
+    def test_idle_notice_spanish_says_stopped_lesson(self):
+        from engine.session import build_idle_notice
+        text = build_idle_notice(self._user('B1'), 90)
+        assert 'paré nuestra clase' in text or 'listo' in text.lower()
+
+    def test_idle_notice_english_says_stopped_lesson(self):
+        from engine.session import build_idle_notice
+        text = build_idle_notice(self._user('A2'), 90)
+        assert 'stopped our lesson' in text
+        assert 'listo' in text
+
+
+@pytest.mark.asyncio
+@pytest.mark.django_db(transaction=True)
+async def test_resume_pending_flag_skips_checkin(make_user, make_skill):
+    """When user.resume_pending=True on session open, the scripted check-in
+    is skipped and the flag is cleared — the user goes straight into content."""
+    from unittest.mock import patch, AsyncMock
+    from asgiref.sync import sync_to_async
+    from engine.session import handle_session
+    from learner.models import Session, User
+
+    user = await sync_to_async(make_user)(discord_id='td_resume1', cefr_level='B1')
+    # Simulate a prior completed session (needed for the check-in codepath).
+    old = await sync_to_async(Session.objects.create)(
+        user=user, session_type='new_skill',
+    )
+    from django.utils import timezone as _tz
+    from datetime import timedelta as _td
+    await sync_to_async(
+        lambda: Session.objects.filter(pk=old.pk).update(
+            ended_at=_tz.now() - _td(hours=1), summary='prior session summary'
+        )
+    )()
+    # Set the resume flag as if an idle-close just happened.
+    await sync_to_async(
+        lambda: User.objects.filter(pk=user.pk).update(resume_pending=True)
+    )()
+    await sync_to_async(user.refresh_from_db)()
+
+    skill = await sync_to_async(make_skill)(skill_id='b1_resume_skill', name='Resume test',
+                                            description='desc', cefr_level='B1')
+    units_json = '[{"id":"a","label":"a","note":""}]'
+    with patch('engine.teach_drill.call_llm', new=AsyncMock(return_value=units_json)):
+        with patch('engine.session.call_llm', new=AsyncMock(return_value="LESSON OPENING")):
+            with patch('engine.session._select_session',
+                       new=AsyncMock(return_value=('new_skill', {'skill': {'id': skill.skill_id}}, []))):
+                result = await handle_session(user, "listo")
+
+    # Response should be the lesson opening (not the scripted "¿Listo?" check-in).
+    assert result['text'] == "LESSON OPENING"
+
+    # Flag should be cleared.
+    await sync_to_async(user.refresh_from_db)()
+    assert user.resume_pending is False
+
+
 # ── Area 9: _select_session decision tree ────────────────────────────────────
 
 @pytest.mark.django_db(transaction=True)
