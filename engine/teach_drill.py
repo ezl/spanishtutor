@@ -479,6 +479,19 @@ async def handle_teach_drill_turn(user, session, text: str) -> dict:
     # Strip markers.
     response, marker_seen = _strip_lesson_complete_marker(response)
     response, redo_pending = _strip_redo_pending_marker(response)
+    response, feedback_interpretation = _strip_feedback_marker(response)
+
+    # Log feedback if the LLM captured any. Anchor to the most recent existing
+    # SessionEvent — that's the assistant turn the user was reacting to.
+    if feedback_interpretation:
+        from learner.models import SessionFeedback
+        anchor = events[-1] if events else None
+        await sync_to_async(SessionFeedback.objects.create)(
+            session=session,
+            anchor_event=anchor,
+            user_message=text,
+            interpretation=feedback_interpretation,
+        )
 
     # Update state.
     # If the LLM emitted <<REDO_PENDING>>, it deferred teach/retrieval to do a

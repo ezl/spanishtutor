@@ -748,3 +748,146 @@ class TestContinuationSuffixClassification:
         from engine.teach_drill import TEACH_DRILL_CONTINUATION_SUFFIX
         assert "both an answer" in TEACH_DRILL_CONTINUATION_SUFFIX.lower() \
             or "answer and feedback" in TEACH_DRILL_CONTINUATION_SUFFIX.lower()
+
+
+class TestFeedbackCapture:
+    @pytest.mark.asyncio
+    @pytest.mark.django_db(transaction=True)
+    async def test_feedback_marker_in_response_creates_row(self, make_user, make_skill):
+        """When the LLM response contains the feedback markers, a SessionFeedback
+        row is created with the paraphrase, the raw user message, and the FK to
+        the most-recent prior SessionEvent."""
+        from unittest.mock import patch, AsyncMock
+        from engine.teach_drill import handle_teach_drill_turn
+        from learner.models import Session, SessionEvent, SessionFeedback
+
+        user = await sync_to_async(make_user)(discord_id='fb1', cefr_level='B1')
+        skill = await sync_to_async(make_skill)(skill_id='sk_fb1')
+        session = await sync_to_async(Session.objects.create)(
+            user=user, session_type='new_skill', target_skill=skill,
+            current_phase='teach_drill',
+            quiz_state={"teach_drill": {
+                "units": [{"id": "ser_ir", "label": "ser/ir", "note": ""}],
+                "taught": [], "drills": {}, "turn_count": 0,
+                "lesson_complete": False, "last_turn_type": None,
+            }},
+        )
+        prior_event = await sync_to_async(SessionEvent.objects.create)(
+            session=session, event_type='conversation',
+            content='Luz asked something', user_response='',
+        )
+
+        llm_response = (
+            "Got it, logged that. Sigamos.\n"
+            "<<FEEDBACK>>Student thinks the previous cue was ambiguous.<<END_FEEDBACK>>\n"
+            "[normal teach content here...]"
+        )
+        with patch('engine.teach_drill.call_llm', new=AsyncMock(return_value=llm_response)):
+            result = await handle_teach_drill_turn(
+                user, session, text="that cue was ambiguous, honestly",
+            )
+
+        assert "<<FEEDBACK>>" not in result["text"]
+        assert "<<END_FEEDBACK>>" not in result["text"]
+
+        fb_qs = await sync_to_async(list)(SessionFeedback.objects.filter(session=session))
+        assert len(fb_qs) == 1
+        fb = fb_qs[0]
+        assert fb.user_message == "that cue was ambiguous, honestly"
+        assert fb.interpretation == "Student thinks the previous cue was ambiguous."
+        assert fb.anchor_event_id == prior_event.pk
+        assert fb.resolved is False
+
+    @pytest.mark.asyncio
+    @pytest.mark.django_db(transaction=True)
+    async def test_no_marker_creates_no_row(self, make_user, make_skill):
+        from unittest.mock import patch, AsyncMock
+        from engine.teach_drill import handle_teach_drill_turn
+        from learner.models import Session, SessionFeedback
+
+        user = await sync_to_async(make_user)(discord_id='fb2', cefr_level='B1')
+        skill = await sync_to_async(make_skill)(skill_id='sk_fb2')
+        session = await sync_to_async(Session.objects.create)(
+            user=user, session_type='new_skill', target_skill=skill,
+            current_phase='teach_drill',
+            quiz_state={"teach_drill": {
+                "units": [{"id": "a", "label": "a", "note": ""}],
+                "taught": [], "drills": {}, "turn_count": 0,
+                "lesson_complete": False, "last_turn_type": None,
+            }},
+        )
+
+        with patch('engine.teach_drill.call_llm', new=AsyncMock(return_value="normal teach response")):
+            await handle_teach_drill_turn(user, session, text="fui al gym")
+
+        assert await sync_to_async(SessionFeedback.objects.filter(session=session).count)() == 0
+
+    @pytest.mark.asyncio
+    @pytest.mark.django_db(transaction=True)
+    async def test_feedback_coexists_with_redo_pending(self, make_user, make_skill):
+        """A response containing BOTH markers must log feedback AND still gate
+        state advancement per REDO_PENDING semantics."""
+        from unittest.mock import patch, AsyncMock
+        from engine.teach_drill import handle_teach_drill_turn
+        from learner.models import Session, SessionFeedback
+
+        user = await sync_to_async(make_user)(discord_id='fb3', cefr_level='B1')
+        skill = await sync_to_async(make_skill)(skill_id='sk_fb3')
+        session = await sync_to_async(Session.objects.create)(
+            user=user, session_type='new_skill', target_skill=skill,
+            current_phase='teach_drill',
+            quiz_state={"teach_drill": {
+                "units": [{"id": "a", "label": "a", "note": ""},
+                          {"id": "b", "label": "b", "note": ""}],
+                "taught": ["a"], "drills": {"a": ["yo"]},
+                "turn_count": 1, "lesson_complete": False,
+                "last_turn_type": "teach",
+            }},
+        )
+        llm_response = (
+            "✗ correction line.\nTry again: [rephrased Q]\n"
+            "<<FEEDBACK>>Student says the drills are too fast.<<END_FEEDBACK>>\n"
+            "<<REDO_PENDING>>"
+        )
+        with patch('engine.teach_drill.call_llm', new=AsyncMock(return_value=llm_response)):
+            await handle_teach_drill_turn(user, session, text="wrong answer + this is too fast")
+
+        fb_count = await sync_to_async(SessionFeedback.objects.filter(session=session).count)()
+        assert fb_count == 1
+
+        session = await sync_to_async(
+            lambda: Session.objects.select_related('target_skill').get(pk=session.pk)
+        )()
+        state = session.quiz_state["teach_drill"]
+        assert "b" not in state["taught"]
+
+    @pytest.mark.asyncio
+    @pytest.mark.django_db(transaction=True)
+    async def test_feedback_stored_content_does_not_contain_marker(self, make_user, make_skill):
+        """The SessionEvent that persists the LLM response for later turns must
+        have the marker block stripped so it doesn't leak into future prompts."""
+        from unittest.mock import patch, AsyncMock
+        from engine.teach_drill import handle_teach_drill_turn
+        from learner.models import Session, SessionEvent
+
+        user = await sync_to_async(make_user)(discord_id='fb4', cefr_level='B1')
+        skill = await sync_to_async(make_skill)(skill_id='sk_fb4')
+        session = await sync_to_async(Session.objects.create)(
+            user=user, session_type='new_skill', target_skill=skill,
+            current_phase='teach_drill',
+            quiz_state={"teach_drill": {
+                "units": [{"id": "a", "label": "a", "note": ""}],
+                "taught": [], "drills": {}, "turn_count": 0,
+                "lesson_complete": False, "last_turn_type": None,
+            }},
+        )
+        llm_response = "prefix\n<<FEEDBACK>>paraphrase<<END_FEEDBACK>>\nsuffix"
+        with patch('engine.teach_drill.call_llm', new=AsyncMock(return_value=llm_response)):
+            await handle_teach_drill_turn(user, session, text="msg")
+
+        latest_event = await sync_to_async(
+            lambda: SessionEvent.objects.filter(session=session).order_by('-timestamp').first()
+        )()
+        assert "<<FEEDBACK>>" not in latest_event.content
+        assert "<<END_FEEDBACK>>" not in latest_event.content
+        assert "paraphrase" not in latest_event.content
