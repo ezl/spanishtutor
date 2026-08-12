@@ -724,6 +724,10 @@ async def _open_session(user, text: str) -> dict:
             await sync_to_async(
                 lambda: Session.objects.filter(pk=session.pk).update(target_skill=_ts)
             )()
+            # The target skill MUST be in SessionSkill so score_session grades it
+            # at close time. Without this, the scoring LLM only sees frontier skills
+            # (mostly not-touched-this-session) and returns [] — no scores written.
+            await sync_to_async(SessionSkill.objects.get_or_create)(session=session, skill=target_skill_obj)
 
     elif session_type == 'reading':
         from learner.models import SkillScore, Skill as SkillModel

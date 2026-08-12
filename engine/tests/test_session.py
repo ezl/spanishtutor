@@ -346,6 +346,40 @@ async def test_grammar_new_skill_uses_teach_drill_phase(make_user, make_skill):
 
 @pytest.mark.asyncio
 @pytest.mark.django_db(transaction=True)
+async def test_new_skill_target_gets_added_to_session_skills(make_user, make_skill):
+    """The target_skill for a new_skill session MUST be present in SessionSkill,
+    otherwise score_session grades against the wrong pool and returns [].
+    Reading and writing branches already do this; the new_skill branch used to
+    miss it — this test guards the fix."""
+    from unittest.mock import patch, AsyncMock
+    from asgiref.sync import sync_to_async
+    from engine.session import handle_session
+    from learner.models import Session, SessionSkill
+
+    user = await sync_to_async(make_user)(discord_id='td_ss1', cefr_level='B1')
+    target_skill = await sync_to_async(make_skill)(
+        skill_id='b1_ss_target', name='SS target', description='desc', cefr_level='B1',
+    )
+
+    units_json = '[{"id":"a","label":"a","note":""}]'
+    with patch('engine.teach_drill.call_llm', new=AsyncMock(return_value=units_json)):
+        with patch('engine.session.call_llm', new=AsyncMock(return_value="opening")):
+            with patch('engine.session._select_session',
+                       new=AsyncMock(return_value=('new_skill', {'skill': {'id': target_skill.skill_id}}, []))):
+                await handle_session(user, "hola")
+
+    session = await sync_to_async(
+        lambda: Session.objects.filter(user=user, ended_at__isnull=True).first()
+    )()
+    ss_skill_ids = await sync_to_async(
+        lambda: set(SessionSkill.objects.filter(session=session).values_list('skill__skill_id', flat=True))
+    )()
+    assert target_skill.skill_id in ss_skill_ids, \
+        f"target skill {target_skill.skill_id} missing from SessionSkill (found: {ss_skill_ids})"
+
+
+@pytest.mark.asyncio
+@pytest.mark.django_db(transaction=True)
 async def test_teach_drill_phase_delegates_to_handler(make_user, make_skill):
     """When a session is in teach_drill phase, _continue_new_skill calls the handler."""
     from unittest.mock import patch, AsyncMock
