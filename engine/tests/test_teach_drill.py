@@ -719,3 +719,32 @@ class TestFeedbackMarker:
         from engine.teach_drill import FEEDBACK_MARKER_OPEN, FEEDBACK_MARKER_CLOSE
         assert FEEDBACK_MARKER_OPEN == '<<FEEDBACK>>'
         assert FEEDBACK_MARKER_CLOSE == '<<END_FEEDBACK>>'
+
+
+class TestContinuationSuffixClassification:
+    def test_suffix_documents_the_three_classifications(self):
+        from engine.teach_drill import TEACH_DRILL_CONTINUATION_SUFFIX
+        assert "Lesson answer" in TEACH_DRILL_CONTINUATION_SUFFIX
+        assert "Content question" in TEACH_DRILL_CONTINUATION_SUFFIX
+        assert "Meta-feedback" in TEACH_DRILL_CONTINUATION_SUFFIX
+
+    def test_suffix_names_the_feedback_markers(self):
+        from engine.teach_drill import TEACH_DRILL_CONTINUATION_SUFFIX
+        assert "<<FEEDBACK>>" in TEACH_DRILL_CONTINUATION_SUFFIX
+        assert "<<END_FEEDBACK>>" in TEACH_DRILL_CONTINUATION_SUFFIX
+
+    def test_suffix_biases_ambiguous_cases_toward_content_question(self):
+        """The spec calls out that ambiguity should default to content question,
+        not feedback — avoids false-positive log entries."""
+        from engine.teach_drill import TEACH_DRILL_CONTINUATION_SUFFIX
+        assert "prefer content question" in TEACH_DRILL_CONTINUATION_SUFFIX.lower() \
+            or "default to content question" in TEACH_DRILL_CONTINUATION_SUFFIX.lower()
+
+    def test_suffix_handles_mixed_messages(self):
+        """Mixed message (answer + feedback in one) must be extractable per the spec.
+        Tightened from the plan's `assert 'both' in suffix` — the word 'both'
+        already appears in the existing 'Never emit BOTH markers' rule, which
+        would make the plan's assertion a false positive."""
+        from engine.teach_drill import TEACH_DRILL_CONTINUATION_SUFFIX
+        assert "both an answer" in TEACH_DRILL_CONTINUATION_SUFFIX.lower() \
+            or "answer and feedback" in TEACH_DRILL_CONTINUATION_SUFFIX.lower()
