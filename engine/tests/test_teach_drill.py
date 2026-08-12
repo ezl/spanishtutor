@@ -619,3 +619,63 @@ async def test_next_turn_after_redo_teaches_the_deferred_unit(make_user, make_sk
     # Now hacer should be marked taught and drilled.
     assert "hacer" in state["taught"]
     assert "hacer" in state["drills"]
+
+
+class TestSessionFeedbackModel:
+    @pytest.mark.django_db(transaction=True)
+    def test_sessionfeedback_creates_and_reads_back(self, make_user, make_skill):
+        from learner.models import Session, SessionEvent, SessionFeedback
+        user = make_user(discord_id='sf_model1')
+        skill = make_skill(skill_id='sk_sf_model1')
+        session = Session.objects.create(user=user, session_type='new_skill', target_skill=skill)
+        event = SessionEvent.objects.create(
+            session=session, event_type='conversation',
+            content='Luz asked a question', user_response='',
+        )
+        fb = SessionFeedback.objects.create(
+            session=session,
+            anchor_event=event,
+            user_message="that cue was ambiguous",
+            interpretation="Student flagged that the English cue was ambiguous between ser and estar.",
+        )
+        reloaded = SessionFeedback.objects.get(pk=fb.pk)
+        assert reloaded.session_id == session.pk
+        assert reloaded.anchor_event_id == event.pk
+        assert reloaded.user_message == "that cue was ambiguous"
+        assert reloaded.interpretation.startswith("Student flagged")
+        assert reloaded.resolved is False
+        assert reloaded.resolution_note == ""
+        assert list(session.feedback.all()) == [reloaded]
+
+    @pytest.mark.django_db(transaction=True)
+    def test_anchor_event_deletion_keeps_feedback_with_null_anchor(self, make_user, make_skill):
+        """Deleting the anchoring event must not delete the feedback (SET_NULL semantics)."""
+        from learner.models import Session, SessionEvent, SessionFeedback
+        user = make_user(discord_id='sf_model2')
+        skill = make_skill(skill_id='sk_sf_model2')
+        session = Session.objects.create(user=user, session_type='new_skill', target_skill=skill)
+        event = SessionEvent.objects.create(
+            session=session, event_type='conversation', content='c', user_response='',
+        )
+        fb = SessionFeedback.objects.create(
+            session=session, anchor_event=event,
+            user_message="msg", interpretation="paraphrase",
+        )
+        event.delete()
+        fb.refresh_from_db()
+        assert fb.anchor_event is None
+        assert fb.user_message == "msg"
+
+    @pytest.mark.django_db(transaction=True)
+    def test_session_deletion_cascades_to_feedback(self, make_user, make_skill):
+        """Deleting the session should delete its feedback (CASCADE semantics)."""
+        from learner.models import Session, SessionFeedback
+        user = make_user(discord_id='sf_model3')
+        skill = make_skill(skill_id='sk_sf_model3')
+        session = Session.objects.create(user=user, session_type='new_skill', target_skill=skill)
+        fb = SessionFeedback.objects.create(
+            session=session, user_message="msg", interpretation="p",
+        )
+        fb_pk = fb.pk
+        session.delete()
+        assert not SessionFeedback.objects.filter(pk=fb_pk).exists()

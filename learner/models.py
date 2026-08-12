@@ -230,3 +230,28 @@ class SessionEvent(models.Model):
 
     class Meta:
         app_label = 'learner'
+
+
+class SessionFeedback(models.Model):
+    session = models.ForeignKey(Session, on_delete=models.CASCADE, related_name='feedback')
+    anchor_event = models.ForeignKey(
+        SessionEvent, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='feedback',
+        help_text="The Luz turn the user was reacting to (usually the most recent assistant message).",
+    )
+    user_message = models.TextField(
+        help_text="Raw user message that contained the feedback.",
+    )
+    interpretation = models.TextField(
+        help_text="LLM's one-sentence paraphrase of what the user is flagging.",
+    )
+    resolved = models.BooleanField(default=False)
+    resolution_note = models.TextField(blank=True, help_text="Optional note when reviewing/closing this.")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        app_label = 'learner'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"Feedback #{self.pk} ({self.created_at:%Y-%m-%d %H:%M})"
