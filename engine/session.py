@@ -617,7 +617,7 @@ def build_idle_notice(user, idle_minutes: int) -> str:
     if _is_advanced(user):
         return (
             f"Llevas {span} sin escribir, así que paré nuestra clase. "
-            f"Escríbeme cuando estés listo/a para seguir."
+            f"Cuando estés listo/a para continuar, dime \"listo\" y seguimos."
         )
     return (
         f"You've been idle for {span}, so I stopped our lesson. "

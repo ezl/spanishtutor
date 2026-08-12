@@ -254,16 +254,30 @@ Common traps to AVOID:
 - For saber: use "found out / learned" cues, not just "knew" (preterite meaning shift)."""
 
 
+REDO_FIRST_CHECK = """FIRST DECISION (do this BEFORE anything else): did the student's previous answer contain ANY error? Any preposition mistake, gender/agreement error, tense error, wrong verb form, wrong verb choice, spelling error, or missing accent counts as an error. Do NOT soften with "Close, but..." or partial-credit — an answer is either fully correct (✓) or has an error (✗).
+
+  - If the answer had ANY error (✗) — your ENTIRE response this turn is the REDO pattern, nothing else:
+    * The ✗ line with the correct form and a brief reason (one line).
+    * "Try again: [restate the SAME question with a slight rephrasing]" (one line).
+    * The literal marker on its own line at the very end: <<REDO_PENDING>>
+    STOP THERE. Do NOT execute the teach/drill steps below this turn.
+    Do NOT introduce a new verb, do NOT show a new paradigm, do NOT ask any other question.
+
+  - If the answer was fully correct (✓): write a single "✓" line acknowledging it, then continue to the steps below.
+  - If there was no prior answer (this is the first turn): just proceed to the steps below."""
+
+
 def build_retrieval_only_instruction(retrieval: dict, person_retrieve: str) -> str:
     """Instruction for a drill-only turn (no new teaching): review a prior unit."""
     return (
-        f"1) Evaluate the student's previous response in ONE line if it contained an answer (✓/✗ format).\n\n"
-        f"2) Do NOT teach any new content — this is a review turn.\n\n"
-        f"3) Ask ONE production question testing **{retrieval['label']}** in the "
+        f"{REDO_FIRST_CHECK}\n\n"
+        f"— IF you passed the first check (answer was ✓ or no prior answer), continue: —\n\n"
+        f"1) Do NOT teach any new content — this is a review turn.\n\n"
+        f"2) Ask ONE production question testing **{retrieval['label']}** in the "
         f"**{person_retrieve}** form. Brief context ('quick review:' or similar) is fine, "
         f"but no paradigms.\n\n"
         f"{CUE_SELECTION_RULES}\n\n"
-        f"4) End with a natural line inviting the student to answer. Do NOT emit <<LESSON_COMPLETE>>."
+        f"3) End with a natural line inviting the student to answer. Do NOT emit <<LESSON_COMPLETE>>."
     )
 
 
@@ -272,22 +286,21 @@ def build_teach_instruction(unit: dict, person_new: str, is_final: bool) -> str:
     No retrieval on teach turns — retrieval happens on its own alternating turn."""
     parts = []
 
-    parts.append(
-        f"1) If the student's previous message contained an answer attempt, evaluate it "
-        f"in ONE LINE (✓/✗ format) before doing anything else."
-    )
+    parts.append(REDO_FIRST_CHECK)
+
+    parts.append("— IF you passed the first check (answer was ✓ or no prior answer), continue: —")
 
     label = unit["label"]
     note = unit["note"] or "no special notes"
     parts.append(
-        f"2) Teach exactly this unit: **{label}** (metadata: {note}).\n"
+        f"1) Teach exactly this unit: **{label}** (metadata: {note}).\n"
         f"   - Show the full paradigm one line per person (Yo/Tú/Él/Nosotros/Ellos).\n"
         f"   - Give ONE natural example sentence using an item from this paradigm.\n"
         f"   - Keep it under 100 words for this step."
     )
 
     parts.append(
-        f"3) Ask EXACTLY ONE production question testing **{label}** in the "
+        f"2) Ask EXACTLY ONE production question testing **{label}** in the "
         f"**{person_new}** form. English cue that requires the student to produce the target form."
     )
 
@@ -295,12 +308,12 @@ def build_teach_instruction(unit: dict, person_new: str, is_final: bool) -> str:
 
     if is_final:
         parts.append(
-            f"4) End the message with the literal marker on its own line: <<LESSON_COMPLETE>>"
+            "3) End the message with the literal marker on its own line: <<LESSON_COMPLETE>>"
         )
     else:
         parts.append(
-            f"4) End with a natural line inviting the student to answer "
-            f"(no ceremony — just wait for their reply). Do NOT emit <<LESSON_COMPLETE>>."
+            "3) End with a natural line inviting the student to answer "
+            "(no ceremony — just wait for their reply). Do NOT emit <<LESSON_COMPLETE>>."
         )
 
     return "\n\n".join(parts)
