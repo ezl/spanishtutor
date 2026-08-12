@@ -22,6 +22,33 @@ def _strip_redo_pending_marker(text: str) -> tuple:
     return text, False
 
 
+FEEDBACK_MARKER_OPEN = '<<FEEDBACK>>'
+FEEDBACK_MARKER_CLOSE = '<<END_FEEDBACK>>'
+
+
+def _strip_feedback_marker(text: str) -> tuple:
+    """Return (cleaned_text, interpretation_or_none). Extracts the LLM's
+    paraphrase from between the FEEDBACK markers and removes the marker
+    block (including its content) from the visible text. Only the FIRST
+    marker block is honored — additional blocks (LLM emitting twice by
+    accident) are left in place, protecting against double-log."""
+    open_idx = text.find(FEEDBACK_MARKER_OPEN)
+    if open_idx == -1:
+        return text, None
+    close_idx = text.find(FEEDBACK_MARKER_CLOSE, open_idx + len(FEEDBACK_MARKER_OPEN))
+    if close_idx == -1:
+        return text, None
+    interpretation = text[open_idx + len(FEEDBACK_MARKER_OPEN):close_idx]
+    end_of_block = close_idx + len(FEEDBACK_MARKER_CLOSE)
+    prefix = text[:open_idx].rstrip('\n')
+    suffix = text[end_of_block:].lstrip('\n')
+    if prefix and suffix:
+        cleaned = prefix + '\n' + suffix
+    else:
+        cleaned = prefix + suffix
+    return cleaned, interpretation
+
+
 UNIT_EXTRACTION_PROMPT = """You are decomposing a Spanish grammar skill into teachable units for a chunked lesson.
 
 Skill name: {skill_name}

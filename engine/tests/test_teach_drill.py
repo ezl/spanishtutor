@@ -679,3 +679,43 @@ class TestSessionFeedbackModel:
         fb_pk = fb.pk
         session.delete()
         assert not SessionFeedback.objects.filter(pk=fb_pk).exists()
+
+
+class TestFeedbackMarker:
+    def test_strip_marker_extracts_interpretation(self):
+        from engine.teach_drill import _strip_feedback_marker
+        text = ("Got it, logged that. Sigamos.\n"
+                "<<FEEDBACK>>Student flagged that the ser/estar cue was ambiguous.<<END_FEEDBACK>>\n"
+                "Next question: how would you say 'I went to the wedding'?")
+        cleaned, interp = _strip_feedback_marker(text)
+        assert interp == "Student flagged that the ser/estar cue was ambiguous."
+        assert "<<FEEDBACK>>" not in cleaned
+        assert "<<END_FEEDBACK>>" not in cleaned
+        assert "Got it, logged that. Sigamos." in cleaned
+        assert "Next question" in cleaned
+
+    def test_strip_marker_absent_returns_none(self):
+        from engine.teach_drill import _strip_feedback_marker
+        cleaned, interp = _strip_feedback_marker("regular response, no marker")
+        assert interp is None
+        assert cleaned == "regular response, no marker"
+
+    def test_strip_marker_only_removes_first_block(self):
+        """Guard against LLM accidentally emitting two — only honor the first."""
+        from engine.teach_drill import _strip_feedback_marker
+        text = ("<<FEEDBACK>>first<<END_FEEDBACK>> mid "
+                "<<FEEDBACK>>second<<END_FEEDBACK>>")
+        cleaned, interp = _strip_feedback_marker(text)
+        assert interp == "first"
+        assert "<<FEEDBACK>>second<<END_FEEDBACK>>" in cleaned
+
+    def test_strip_marker_handles_multiline_interpretation(self):
+        from engine.teach_drill import _strip_feedback_marker
+        text = "<<FEEDBACK>>this is\na multiline\nparaphrase<<END_FEEDBACK>>"
+        cleaned, interp = _strip_feedback_marker(text)
+        assert interp == "this is\na multiline\nparaphrase"
+
+    def test_marker_constants_are_the_expected_strings(self):
+        from engine.teach_drill import FEEDBACK_MARKER_OPEN, FEEDBACK_MARKER_CLOSE
+        assert FEEDBACK_MARKER_OPEN == '<<FEEDBACK>>'
+        assert FEEDBACK_MARKER_CLOSE == '<<END_FEEDBACK>>'
