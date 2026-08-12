@@ -467,7 +467,10 @@ async def handle_teach_drill_turn(user, session, text: str) -> dict:
         instruction = (
             "1) Evaluate the student's previous response in ONE line if it contained an answer.\n\n"
             "2) Briefly recap the units taught in ONE sentence, no lists.\n\n"
-            "3) End with the literal marker on its own line: <<LESSON_COMPLETE>>"
+            "3) Explicitly invite the student into the next step so they know what to do: "
+            "ask if they're ready for a quick quiz to check what stuck. Warm and clear, "
+            "e.g. 'Ready to check what stuck? Say \"listo\" and I'll run a quick quiz.'\n\n"
+            "4) End with the literal marker on its own line: <<LESSON_COMPLETE>>"
         )
     history.append({"role": "user", "content": instruction})
 
