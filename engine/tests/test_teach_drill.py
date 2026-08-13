@@ -750,6 +750,47 @@ class TestContinuationSuffixClassification:
             or "answer and feedback" in TEACH_DRILL_CONTINUATION_SUFFIX.lower()
 
 
+class TestParadigmAndGlossingRules:
+    def test_suffix_carries_cefr_level_placeholder(self):
+        """Must have a {cefr_level} slot so runtime can inject the student's level
+        into the glossing decision."""
+        from engine.teach_drill import TEACH_DRILL_CONTINUATION_SUFFIX
+        assert "{cefr_level}" in TEACH_DRILL_CONTINUATION_SUFFIX
+
+    def test_suffix_formats_with_cefr_level(self):
+        """Formatting with both required kwargs must succeed and produce the
+        student's level in the resulting text."""
+        from engine.teach_drill import TEACH_DRILL_CONTINUATION_SUFFIX
+        formatted = TEACH_DRILL_CONTINUATION_SUFFIX.format(
+            skill_name='Preterite irregulars', cefr_level='B1',
+        )
+        # Level appears in the formatted output.
+        assert 'B1' in formatted
+
+    def test_suffix_documents_contrast_paradigm_format(self):
+        """Format A (known → target) must be documented for tense-conjugation
+        skills so the LLM produces contrast rows instead of bare paradigms."""
+        from engine.teach_drill import TEACH_DRILL_CONTINUATION_SUFFIX
+        # Rule name.
+        assert "CONTRAST" in TEACH_DRILL_CONTINUATION_SUFFIX
+        # Concrete example.
+        assert "puedo" in TEACH_DRILL_CONTINUATION_SUFFIX and "pude" in TEACH_DRILL_CONTINUATION_SUFFIX
+        # Arrow syntax spelled out.
+        assert "→" in TEACH_DRILL_CONTINUATION_SUFFIX
+
+    def test_suffix_documents_level_conditional_glossing(self):
+        """Glossing rules must differentiate at least three level tiers so the
+        LLM adjusts glossing density to the student's level."""
+        from engine.teach_drill import TEACH_DRILL_CONTINUATION_SUFFIX
+        lower = TEACH_DRILL_CONTINUATION_SUFFIX.lower()
+        # Reference to level-conditional glossing.
+        assert "glossing" in lower
+        # A1/A2, B1, and B2+ each named with distinct guidance.
+        assert "a1" in lower or "a2" in lower
+        assert "b1" in lower
+        assert "b2" in lower
+
+
 class TestFeedbackCapture:
     @pytest.mark.asyncio
     @pytest.mark.django_db(transaction=True)

@@ -230,15 +230,41 @@ Do not preview specific verbs or forms — the actual teaching starts next turn.
 
 TEACH_DRILL_CONTINUATION_SUFFIX = """CURRENT PHASE: Teach-drill loop for {skill_name}
 
+Student CEFR level: {cefr_level}
+
 You will receive a specific instruction each turn telling you which unit to teach and which questions to ask. Follow it exactly. Do NOT invent additional content or drill unrelated items.
 
-Paradigm formatting (critical): when showing a conjugation, render it ONE LINE PER PERSON:
+Paradigm formatting (critical): render conjugations ONE LINE PER PERSON (Yo/Tú/Él/Nosotros/Ellos, Latin American — skip vosotros). Never inline comma-separated lists.
+
+TWO paradigm formats, pick the one that fits the skill:
+
+Format A — CONTRAST paradigm (preferred when the target form has a natural counterpart the student already knows). Use for:
+- Any past-tense conjugation vs present (preterite ↔ present, imperfect ↔ present)
+- Any future/conditional conjugation vs present
+- Reflexive ↔ non-reflexive
+- Present progressive ↔ simple present
+- Present subjunctive ↔ present indicative
+Render as `known → target`:
+    Yo puedo → Yo pude (I can → I could)
+    Tú puedes → Tú pudiste (you can → you could)
+    Él puede → Él pudo (he could)
+    Nosotros podemos → Nosotros pudimos (we could)
+    Ellos pueden → Ellos pudieron (they could)
+The `known` side is what the student already has automated; the `target` side is what they're learning. The bridge is the whole point — surfaces the transformation, links new to known, and trains the retrieval switch they'll need in real speech.
+
+Format B — BARE paradigm (fallback when no natural contrast exists, e.g. the "known" form is also unusual or the skill isn't tense-conjugation-shaped):
     Yo tuve
     Tú tuviste
     Él/ella/usted tuvo
     Nosotros tuvimos
     Ellos/ellas/ustedes tuvieron
-(Latin American — skip vosotros.) Never inline comma-separated lists.
+With target-form glosses per the level-conditional rule below.
+
+GLOSSING (level-conditional based on student CEFR level above):
+- A1 or A2: gloss ALL Spanish content in parens. Paradigm rows, drill cues, correction lines, example sentences. Meaning-first.
+- B1: gloss target-form content (paradigm rows, drill cues that use the target form, correction lines showing the target form). Do NOT gloss vocabulary the student already knows or example sentences whose meaning is transparent from cognates/context.
+- B2 or higher (C1, C2): minimal glossing. Only exotic vocabulary or idiomatic phrases whose meaning isn't inferable. Push toward Spanish-only processing (desirable difficulty).
+When in doubt at B1+, err on LESS glossing rather than more — over-glossing at higher levels reduces retention.
 
 Chunk sizing (critical): teach EXACTLY ONE unit per turn, unless the instruction explicitly names a shared-paradigm pair.
 
@@ -476,7 +502,8 @@ async def handle_teach_drill_turn(user, session, text: str) -> dict:
 
     # Call LLM.
     skill_name = session.target_skill.name if session.target_skill else "this skill"
-    suffix = TEACH_DRILL_CONTINUATION_SUFFIX.format(skill_name=skill_name)
+    cefr_level = user.estimated_cefr_level or 'A2'
+    suffix = TEACH_DRILL_CONTINUATION_SUFFIX.format(skill_name=skill_name, cefr_level=cefr_level)
     response = await call_llm(history, user=user, system_suffix=suffix)
 
     # Strip markers.
