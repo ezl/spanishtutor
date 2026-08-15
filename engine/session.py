@@ -718,9 +718,15 @@ async def _open_session(user, text: str) -> dict:
 
     session_type, context, frontier_skills = await _select_session(user)
 
+    # Walk back to the most recent session with an actual summary. Sessions
+    # that auto-closed after minimal activity (idle-close with <N events) can
+    # end with a blank summary — treating those as the "last session" caused
+    # the LLM to see an empty snippet and greet the user as a first-timer.
     last_session = await sync_to_async(
         lambda: Session.objects.filter(user=user, ended_at__isnull=False)
                                .exclude(session_type='onboarding')
+                               .exclude(summary='')
+                               .exclude(summary__isnull=True)
                                .order_by('-ended_at').first()
     )()
     last_summary = last_session.summary[:120] if last_session and last_session.summary else "this is their first session"
@@ -1022,9 +1028,15 @@ async def _handle_check_in(user, session, text: str) -> dict:
 
     level = user.estimated_cefr_level or 'A1'
     interests = user.interests or "daily life, work, food, exercise, friends and family"
+    # Walk back to the most recent session with an actual summary. Sessions
+    # that auto-closed after minimal activity (idle-close with <N events) can
+    # end with a blank summary — treating those as the "last session" caused
+    # the LLM to see an empty snippet and greet the user as a first-timer.
     last_session = await sync_to_async(
         lambda: Session.objects.filter(user=user, ended_at__isnull=False)
                                .exclude(session_type='onboarding')
+                               .exclude(summary='')
+                               .exclude(summary__isnull=True)
                                .order_by('-ended_at').first()
     )()
     last_summary = last_session.summary[:120] if last_session and last_session.summary else "this is their first session"

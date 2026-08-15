@@ -595,3 +595,61 @@ async def test_conversation_force_closes_at_safety_cap(make_user):
     assert result["session_ended"] is True
     await sync_to_async(session.refresh_from_db)()
     assert session.ended_at is not None
+
+
+@pytest.mark.asyncio
+@pytest.mark.django_db(transaction=True)
+async def test_open_session_skips_empty_summary_sessions(make_user, make_skill):
+    """last_session lookup must walk back past sessions whose summary is empty
+    or NULL. Otherwise the check-in quotes an empty snippet and the LLM greets
+    the user as a first-timer (bug seen in the wild: session 40 opening said
+    'Bienvenido a tu primera sesión')."""
+    from unittest.mock import patch, AsyncMock
+    from asgiref.sync import sync_to_async
+    from django.utils import timezone as _tz
+    from datetime import timedelta as _td
+    from engine.session import handle_session
+    from learner.models import Session, SessionEvent
+
+    user = await sync_to_async(make_user)(discord_id='taint_summary', cefr_level='B1')
+
+    # Real session, 2 days ago, with a meaningful summary.
+    real_session = await sync_to_async(Session.objects.create)(
+        user=user, session_type='new_skill',
+    )
+    two_days_ago = _tz.now() - _td(days=2)
+    await sync_to_async(
+        lambda: Session.objects.filter(pk=real_session.pk).update(
+            ended_at=two_days_ago,
+            summary='Practicamos preterite irregulars con ser, ir, estar.',
+        )
+    )()
+
+    # Empty-summary session, 1 hour ago. This is what the auto-close leaves
+    # when a session barely gets going.
+    empty_session = await sync_to_async(Session.objects.create)(
+        user=user, session_type='new_skill',
+    )
+    one_hour_ago = _tz.now() - _td(hours=1)
+    await sync_to_async(
+        lambda: Session.objects.filter(pk=empty_session.pk).update(
+            ended_at=one_hour_ago, summary='',  # blank!
+        )
+    )()
+
+    # Force a conversation session (which triggers the check-in path — and
+    # the check-in message directly quotes the last_session summary).
+    with patch('engine.session._select_session',
+               new=AsyncMock(return_value=('conversation', {}, []))):
+        await handle_session(user, "hola")
+
+    # The new session's check-in event content must reference the REAL summary,
+    # NOT the empty one — proving the query walked back past the empty session.
+    new_session = await sync_to_async(
+        lambda: Session.objects.filter(user=user, session_type='conversation').first()
+    )()
+    check_in_event = await sync_to_async(
+        lambda: SessionEvent.objects.filter(session=new_session).first()
+    )()
+    assert 'preterite irregulars' in check_in_event.content, \
+        f"Check-in should quote real summary but was: {check_in_event.content!r}"
