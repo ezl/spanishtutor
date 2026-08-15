@@ -237,6 +237,19 @@ Evaluate the student's last answer in ONE line only (correct or confirm). Stop t
 
 CONVERSATION_TURNS = 6
 
+CONVERSATION_END_MARKER = '<<CONVERSATION_END>>'
+
+
+def _strip_conversation_end_marker(text: str) -> tuple:
+    """Return (cleaned_text, marker_present). Emitted by the LLM at the true
+    end of a conversation wrap-up. Code refuses to close the session unless
+    this marker is present — prevents silent session termination when the LLM
+    ignores the wrap-up instruction and produces a continuation instead."""
+    if CONVERSATION_END_MARKER in text:
+        return text.replace(CONVERSATION_END_MARKER, '').rstrip(), True
+    return text, False
+
+
 CONVERSATION_PROMPT = """The student is starting a free conversation session.
 
 Student level: {cefr_level}
@@ -250,14 +263,35 @@ Minor errors (accents, small typos): ignore, never interrupt flow.
 
 Generate the opening question now. Spanish if B1+, English if A1-A2."""
 
-CONVERSATION_CLOSE_SUFFIX = """CURRENT TASK: Conversation wrap-up
 
-The conversation has reached its natural end. Close with 3-4 sentences:
-1. One specific thing the student did well (grammar, vocabulary, or expression — be concrete, name it)
-2. One specific thing to watch next time (equally concrete)
-3. A warm goodbye
+CONVERSATION_PENULTIMATE_SUFFIX = """CURRENT TASK: Second-to-last conversation turn.
 
-No generic praise. Be specific about what you actually observed in this conversation."""
+The conversation is about to wrap up on the next turn. Do the following in this response:
+1. Respond to what the student just said (evaluate, correct, or engage — one natural chat-length paragraph).
+2. Then explicitly tell them the chat is wrapping up next turn so they can prepare, e.g. "Una más y cerramos por hoy — vamos a saltar a una lección." (Spanish for B1+) or "One more and we'll wrap up — ready to switch to a lesson." (English for A1/A2).
+
+Do NOT emit any marker on this turn. Just the natural response + the heads-up.
+"""
+
+
+CONVERSATION_CLOSE_SUFFIX = """CURRENT TASK: Conversation wrap-up (CRITICAL — strictly enforced).
+
+The conversation has reached the cap. Your ENTIRE response is a wrap-up message — nothing else. Do NOT ask another conversational question, do NOT continue the topic. This IS the goodbye turn.
+
+Write 3-4 sentences, in this order:
+1. One specific thing the student did well (grammar, vocabulary, or expression — be concrete, name it, no generic praise).
+2. One specific thing to watch next time (equally concrete).
+3. A warm goodbye that signals the chat is ending and a lesson is coming next, e.g. "Nos vemos en la próxima — vamos a una lección ahora." (B1+) or "See you next time — lesson coming up." (A1/A2).
+
+End the message with the literal marker on its own line at the very end: <<CONVERSATION_END>>
+
+The marker is REQUIRED. If you do not emit the marker, the system will treat this response as an incomplete wrap-up and keep the session open. Only emit the marker when you have written a genuine wrap-up (all three parts above), not a continuation question.
+
+Forbidden on this turn:
+- Any question about the student's life or the topic just discussed
+- Phrases like "cuéntame más", "y tú, qué...", "¿qué opinas?"
+- Any new topic
+- Any content that suggests the chat is continuing"""
 
 READING_PHASE_TURNS = {'comprehension': 4, 'production': 2}
 
@@ -1373,27 +1407,52 @@ async def _continue_conversation(user, session, text: str) -> dict:
             history.append({"role": "user", "content": e.user_response})
     history.append({"role": "user", "content": text})
 
+    # Safety cap: after this many close attempts where the LLM disobeyed the
+    # marker requirement, force-close even without the marker to avoid an
+    # unbounded chat.
+    close_attempts = (session.quiz_state or {}).get('conversation_close_attempts', 0)
+    CLOSE_ATTEMPT_CAP = 2
+
     if turns >= CONVERSATION_TURNS:
         response_text = await call_llm(history, user=user, system_suffix=CONVERSATION_CLOSE_SUFFIX)
+        response_text, end_marker_seen = _strip_conversation_end_marker(response_text)
+        force_close = close_attempts + 1 >= CLOSE_ATTEMPT_CAP
+
+        should_close = end_marker_seen or force_close
 
         await sync_to_async(SessionEvent.objects.create)(
             session=session, event_type='conversation',
             content=response_text, user_response='',
         )
-        await sync_to_async(
-            lambda: Session.objects.filter(pk=session.pk).update(
-                ended_at=timezone.now(), summary=response_text[:500]
-            )
-        )()
-        await extract_and_store_interests(session, user)
-        try:
-            await score_session(session, user)
-        except Exception:
-            pass
 
-        return {"text": response_text, "audio_url": None, "session_ended": True}
+        if should_close:
+            await sync_to_async(
+                lambda: Session.objects.filter(pk=session.pk).update(
+                    ended_at=timezone.now(), summary=response_text[:500]
+                )
+            )()
+            await extract_and_store_interests(session, user)
+            try:
+                await score_session(session, user)
+            except Exception:
+                pass
+            return {"text": response_text, "audio_url": None, "session_ended": True}
+        else:
+            # LLM produced a continuation instead of a wrap-up. Keep the session
+            # open, record the attempt, and let the next user reply trigger
+            # another close attempt (safety cap will force-close if needed).
+            new_state = {**(session.quiz_state or {}), 'conversation_close_attempts': close_attempts + 1}
+            await sync_to_async(
+                lambda: Session.objects.filter(pk=session.pk).update(quiz_state=new_state)
+            )()
+            return {"text": response_text, "audio_url": None, "session_ended": False}
 
-    response_text = await call_llm(history, user=user)
+    # Penultimate turn: warn the user the wrap-up is next.
+    if turns == CONVERSATION_TURNS - 1:
+        response_text = await call_llm(history, user=user, system_suffix=CONVERSATION_PENULTIMATE_SUFFIX)
+    else:
+        response_text = await call_llm(history, user=user)
+
     await _set_phase(session, 'conversation', turns + 1)
 
     await sync_to_async(SessionEvent.objects.create)(

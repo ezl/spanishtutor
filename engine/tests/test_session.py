@@ -469,3 +469,129 @@ async def test_grammar_new_skill_falls_back_when_unit_extraction_fails(make_user
     assert session.current_phase == 'questions'  # legacy fallback path
     # quiz_state should NOT have teach_drill sub-dict (fallback never entered teach_drill)
     assert not session.quiz_state or 'teach_drill' not in (session.quiz_state or {})
+
+
+# ── Conversation wrap-up marker gating ────────────────────────────────────────
+
+class TestConversationEndMarker:
+    def test_strip_marker_present(self):
+        from engine.session import _strip_conversation_end_marker
+        cleaned, present = _strip_conversation_end_marker(
+            "Nice work today.\nSee you next time.\n<<CONVERSATION_END>>"
+        )
+        assert present is True
+        assert "<<CONVERSATION_END>>" not in cleaned
+        assert "See you next time." in cleaned
+
+    def test_strip_marker_absent(self):
+        from engine.session import _strip_conversation_end_marker
+        cleaned, present = _strip_conversation_end_marker("some ordinary response")
+        assert present is False
+        assert cleaned == "some ordinary response"
+
+    def test_close_suffix_requires_marker(self):
+        from engine.session import CONVERSATION_CLOSE_SUFFIX
+        assert "<<CONVERSATION_END>>" in CONVERSATION_CLOSE_SUFFIX
+        # Explicit forbidden content list catches the failure mode we saw.
+        assert "Forbidden" in CONVERSATION_CLOSE_SUFFIX or "REQUIRED" in CONVERSATION_CLOSE_SUFFIX
+
+    def test_penultimate_suffix_warns_of_wrapup(self):
+        from engine.session import CONVERSATION_PENULTIMATE_SUFFIX
+        # Must instruct the LLM to tell the student the wrap-up is coming.
+        assert "next turn" in CONVERSATION_PENULTIMATE_SUFFIX.lower() or "wrapping" in CONVERSATION_PENULTIMATE_SUFFIX.lower()
+
+
+@pytest.mark.asyncio
+@pytest.mark.django_db(transaction=True)
+async def test_conversation_stays_open_when_llm_omits_end_marker(make_user):
+    """If the LLM ignores the wrap-up instruction and produces a continuation
+    (no marker), the code MUST NOT close the session — this is the bug that
+    caused a mid-conversation silent termination in the wild."""
+    from unittest.mock import patch, AsyncMock
+    from asgiref.sync import sync_to_async
+    from engine.session import _continue_conversation, CONVERSATION_TURNS
+    from learner.models import Session
+
+    user = await sync_to_async(make_user)(discord_id='conv_no_marker', cefr_level='B1')
+    session = await sync_to_async(Session.objects.create)(
+        user=user, session_type='conversation',
+        current_phase='conversation',
+        phase_turns_completed=CONVERSATION_TURNS,  # at the cap
+    )
+    # LLM disobeys — returns a continuation question instead of the wrap-up
+    # (no <<CONVERSATION_END>> marker). This is the exact failure we saw in
+    # session 40.
+    disobedient_response = "¿Y qué opinas de la boda de tu amigo?"
+    with patch('engine.session.call_llm', new=AsyncMock(return_value=disobedient_response)):
+        result = await _continue_conversation(user, session, text="anything")
+
+    # Session must remain open.
+    assert result["session_ended"] is False
+    await sync_to_async(session.refresh_from_db)()
+    assert session.ended_at is None
+    # Attempt counter incremented so the safety cap eventually forces close.
+    assert (session.quiz_state or {}).get('conversation_close_attempts') == 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.django_db(transaction=True)
+async def test_conversation_closes_when_llm_emits_end_marker(make_user):
+    """When the LLM DOES emit the marker (obedient wrap-up), the session
+    closes cleanly and the marker is stripped from the visible text and summary."""
+    from unittest.mock import patch, AsyncMock
+    from asgiref.sync import sync_to_async
+    from engine.session import _continue_conversation, CONVERSATION_TURNS
+    from learner.models import Session
+
+    user = await sync_to_async(make_user)(discord_id='conv_marker', cefr_level='B1')
+    session = await sync_to_async(Session.objects.create)(
+        user=user, session_type='conversation',
+        current_phase='conversation',
+        phase_turns_completed=CONVERSATION_TURNS,
+    )
+    good_wrapup = (
+        "Great work today — you nailed the preterite forms on the wedding stories.\n"
+        "Next time, watch the ser/estar for location.\n"
+        "Nos vemos, ¡vamos a una lección ahora!\n"
+        "<<CONVERSATION_END>>"
+    )
+    # extract_and_store_interests and score_session are imported inside the
+    # function body — patch them at their source modules.
+    with patch('engine.session.call_llm', new=AsyncMock(return_value=good_wrapup)):
+        with patch('engine.interests.extract_and_store_interests', new=AsyncMock()):
+            with patch('engine.scoring.score_session', new=AsyncMock()):
+                result = await _continue_conversation(user, session, text="thanks")
+
+    assert result["session_ended"] is True
+    assert "<<CONVERSATION_END>>" not in result["text"]
+    await sync_to_async(session.refresh_from_db)()
+    assert session.ended_at is not None
+    assert "<<CONVERSATION_END>>" not in session.summary
+
+
+@pytest.mark.asyncio
+@pytest.mark.django_db(transaction=True)
+async def test_conversation_force_closes_at_safety_cap(make_user):
+    """After the safety cap of failed close attempts, force close even without
+    the marker so a broken LLM can't keep the conversation open forever."""
+    from unittest.mock import patch, AsyncMock
+    from asgiref.sync import sync_to_async
+    from engine.session import _continue_conversation, CONVERSATION_TURNS
+    from learner.models import Session
+
+    user = await sync_to_async(make_user)(discord_id='conv_cap', cefr_level='B1')
+    session = await sync_to_async(Session.objects.create)(
+        user=user, session_type='conversation',
+        current_phase='conversation',
+        phase_turns_completed=CONVERSATION_TURNS,
+        quiz_state={'conversation_close_attempts': 1},  # one prior failed attempt
+    )
+    disobedient_response = "¿Y algo más que quieras contar?"  # no marker
+    with patch('engine.session.call_llm', new=AsyncMock(return_value=disobedient_response)):
+        with patch('engine.interests.extract_and_store_interests', new=AsyncMock()):
+            with patch('engine.scoring.score_session', new=AsyncMock()):
+                result = await _continue_conversation(user, session, text="k")
+
+    assert result["session_ended"] is True
+    await sync_to_async(session.refresh_from_db)()
+    assert session.ended_at is not None
