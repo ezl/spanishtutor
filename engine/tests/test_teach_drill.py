@@ -115,6 +115,7 @@ class TestState:
             quiz_state = None
         state = get_state(FakeSession())
         assert state == {"units": [], "taught": [], "drills": {}, "turn_count": 0,
+                         "progress_count": 0,
                          "lesson_complete": False, "last_turn_type": None}
 
     def test_get_state_returns_existing_teach_drill_subdict(self):
@@ -370,7 +371,8 @@ class TestHandleTeachDrillTurn:
     @pytest.mark.asyncio
     @pytest.mark.django_db(transaction=True)
     async def test_safety_cap_forces_completion(self, make_user, make_skill):
-        """After TEACH_DRILL_MAX_TURNS, mark lesson_complete on the next turn regardless of marker."""
+        """Hard cap on total LLM calls (TEACH_DRILL_MAX_TURNS) fires
+        force_complete regardless of marker — emergency brake."""
         from engine.teach_drill import handle_teach_drill_turn, TEACH_DRILL_MAX_TURNS
         from learner.models import Session
 
@@ -393,6 +395,71 @@ class TestHandleTeachDrillTurn:
 
         await sync_to_async(session.refresh_from_db)()
         assert session.quiz_state["teach_drill"]["lesson_complete"] is True
+
+    @pytest.mark.asyncio
+    @pytest.mark.django_db(transaction=True)
+    async def test_progress_cap_forces_completion(self, make_user, make_skill):
+        """Pedagogical cap (TEACH_DRILL_MAX_PROGRESS_TURNS) fires force_complete
+        based on actual lesson progress, independent of total LLM calls."""
+        from engine.teach_drill import handle_teach_drill_turn, TEACH_DRILL_MAX_PROGRESS_TURNS
+        from learner.models import Session
+
+        user = await sync_to_async(make_user)(discord_id='td_progress_cap', cefr_level='B1')
+        skill = await sync_to_async(make_skill)(skill_id='sk_progress_cap')
+        session = await sync_to_async(Session.objects.create)(
+            user=user, session_type='new_skill', target_skill=skill,
+            current_phase='teach_drill',
+            quiz_state={"teach_drill": {
+                "units": [{"id": "a", "label": "a", "note": ""}],
+                "taught": ["a"], "drills": {"a": ["yo"]},
+                "turn_count": 5,  # well under hard cap
+                "progress_count": TEACH_DRILL_MAX_PROGRESS_TURNS,  # at pedagogical cap
+                "lesson_complete": False, "last_turn_type": "teach",
+            }},
+        )
+
+        with patch('engine.teach_drill.call_llm',
+                   new=AsyncMock(return_value="response")):
+            await handle_teach_drill_turn(user, session, text="ok")
+
+        await sync_to_async(session.refresh_from_db)()
+        assert session.quiz_state["teach_drill"]["lesson_complete"] is True
+
+    @pytest.mark.asyncio
+    @pytest.mark.django_db(transaction=True)
+    async def test_deferred_turns_do_not_burn_progress_count(self, make_user, make_skill):
+        """Deferred turns (REDO / QUESTION_ANSWERED) must NOT increment
+        progress_count — a student's clarifying conversation shouldn't burn
+        down the pedagogical cap. turn_count still advances for the hard cap."""
+        from engine.teach_drill import handle_teach_drill_turn
+        from learner.models import Session
+
+        user = await sync_to_async(make_user)(discord_id='td_defer_count', cefr_level='B1')
+        skill = await sync_to_async(make_skill)(skill_id='sk_defer_count')
+        session = await sync_to_async(Session.objects.create)(
+            user=user, session_type='new_skill', target_skill=skill,
+            current_phase='teach_drill',
+            quiz_state={"teach_drill": {
+                "units": [{"id": "a", "label": "a", "note": ""},
+                          {"id": "b", "label": "b", "note": ""}],
+                "taught": ["a"], "drills": {"a": ["yo"]},
+                "turn_count": 4, "progress_count": 3,
+                "lesson_complete": False, "last_turn_type": "teach",
+            }},
+        )
+        # LLM returns a content-question deferral.
+        qa_response = "Answer... Volviendo: [drill]\n<<QUESTION_ANSWERED>>"
+        with patch('engine.teach_drill.call_llm', new=AsyncMock(return_value=qa_response)):
+            await handle_teach_drill_turn(user, session, text="quick question")
+
+        await sync_to_async(session.refresh_from_db)()
+        state = session.quiz_state["teach_drill"]
+        # turn_count bumps (hard cap counts every LLM call).
+        assert state["turn_count"] == 5
+        # progress_count does NOT bump (deferred turn is free).
+        assert state["progress_count"] == 3
+        # lesson_complete still False — neither cap hit.
+        assert state["lesson_complete"] is False
 
 
 @pytest.mark.asyncio

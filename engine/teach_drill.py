@@ -169,7 +169,8 @@ EMPTY_STATE = {
     "units": [],
     "taught": [],
     "drills": {},
-    "turn_count": 0,
+    "turn_count": 0,       # every LLM call, including deferred (side questions, redos)
+    "progress_count": 0,   # only teach/retrieval/wrap-up turns that actually advanced state
     "lesson_complete": False,
     "last_turn_type": None,  # "teach" | "retrieval" | None — drives Option-B alternation
 }
@@ -189,6 +190,7 @@ def get_state(session) -> dict:
         "taught": list(td.get("taught", [])),
         "drills": {k: list(v) for k, v in td.get("drills", {}).items()},
         "turn_count": int(td.get("turn_count", 0)),
+        "progress_count": int(td.get("progress_count", 0)),
         "lesson_complete": bool(td.get("lesson_complete", False)),
         "last_turn_type": td.get("last_turn_type"),
     }
@@ -454,7 +456,16 @@ def build_teach_instruction(unit: dict, person_new: str, is_final: bool) -> str:
 from .session import _strip_lesson_complete_marker, _build_new_skill_history
 
 
-TEACH_DRILL_MAX_TURNS = 16
+# Two safety caps for teach_drill sessions:
+# - PROGRESS cap fires when the lesson has advanced state that many times.
+#   Deferred turns (REDO, QUESTION_ANSWERED) don't count. This is the
+#   pedagogical ceiling — protects against a lesson drifting past its natural
+#   endpoint without cutting short the student's clarifying conversations.
+# - HARD cap fires on total LLM calls including deferred ones. Emergency brake
+#   against pathological loops. Set generously so legitimate side-question
+#   sessions don't trip it.
+TEACH_DRILL_MAX_PROGRESS_TURNS = 12
+TEACH_DRILL_MAX_TURNS = 40
 
 
 async def handle_teach_drill_turn(user, session, text: str) -> dict:
@@ -490,8 +501,13 @@ async def handle_teach_drill_turn(user, session, text: str) -> dict:
     # Pick next un-taught unit (or None if all taught).
     next_unit = next_teach_unit(units, taught_ids)
 
-    # Force completion at safety cap.
-    force_complete = state["turn_count"] >= TEACH_DRILL_MAX_TURNS
+    # Force completion when EITHER cap is hit:
+    # - progress_count fires the pedagogical cap (deferred turns don't count)
+    # - turn_count fires the hard emergency cap on total LLM calls
+    force_complete = (
+        state["progress_count"] >= TEACH_DRILL_MAX_PROGRESS_TURNS
+        or state["turn_count"] >= TEACH_DRILL_MAX_TURNS
+    )
 
     # Every taught unit has been drilled at least twice (invariant target for completion).
     all_units_drilled = all(len(drills.get(uid, [])) >= 2 for uid in taught_ids)
@@ -603,6 +619,11 @@ async def handle_teach_drill_turn(user, session, text: str) -> dict:
             state["last_turn_type"] = "retrieval"
         # wrap_up doesn't update taught/drilled; marker or force_complete handles completion.
     state["turn_count"] += 1
+    # progress_count only advances on real lesson turns (not deferred).
+    # Deferred turns (REDO, QUESTION_ANSWERED) are "free" — a student asking
+    # many clarifying questions shouldn't burn down the pedagogical cap.
+    if not defer_state:
+        state["progress_count"] += 1
     if marker_seen or force_complete or (turn_type == "wrap_up" and not defer_state):
         mark_complete(state)
 
