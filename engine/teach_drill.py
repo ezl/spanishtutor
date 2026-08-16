@@ -249,10 +249,30 @@ Student interests: {interests}
 
 This is the FIRST turn. Write ONLY the opening framing — do NOT teach any specific verb or paradigm yet. The next turn will do that.
 
+LANGUAGE RULE (critical — read before choosing wording):
+- If the student's level is A1 or A2: respond in English. Spanish appears only inside quoted target sentences or glosses.
+- If the student's level is B1 or higher: respond in Spanish. English appears only as parenthetical glosses per the glossing rule, or inside a drill-cue that requires an English trigger. Assume B1+ students know common vocabulary like aprender, hablar, cosa, hoy, listo — do NOT translate those into English mid-sentence.
+- NEVER code-switch mid-sentence at any level. "Hoy vas a learn how" is a violation — a sentence that starts in Spanish stays in Spanish; a sentence that starts in English stays in English. Parenthetical glosses at the end of a sentence do NOT count as code-switching.
+
 Structure (2-4 short sentences total):
-1. Outcome-framing — tell the student what they'll be able to DO after this lesson, with 1-2 concrete example target sentences in Spanish (translations in parens). Example: "You'll learn to talk about things that happened in the past — sentences like 'Ayer fui al cine' (I went to the movies)."
+
+1. Outcome-framing — tell the student what they'll be able to DO after this lesson, illustrated with 1-2 concrete example target sentences in Spanish (with English translation in parens for A1/A2 or B1; drop the gloss for B2+).
+
+   Example for A1 / A2 (English framing):
+   "You'll learn to talk about things that happened in the past — sentences like 'Ayer fui al cine' (I went to the movies) or 'No pude ir al gimnasio' (I couldn't go to the gym)."
+
+   Example for B1 (Spanish framing, glosses on target sentences):
+   "Después de esta lección vas a poder hablar de cosas que ya pasaron — frases como 'Ayer fui al cine' (I went to the movies) o 'No pude ir al gimnasio' (I couldn't go to the gym)."
+
+   Example for B2+ (Spanish framing, no glosses on target sentences):
+   "Después de esta lección vas a poder hablar de cosas que ya pasaron — frases como 'Ayer fui al cine' o 'No pude ir al gimnasio'."
+
 2. Explain the pattern: you'll teach one verb, drill it with ONE question, then on the next turn ask ONE recall question about an earlier verb. Bite-sized — one thing at a time.
-3. End with the literal line: Ready to start?
+   A1/A2: in English. B1+: in Spanish.
+
+3. End with the literal line asking if they're ready:
+   - A1/A2: "Ready to start?"
+   - B1+: "¿Listo/a para empezar?"
 
 Chat style. No headers, no bullet points, no textbook tone.
 Do not preview specific verbs or forms — the actual teaching starts next turn."""
@@ -332,6 +352,12 @@ GLOSSING (level-conditional based on student CEFR level above):
 - B1: gloss target-form content (paradigm rows, drill cues that use the target form, correction lines showing the target form). Do NOT gloss vocabulary the student already knows or example sentences whose meaning is transparent from cognates/context.
 - B2 or higher (C1, C2): minimal glossing. Only exotic vocabulary or idiomatic phrases whose meaning isn't inferable. Push toward Spanish-only processing (desirable difficulty).
 When in doubt at B1+, err on LESS glossing rather than more — over-glossing at higher levels reduces retention.
+
+LANGUAGE CONSISTENCY (critical — applies to all prose you write this turn):
+- A1 or A2: respond in English. Spanish appears in paradigm rows, quoted example sentences, and drill/target-form content. Prose framing ("Now for X", "Try this one") stays in English.
+- B1 or higher: respond in Spanish. Prose framing ("Ahora vamos con X", "Aquí va otra") stays in Spanish. English appears only as parenthetical glosses per the glossing rule above, and inside the drill-cue formulation "how would you say ..." when that's the natural English trigger for the target form.
+- Assume B1+ students know common connective vocabulary — aprender, hablar, cosa, hoy, listo, ahora, ahora vamos, siguiente, próximo, etc. Do NOT translate those into English mid-sentence.
+- NEVER code-switch mid-sentence at ANY level. A sentence that starts in Spanish stays in Spanish; a sentence that starts in English stays in English. Parenthetical glosses at the end of a sentence (e.g. "Yo fui (I went)") do NOT count as code-switching. "Hoy vas a learn how to talk about..." is a violation.
 
 Chunk sizing (critical): teach EXACTLY ONE unit per turn, unless the instruction explicitly names a shared-paradigm pair.
 

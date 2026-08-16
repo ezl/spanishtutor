@@ -209,10 +209,35 @@ class TestPromptBuilding:
         # Must instruct the LLM to include outcome framing.
         assert "outcome" in TEACH_DRILL_OPENING_PROMPT.lower() or "you'll" in TEACH_DRILL_OPENING_PROMPT.lower()
 
+    def test_opening_prompt_provides_level_conditional_examples(self):
+        """The observed failure ('Hoy vas a learn how...') stemmed from the
+        prompt only having an English example — LLM pattern-matched to that.
+        Now must provide separate examples per level so the LLM has a
+        Spanish template for B1+."""
+        from engine.teach_drill import TEACH_DRILL_OPENING_PROMPT
+        # Both an English example (for A1/A2) AND a Spanish example (for B1+).
+        assert "You'll learn" in TEACH_DRILL_OPENING_PROMPT
+        assert "vas a poder" in TEACH_DRILL_OPENING_PROMPT
+
+    def test_opening_prompt_forbids_mid_sentence_code_switching(self):
+        """Explicit ban on the observed failure mode."""
+        from engine.teach_drill import TEACH_DRILL_OPENING_PROMPT
+        assert "code-switch" in TEACH_DRILL_OPENING_PROMPT.lower()
+        # The specific failing example is called out by name.
+        assert "vas a learn how" in TEACH_DRILL_OPENING_PROMPT.lower()
+
     def test_continuation_suffix_contains_paradigm_format_rule(self):
         from engine.teach_drill import TEACH_DRILL_CONTINUATION_SUFFIX
         # Must instruct one-line-per-person paradigm rendering.
         assert "one line" in TEACH_DRILL_CONTINUATION_SUFFIX.lower() or "per person" in TEACH_DRILL_CONTINUATION_SUFFIX.lower()
+
+    def test_continuation_suffix_has_language_consistency_rule(self):
+        """Language consistency rule must apply to all teach/retrieval turns,
+        not just the opening. Same failure mode can happen in prose framing
+        of any turn."""
+        from engine.teach_drill import TEACH_DRILL_CONTINUATION_SUFFIX
+        assert "LANGUAGE CONSISTENCY" in TEACH_DRILL_CONTINUATION_SUFFIX
+        assert "code-switch" in TEACH_DRILL_CONTINUATION_SUFFIX.lower()
 
 
 class TestHandleTeachDrillTurn:
