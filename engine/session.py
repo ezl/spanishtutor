@@ -1189,6 +1189,12 @@ async def _continue_new_skill(user, session, text: str) -> dict:
     if phase == 'teach_drill':
         from .teach_drill import handle_teach_drill_turn
         result = await handle_teach_drill_turn(user, session, text)
+        if result.get("end_lesson_early"):
+            # Student explicitly asked to stop. Close the session cleanly
+            # (still runs scoring on the transcript so far). Skip assessment.
+            await _close_session_record(session, user)
+            return {"text": result["text"], "audio_url": result["audio_url"],
+                    "session_ended": True}
         if result["advance_to_assessment"]:
             await _set_phase(session, 'assessment', 0)
             # Immediately generate the first assessment question so the student

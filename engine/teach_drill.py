@@ -27,12 +27,26 @@ QUESTION_ANSWERED_MARKER = '<<QUESTION_ANSWERED>>'
 
 def _strip_question_answered_marker(text: str) -> tuple:
     """Return (cleaned_text, marker_present). Emitted by the LLM when the
-    student's message was a content question (not a drill answer) — the LLM
-    answered the question and re-asked the pending drill. Code uses this to
-    skip state advancement so the same drill fires again next turn and gets
-    its actual answer."""
+    student's message was a content question, an ambient acknowledgment, or
+    otherwise not a drill answer — the LLM answered / acknowledged and
+    re-served the pending drill. Code uses this to skip state advancement so
+    the same drill fires again next turn and gets its actual answer."""
     if QUESTION_ANSWERED_MARKER in text:
         return text.replace(QUESTION_ANSWERED_MARKER, '').rstrip(), True
+    return text, False
+
+
+END_LESSON_EARLY_MARKER = '<<END_LESSON_EARLY>>'
+
+
+def _strip_end_lesson_early_marker(text: str) -> tuple:
+    """Return (cleaned_text, marker_present). Emitted by the LLM when the
+    student explicitly asked to stop the current lesson ("let's move on",
+    "skip this", "let's do vocab instead", "I'm done"). Code closes the
+    session immediately (still runs scoring on the transcript so far) —
+    does NOT transition to assessment."""
+    if END_LESSON_EARLY_MARKER in text:
+        return text.replace(END_LESSON_EARLY_MARKER, '').rstrip(), True
     return text, False
 
 
@@ -341,34 +355,18 @@ If the student's answer used a different but grammatically valid verb (e.g. they
 
 On the FOLLOWING turn: evaluate the redo attempt in ONE line. If correct, briefly ✓ acknowledge and THEN follow the normal per-turn instruction. If wrong AGAIN, give the definitive correct answer in ONE line and THEN follow the normal instruction — do NOT ask a third time.
 
-The marker <<LESSON_COMPLETE>>, if the instruction asks you to emit it, goes on its own line at the very end. Never emit it otherwise.
-The marker <<REDO_PENDING>>, when emitted, goes on its own line at the very end.
-The marker <<QUESTION_ANSWERED>>, when emitted, goes on its own line at the very end.
-Never emit more than ONE of these three state markers in the same message (LESSON_COMPLETE / REDO_PENDING / QUESTION_ANSWERED are mutually exclusive). The <<FEEDBACK>>...<<END_FEEDBACK>> marker is orthogonal and may coexist with any of the others.
+MARKER RULES (critical):
+- <<LESSON_COMPLETE>> — natural end of the lesson via wrap-up. Emit only when the per-turn instruction explicitly asks you to.
+- <<REDO_PENDING>> — student's lesson answer had an error; you deferred to re-ask.
+- <<QUESTION_ANSWERED>> — student's message was a content question or ambient acknowledgment (not a drill answer); you re-served the pending drill.
+- <<END_LESSON_EARLY>> — student asked to stop the lesson; the session closes on this turn.
+- <<FEEDBACK>>[paraphrase]<<END_FEEDBACK>> — meta-feedback about the app/pedagogy; logged for developer review.
 
-SECOND DECISION (after the REDO check passes): what IS the student's message? Classify it into ONE of:
+The four STATE markers (LESSON_COMPLETE, REDO_PENDING, QUESTION_ANSWERED, END_LESSON_EARLY) are mutually exclusive — emit at most ONE per response. The FEEDBACK marker is orthogonal and may coexist with any state marker.
 
-  (a) Lesson answer — an attempt to answer the question you just asked. The REDO check above already handles this path (correct → continue; wrong → redo).
+Every marker, when emitted, goes on its own line at the very end of the message.
 
-  (b) Content question — asking about Spanish itself. Examples: "wait, is estar always for locations?", "why is it hizo not hico?", "does poder always mean 'managed to' in preterite?".
-      When you classify a message as a content question, the pending drill from the prior turn was NOT answered. Do NOT let it drop. Your ENTIRE response this turn is:
-      1. Answer the content question in 2-3 sentences.
-      2. Explicit re-ask on a new line: "Volviendo a lo que te preguntaba: [restate the drill question verbatim or with minimal rephrasing]" (or the English equivalent "Back to what I was asking: [restate]" for A1/A2).
-      3. Emit the literal marker on its own line at the very end: <<QUESTION_ANSWERED>>
-      Do NOT teach a new unit, do NOT introduce a new drill, do NOT skip to the next step. The instruction's teach/drill steps are DEFERRED — they run on the following turn instead, after the student's actual drill answer.
-      Applies uniformly to any turn type (teach turn OR retrieval turn) where the student interrupts with a content question rather than answering the drill.
-
-  (c) Meta-feedback about the app or lesson — comments about YOU, the pedagogy, the pacing, the cues, or the style. Examples: "that cue was ambiguous", "you keep asking me the same person", "this is going too fast", "shouldn't 'I was at the wedding' be estar?" (meta because the student is questioning YOUR choice, not asking a language question).
-      Do ALL of the following in your response, in this order:
-      1. Emit the feedback marker block on its own paragraph: <<FEEDBACK>>[one-sentence paraphrase of what the student is flagging]<<END_FEEDBACK>>
-      2. Write ONE short line acknowledging: "Got it, logged that. Sigamos." or similar.
-      3. Continue with the normal per-turn instruction (teach step or retrieval step). Do NOT skip the lesson step.
-
-  (d) Both an answer AND feedback in the same message — extract BOTH. Evaluate the answer per the REDO check above, AND emit the feedback marker block per (c).
-
-  (e) Both a content question AND feedback — combine (b) and (c): answer + re-ask + <<FEEDBACK>>...<<END_FEEDBACK>> block + <<QUESTION_ANSWERED>>. Both markers are permitted since FEEDBACK is orthogonal.
-
-Classification bar: if you are uncertain whether a message is a content question or meta-feedback, prefer content question (answer inline; emit <<QUESTION_ANSWERED>> if the pending drill was left unanswered). Only emit the feedback marker when the student is clearly commenting on YOUR behavior or the app.
+Message classification and per-turn action selection is defined in the per-turn instruction (which arrives as your last user message this turn). Follow the classification and evaluation rules there — do NOT default to the old "REDO first, then classify" flow.
 
 Chat style, no bold headers."""
 
@@ -386,24 +384,60 @@ Common traps to AVOID:
 - For saber: use "found out / learned" cues, not just "knew" (preterite meaning shift)."""
 
 
-REDO_FIRST_CHECK = """FIRST DECISION (do this BEFORE anything else): did the student's previous answer contain ANY error? Any preposition mistake, gender/agreement error, tense error, wrong verb form, wrong verb choice, spelling error, or missing accent counts as an error. Do NOT soften with "Close, but..." or partial-credit — an answer is either fully correct (✓) or has an error (✗).
+CLASSIFY_FIRST_CHECK = """FIRST DECISION (do this BEFORE anything else): classify the student's most recent message. Read what they wrote and pick ONE category:
 
-  - If the answer had ANY error (✗) — your ENTIRE response this turn is the REDO pattern, nothing else:
+  (a) LESSON ANSWER — a Spanish attempt at the drill question you just asked. The message reads as an answer, even if partial or wrong. Examples: "Yo tuve", "fuiste al gimnasio", any Spanish text that looks like an attempt at the target form.
+      → Go to CORRECTNESS EVALUATION below.
+
+  (b) CONTENT QUESTION — asking about Spanish itself (grammar, meaning, usage, comparisons). Examples: "wait, is estar always for locations?", "why is it hizo not hico?", "does poder always mean 'managed to' in preterite?"
+      → Your ENTIRE response this turn is EXACTLY these parts:
+        1. Answer the question in 2-3 sentences.
+        2. "Volviendo a lo que te preguntaba: [restate the drill question verbatim or with minimal rephrasing]" (Spanish for B1+) or "Back to what I was asking: [restate]" (English for A1/A2).
+        3. Literal marker on its own line at the very end: <<QUESTION_ANSWERED>>
+      Do NOT teach a new unit, do NOT introduce a new drill. The teach/drill steps below this check are DEFERRED to the next turn.
+
+  (c) META-FEEDBACK — commenting on YOU, the pedagogy, the pacing, the cues, or the style. Examples: "that cue was ambiguous", "you keep asking me the same person", "this is going too fast", "shouldn't 'I was at the wedding' be estar?" (meta because the student is questioning YOUR choice).
+      → Emit <<FEEDBACK>>[one-sentence paraphrase]<<END_FEEDBACK>> block + one short acknowledgment ("Got it, logged that. Sigamos.") + CONTINUE with the teach/drill steps below this check. FEEDBACK is orthogonal — proceed normally with the lesson.
+
+  (d) AMBIENT ACKNOWLEDGMENT — short filler with no linguistic content. Examples: "ok", "hmm", "got it", "yeah", "sure", 👍, "makes sense", "cool". This is NOT an answer and NOT a question — it's a nudge to proceed. Critical: do NOT treat this as a wrong lesson answer.
+      → Your ENTIRE response this turn is:
+        1. Brief re-serve of the pending drill: "Volviendo: [restate]" (Spanish for B1+) or "Back to it: [restate]" (English for A1/A2). No explanation, no praise, no ✗.
+        2. Literal marker on its own line at the very end: <<QUESTION_ANSWERED>>
+      Do NOT fire REDO — an ambient ack is NOT a wrong answer. Do NOT teach new content. Teach/drill steps deferred.
+
+  (e) SESSION CONTROL — student wants to STOP this lesson. Examples: "let's move on", "skip this", "let's do something else", "let's do vocab instead", "I'm done", "next lesson please", "boring, next", "otro tema", "cambiemos".
+      → Your ENTIRE response this turn is:
+        1. Brief warm acknowledgment: "Ok, cerramos por hoy. ¡Nos vemos!" (Spanish for B1+) or "Ok, wrapping this up. See you next time!" (English for A1/A2).
+        2. Literal marker on its own line at the very end: <<END_LESSON_EARLY>>
+      Do NOT teach anything more, do NOT ask another question. The session closes on this turn.
+
+  (f) COMBINATIONS — a message may contain multiple types. FEEDBACK is orthogonal to all others. If the student's message is BOTH e.g. a lesson answer AND meta-feedback, evaluate the answer per CORRECTNESS EVALUATION below AND include the <<FEEDBACK>>...<<END_FEEDBACK>> block. If BOTH a content question AND feedback: (b) response with the FEEDBACK block added. State markers (QUESTION_ANSWERED, END_LESSON_EARLY, REDO_PENDING) are mutually exclusive — pick the primary intent for the state marker.
+
+Classification bar:
+- Uncertain between LESSON ANSWER and CONTENT QUESTION → prefer CONTENT QUESTION (safer to defer than falsely mark ✗).
+- Uncertain between CONTENT QUESTION and AMBIENT ACK → use AMBIENT ACK for one-to-three-word fillers with no linguistic substance; CONTENT QUESTION for anything that's actually asking something.
+- Uncertain between CONTENT QUESTION and META-FEEDBACK → prefer CONTENT QUESTION (avoids false-positive log entries).
+- Uncertain between LESSON ANSWER and AMBIENT ACK → if it's in the target language and looks like it could be attempting the form, treat as LESSON ANSWER.
+
+CORRECTNESS EVALUATION (only if you classified as LESSON ANSWER): did the Spanish attempt contain ANY error?
+
+  Any preposition mistake, gender/agreement error, tense error, wrong verb form, wrong verb choice, spelling error, or missing accent counts as an error. Do NOT soften with "Close, but..." or partial-credit — an answer is either fully correct (✓) or has an error (✗).
+
+  - If ✗ — your ENTIRE response this turn is the REDO pattern, nothing else:
     * The ✗ line with the correct form and a brief reason (one line).
     * "Try again: [restate the SAME question with a slight rephrasing]" (one line).
-    * The literal marker on its own line at the very end: <<REDO_PENDING>>
-    STOP THERE. Do NOT execute the teach/drill steps below this turn.
-    Do NOT introduce a new verb, do NOT show a new paradigm, do NOT ask any other question.
+    * Literal marker on its own line at the very end: <<REDO_PENDING>>
+    STOP THERE. Do NOT execute the teach/drill steps below. Do NOT introduce a new verb, do NOT show a new paradigm, do NOT ask any other question.
 
-  - If the answer was fully correct (✓): write a single "✓" line acknowledging it, then continue to the steps below.
-  - If there was no prior answer (this is the first turn): just proceed to the steps below."""
+  - If ✓: write a single "✓" line acknowledging it, then continue to the teach/drill steps below.
+  - If there was no prior answer (this is the first turn of the session): just proceed to the steps below."""
 
 
 def build_retrieval_only_instruction(retrieval: dict, person_retrieve: str) -> str:
     """Instruction for a drill-only turn (no new teaching): review a prior unit."""
     return (
-        f"{REDO_FIRST_CHECK}\n\n"
-        f"— IF you passed the first check (answer was ✓ or no prior answer), continue: —\n\n"
+        f"{CLASSIFY_FIRST_CHECK}\n\n"
+        f"— IF classification was LESSON ANSWER + evaluated ✓, OR there was no prior answer, OR you're proceeding after a META-FEEDBACK acknowledgment — continue with the teach/drill steps below: —\n\n"
         f"1) Do NOT teach any new content — this is a review turn.\n\n"
         f"2) Ask ONE production question testing **{retrieval['label']}** in the "
         f"**{person_retrieve}** form. Brief context ('quick review:' or similar) is fine, "
@@ -418,9 +452,9 @@ def build_teach_instruction(unit: dict, person_new: str, is_final: bool) -> str:
     No retrieval on teach turns — retrieval happens on its own alternating turn."""
     parts = []
 
-    parts.append(REDO_FIRST_CHECK)
+    parts.append(CLASSIFY_FIRST_CHECK)
 
-    parts.append("— IF you passed the first check (answer was ✓ or no prior answer), continue: —")
+    parts.append("— IF classification was LESSON ANSWER + evaluated ✓, OR there was no prior answer, OR you're proceeding after a META-FEEDBACK acknowledgment — continue with the teach/drill steps below: —")
 
     label = unit["label"]
     note = unit["note"] or "no special notes"
@@ -587,6 +621,7 @@ async def handle_teach_drill_turn(user, session, text: str) -> dict:
     response, marker_seen = _strip_lesson_complete_marker(response)
     response, redo_pending = _strip_redo_pending_marker(response)
     response, question_answered = _strip_question_answered_marker(response)
+    response, end_lesson_early = _strip_end_lesson_early_marker(response)
     response, feedback_interpretation = _strip_feedback_marker(response)
 
     # Log feedback if the LLM captured any. Anchor to the most recent existing
@@ -622,9 +657,10 @@ async def handle_teach_drill_turn(user, session, text: str) -> dict:
     # progress_count only advances on real lesson turns (not deferred).
     # Deferred turns (REDO, QUESTION_ANSWERED) are "free" — a student asking
     # many clarifying questions shouldn't burn down the pedagogical cap.
-    if not defer_state:
+    # END_LESSON_EARLY is also "free" (it's a stop, not progress).
+    if not defer_state and not end_lesson_early:
         state["progress_count"] += 1
-    if marker_seen or force_complete or (turn_type == "wrap_up" and not defer_state):
+    if marker_seen or force_complete or (turn_type == "wrap_up" and not defer_state) or end_lesson_early:
         mark_complete(state)
 
     await save_state(session, state)
@@ -640,4 +676,5 @@ async def handle_teach_drill_turn(user, session, text: str) -> dict:
         "audio_url": None,
         "session_ended": False,
         "advance_to_assessment": False,
+        "end_lesson_early": end_lesson_early,
     }

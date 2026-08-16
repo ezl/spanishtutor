@@ -788,33 +788,48 @@ class TestFeedbackMarker:
         assert FEEDBACK_MARKER_CLOSE == '<<END_FEEDBACK>>'
 
 
-class TestContinuationSuffixClassification:
-    def test_suffix_documents_the_three_classifications(self):
-        from engine.teach_drill import TEACH_DRILL_CONTINUATION_SUFFIX
-        assert "Lesson answer" in TEACH_DRILL_CONTINUATION_SUFFIX
-        assert "Content question" in TEACH_DRILL_CONTINUATION_SUFFIX
-        assert "Meta-feedback" in TEACH_DRILL_CONTINUATION_SUFFIX
+class TestClassifyFirstCheckClassification:
+    """The classify-first structure lives in CLASSIFY_FIRST_CHECK (injected
+    into every per-turn instruction). Previously in TEACH_DRILL_CONTINUATION_SUFFIX
+    under a SECOND DECISION heading."""
 
-    def test_suffix_names_the_feedback_markers(self):
+    def test_check_documents_all_six_classifications(self):
+        from engine.teach_drill import CLASSIFY_FIRST_CHECK
+        assert "LESSON ANSWER" in CLASSIFY_FIRST_CHECK
+        assert "CONTENT QUESTION" in CLASSIFY_FIRST_CHECK
+        assert "META-FEEDBACK" in CLASSIFY_FIRST_CHECK
+        assert "AMBIENT ACKNOWLEDGMENT" in CLASSIFY_FIRST_CHECK
+        assert "SESSION CONTROL" in CLASSIFY_FIRST_CHECK
+        assert "COMBINATIONS" in CLASSIFY_FIRST_CHECK
+
+    def test_suffix_still_names_the_feedback_markers(self):
         from engine.teach_drill import TEACH_DRILL_CONTINUATION_SUFFIX
         assert "<<FEEDBACK>>" in TEACH_DRILL_CONTINUATION_SUFFIX
         assert "<<END_FEEDBACK>>" in TEACH_DRILL_CONTINUATION_SUFFIX
 
-    def test_suffix_biases_ambiguous_cases_toward_content_question(self):
-        """The spec calls out that ambiguity should default to content question,
-        not feedback — avoids false-positive log entries."""
-        from engine.teach_drill import TEACH_DRILL_CONTINUATION_SUFFIX
-        assert "prefer content question" in TEACH_DRILL_CONTINUATION_SUFFIX.lower() \
-            or "default to content question" in TEACH_DRILL_CONTINUATION_SUFFIX.lower()
+    def test_check_biases_ambiguous_cases_toward_content_question(self):
+        """Ambiguity between LESSON ANSWER and CONTENT QUESTION should default
+        to content question (safer to defer than falsely mark ✗)."""
+        from engine.teach_drill import CLASSIFY_FIRST_CHECK
+        lower = CLASSIFY_FIRST_CHECK.lower()
+        assert "prefer content question" in lower
 
-    def test_suffix_handles_mixed_messages(self):
-        """Mixed message (answer + feedback in one) must be extractable per the spec.
-        Tightened from the plan's `assert 'both' in suffix` — the word 'both'
-        already appears in the existing 'Never emit BOTH markers' rule, which
-        would make the plan's assertion a false positive."""
-        from engine.teach_drill import TEACH_DRILL_CONTINUATION_SUFFIX
-        assert "both an answer" in TEACH_DRILL_CONTINUATION_SUFFIX.lower() \
-            or "answer and feedback" in TEACH_DRILL_CONTINUATION_SUFFIX.lower()
+    def test_check_handles_combinations(self):
+        """Combined messages (e.g., answer + feedback) must be extractable."""
+        from engine.teach_drill import CLASSIFY_FIRST_CHECK
+        assert "COMBINATIONS" in CLASSIFY_FIRST_CHECK
+        # Orthogonality of FEEDBACK vs state markers is spelled out.
+        assert "orthogonal" in CLASSIFY_FIRST_CHECK.lower()
+
+    def test_correctness_evaluation_only_runs_after_lesson_answer_classification(self):
+        """Architectural check: REDO evaluation must be gated on classification,
+        not the first thing the LLM does. Previously REDO was FIRST DECISION,
+        which caused 'ok' acknowledgments to be marked ✗."""
+        from engine.teach_drill import CLASSIFY_FIRST_CHECK
+        # The word 'CORRECTNESS' or 'EVALUATION' appears BELOW the classification.
+        assert "CORRECTNESS EVALUATION" in CLASSIFY_FIRST_CHECK
+        # And is explicitly gated on lesson-answer classification.
+        assert "only if you classified as LESSON ANSWER" in CLASSIFY_FIRST_CHECK
 
 
 class TestParadigmAndGlossingRules:
@@ -1050,14 +1065,18 @@ class TestQuestionAnsweredMarker:
         assert present is False
         assert cleaned == "regular teach response"
 
-    def test_continuation_suffix_documents_the_marker(self):
-        """The suffix must instruct the LLM about when to emit the marker."""
-        from engine.teach_drill import TEACH_DRILL_CONTINUATION_SUFFIX
+    def test_classification_check_documents_the_marker(self):
+        """The classify-first check (injected into every per-turn instruction)
+        must instruct the LLM about when to emit the marker. After the
+        restructure, this lives in CLASSIFY_FIRST_CHECK rather than the suffix."""
+        from engine.teach_drill import CLASSIFY_FIRST_CHECK, TEACH_DRILL_CONTINUATION_SUFFIX
+        assert "<<QUESTION_ANSWERED>>" in CLASSIFY_FIRST_CHECK
+        # The suffix still mentions the marker in the MARKER RULES summary.
         assert "<<QUESTION_ANSWERED>>" in TEACH_DRILL_CONTINUATION_SUFFIX
-        # Must mention the re-ask requirement in Spanish.
-        assert "Volviendo" in TEACH_DRILL_CONTINUATION_SUFFIX
-        # Must forbid teaching new content on this turn.
-        assert "DEFERRED" in TEACH_DRILL_CONTINUATION_SUFFIX or "do NOT teach a new unit" in TEACH_DRILL_CONTINUATION_SUFFIX
+        # Re-ask requirement in Spanish.
+        assert "Volviendo" in CLASSIFY_FIRST_CHECK
+        # Forbid teaching new content on this turn.
+        assert "DEFERRED" in CLASSIFY_FIRST_CHECK or "do NOT teach a new unit" in CLASSIFY_FIRST_CHECK
 
 
 @pytest.mark.asyncio
@@ -1154,3 +1173,136 @@ async def test_question_answered_and_feedback_coexist(make_user, make_skill):
     )()
     state = session.quiz_state["teach_drill"]
     assert "a" not in state["taught"]
+
+
+# ── AMBIENT ACK: reuses QUESTION_ANSWERED marker; must not fire REDO ─────────
+
+class TestAmbientAckBranch:
+    def test_check_documents_ambient_ack_branch(self):
+        """CLASSIFY_FIRST_CHECK branch (d) must exist with example ack tokens."""
+        from engine.teach_drill import CLASSIFY_FIRST_CHECK
+        assert "AMBIENT ACKNOWLEDGMENT" in CLASSIFY_FIRST_CHECK
+        # Named example tokens.
+        lower = CLASSIFY_FIRST_CHECK.lower()
+        assert "ok" in lower
+        # Must forbid REDO for ambient acks (the whole point of this branch).
+        assert "do NOT fire REDO" in CLASSIFY_FIRST_CHECK or "not a wrong answer" in CLASSIFY_FIRST_CHECK.lower()
+
+    def test_check_says_ambient_ack_uses_question_answered_marker(self):
+        """Ambient ack reuses the QUESTION_ANSWERED marker (not a new one) —
+        code path is the same as content question: defer state, re-serve drill."""
+        from engine.teach_drill import CLASSIFY_FIRST_CHECK
+        # The ambient-ack branch must reference the QUESTION_ANSWERED marker.
+        ack_section_start = CLASSIFY_FIRST_CHECK.find("AMBIENT ACKNOWLEDGMENT")
+        ack_section_end = CLASSIFY_FIRST_CHECK.find("SESSION CONTROL")
+        assert ack_section_start >= 0 and ack_section_end > ack_section_start
+        ack_section = CLASSIFY_FIRST_CHECK[ack_section_start:ack_section_end]
+        assert "<<QUESTION_ANSWERED>>" in ack_section
+
+
+# ── END_LESSON_EARLY: session control marker ─────────────────────────────────
+
+class TestEndLessonEarlyMarker:
+    def test_strip_marker_present(self):
+        from engine.teach_drill import _strip_end_lesson_early_marker
+        cleaned, present = _strip_end_lesson_early_marker(
+            "Ok, cerramos por hoy. ¡Nos vemos!\n<<END_LESSON_EARLY>>"
+        )
+        assert present is True
+        assert "<<END_LESSON_EARLY>>" not in cleaned
+        assert "cerramos" in cleaned
+
+    def test_strip_marker_absent(self):
+        from engine.teach_drill import _strip_end_lesson_early_marker
+        cleaned, present = _strip_end_lesson_early_marker("normal response")
+        assert present is False
+        assert cleaned == "normal response"
+
+    def test_check_documents_session_control_branch(self):
+        """CLASSIFY_FIRST_CHECK branch (e) must exist with example utterances
+        and require emitting <<END_LESSON_EARLY>>."""
+        from engine.teach_drill import CLASSIFY_FIRST_CHECK
+        assert "SESSION CONTROL" in CLASSIFY_FIRST_CHECK
+        assert "<<END_LESSON_EARLY>>" in CLASSIFY_FIRST_CHECK
+        # Example utterances from the spec.
+        assert "let's move on" in CLASSIFY_FIRST_CHECK or "skip this" in CLASSIFY_FIRST_CHECK
+
+    def test_suffix_names_end_lesson_early_marker(self):
+        """The suffix's marker summary must list END_LESSON_EARLY too."""
+        from engine.teach_drill import TEACH_DRILL_CONTINUATION_SUFFIX
+        assert "<<END_LESSON_EARLY>>" in TEACH_DRILL_CONTINUATION_SUFFIX
+
+
+@pytest.mark.asyncio
+@pytest.mark.django_db(transaction=True)
+async def test_end_lesson_early_signals_caller_and_closes_session(make_user, make_skill):
+    """When the LLM emits <<END_LESSON_EARLY>>, handle_teach_drill_turn:
+    - marks lesson_complete=True (immediately, not by wrap-up)
+    - returns end_lesson_early=True so _continue_new_skill closes the session"""
+    from unittest.mock import patch, AsyncMock
+    from engine.teach_drill import handle_teach_drill_turn
+    from learner.models import Session
+
+    user = await sync_to_async(make_user)(discord_id='td_end_early', cefr_level='B1')
+    skill = await sync_to_async(make_skill)(skill_id='sk_td_end_early')
+    session = await sync_to_async(Session.objects.create)(
+        user=user, session_type='new_skill', target_skill=skill,
+        current_phase='teach_drill',
+        quiz_state={"teach_drill": {
+            "units": [{"id": "a", "label": "a", "note": ""},
+                      {"id": "b", "label": "b", "note": ""}],
+            "taught": ["a"], "drills": {"a": ["yo"]},
+            "turn_count": 3, "progress_count": 2,
+            "lesson_complete": False, "last_turn_type": "teach",
+        }},
+    )
+    end_response = "Ok, cerramos por hoy. ¡Nos vemos!\n<<END_LESSON_EARLY>>"
+    with patch('engine.teach_drill.call_llm', new=AsyncMock(return_value=end_response)):
+        result = await handle_teach_drill_turn(user, session, text="let's move on")
+
+    # Marker stripped from visible text.
+    assert "<<END_LESSON_EARLY>>" not in result["text"]
+    # Signal fires so caller closes the session.
+    assert result["end_lesson_early"] is True
+
+    session = await sync_to_async(
+        lambda: Session.objects.select_related('target_skill').get(pk=session.pk)
+    )()
+    state = session.quiz_state["teach_drill"]
+    # Marked complete immediately (not waiting for wrap-up).
+    assert state["lesson_complete"] is True
+    # progress_count did NOT advance (end-early isn't lesson progress).
+    assert state["progress_count"] == 2
+
+
+@pytest.mark.asyncio
+@pytest.mark.django_db(transaction=True)
+async def test_continue_new_skill_closes_session_on_end_lesson_early(make_user, make_skill):
+    """_continue_new_skill must call _close_session_record when
+    handle_teach_drill_turn signals end_lesson_early — session gets ended_at
+    set and scoring runs on the transcript."""
+    from unittest.mock import patch, AsyncMock
+    from engine.session import _continue_new_skill
+    from learner.models import Session
+
+    user = await sync_to_async(make_user)(discord_id='cont_end_early', cefr_level='B1')
+    skill = await sync_to_async(make_skill)(skill_id='sk_cont_end_early')
+    session = await sync_to_async(Session.objects.create)(
+        user=user, session_type='new_skill', target_skill=skill,
+        current_phase='teach_drill',
+        quiz_state={"teach_drill": {
+            "units": [{"id": "a", "label": "a", "note": ""}],
+            "taught": ["a"], "drills": {"a": ["yo"]},
+            "turn_count": 2, "progress_count": 1,
+            "lesson_complete": False, "last_turn_type": "teach",
+        }},
+    )
+    end_response = "Ok, cerramos por hoy.\n<<END_LESSON_EARLY>>"
+    with patch('engine.teach_drill.call_llm', new=AsyncMock(return_value=end_response)):
+        with patch('engine.interests.extract_and_store_interests', new=AsyncMock()):
+            with patch('engine.scoring.score_session', new=AsyncMock()):
+                result = await _continue_new_skill(user, session, "let's do something else")
+
+    assert result["session_ended"] is True
+    await sync_to_async(session.refresh_from_db)()
+    assert session.ended_at is not None
