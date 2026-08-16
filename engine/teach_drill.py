@@ -22,6 +22,20 @@ def _strip_redo_pending_marker(text: str) -> tuple:
     return text, False
 
 
+QUESTION_ANSWERED_MARKER = '<<QUESTION_ANSWERED>>'
+
+
+def _strip_question_answered_marker(text: str) -> tuple:
+    """Return (cleaned_text, marker_present). Emitted by the LLM when the
+    student's message was a content question (not a drill answer) — the LLM
+    answered the question and re-asked the pending drill. Code uses this to
+    skip state advancement so the same drill fires again next turn and gets
+    its actual answer."""
+    if QUESTION_ANSWERED_MARKER in text:
+        return text.replace(QUESTION_ANSWERED_MARKER, '').rstrip(), True
+    return text, False
+
+
 FEEDBACK_MARKER_OPEN = '<<FEEDBACK>>'
 FEEDBACK_MARKER_CLOSE = '<<END_FEEDBACK>>'
 
@@ -326,13 +340,21 @@ If the student's answer used a different but grammatically valid verb (e.g. they
 On the FOLLOWING turn: evaluate the redo attempt in ONE line. If correct, briefly ✓ acknowledge and THEN follow the normal per-turn instruction. If wrong AGAIN, give the definitive correct answer in ONE line and THEN follow the normal instruction — do NOT ask a third time.
 
 The marker <<LESSON_COMPLETE>>, if the instruction asks you to emit it, goes on its own line at the very end. Never emit it otherwise.
-The marker <<REDO_PENDING>>, when emitted, goes on its own line at the very end. Never emit BOTH markers in the same message.
+The marker <<REDO_PENDING>>, when emitted, goes on its own line at the very end.
+The marker <<QUESTION_ANSWERED>>, when emitted, goes on its own line at the very end.
+Never emit more than ONE of these three state markers in the same message (LESSON_COMPLETE / REDO_PENDING / QUESTION_ANSWERED are mutually exclusive). The <<FEEDBACK>>...<<END_FEEDBACK>> marker is orthogonal and may coexist with any of the others.
 
 SECOND DECISION (after the REDO check passes): what IS the student's message? Classify it into ONE of:
 
   (a) Lesson answer — an attempt to answer the question you just asked. The REDO check above already handles this path (correct → continue; wrong → redo).
 
-  (b) Content question — asking about Spanish itself. Examples: "wait, is estar always for locations?", "why is it hizo not hico?", "does poder always mean 'managed to' in preterite?". Answer in 2-3 sentences, then continue with the normal per-turn instruction (teach or retrieval).
+  (b) Content question — asking about Spanish itself. Examples: "wait, is estar always for locations?", "why is it hizo not hico?", "does poder always mean 'managed to' in preterite?".
+      When you classify a message as a content question, the pending drill from the prior turn was NOT answered. Do NOT let it drop. Your ENTIRE response this turn is:
+      1. Answer the content question in 2-3 sentences.
+      2. Explicit re-ask on a new line: "Volviendo a lo que te preguntaba: [restate the drill question verbatim or with minimal rephrasing]" (or the English equivalent "Back to what I was asking: [restate]" for A1/A2).
+      3. Emit the literal marker on its own line at the very end: <<QUESTION_ANSWERED>>
+      Do NOT teach a new unit, do NOT introduce a new drill, do NOT skip to the next step. The instruction's teach/drill steps are DEFERRED — they run on the following turn instead, after the student's actual drill answer.
+      Applies uniformly to any turn type (teach turn OR retrieval turn) where the student interrupts with a content question rather than answering the drill.
 
   (c) Meta-feedback about the app or lesson — comments about YOU, the pedagogy, the pacing, the cues, or the style. Examples: "that cue was ambiguous", "you keep asking me the same person", "this is going too fast", "shouldn't 'I was at the wedding' be estar?" (meta because the student is questioning YOUR choice, not asking a language question).
       Do ALL of the following in your response, in this order:
@@ -342,7 +364,9 @@ SECOND DECISION (after the REDO check passes): what IS the student's message? Cl
 
   (d) Both an answer AND feedback in the same message — extract BOTH. Evaluate the answer per the REDO check above, AND emit the feedback marker block per (c).
 
-Classification bar: if you are uncertain whether a message is a content question or meta-feedback, prefer content question (answer inline; no marker). Only emit the feedback marker when the student is clearly commenting on YOUR behavior or the app.
+  (e) Both a content question AND feedback — combine (b) and (c): answer + re-ask + <<FEEDBACK>>...<<END_FEEDBACK>> block + <<QUESTION_ANSWERED>>. Both markers are permitted since FEEDBACK is orthogonal.
+
+Classification bar: if you are uncertain whether a message is a content question or meta-feedback, prefer content question (answer inline; emit <<QUESTION_ANSWERED>> if the pending drill was left unanswered). Only emit the feedback marker when the student is clearly commenting on YOUR behavior or the app.
 
 Chat style, no bold headers."""
 
@@ -546,6 +570,7 @@ async def handle_teach_drill_turn(user, session, text: str) -> dict:
     # Strip markers.
     response, marker_seen = _strip_lesson_complete_marker(response)
     response, redo_pending = _strip_redo_pending_marker(response)
+    response, question_answered = _strip_question_answered_marker(response)
     response, feedback_interpretation = _strip_feedback_marker(response)
 
     # Log feedback if the LLM captured any. Anchor to the most recent existing
@@ -561,11 +586,14 @@ async def handle_teach_drill_turn(user, session, text: str) -> dict:
         )
 
     # Update state.
-    # If the LLM emitted <<REDO_PENDING>>, it deferred teach/retrieval to do a
-    # re-attempt. Skip mark_taught/mark_drilled and last_turn_type updates — the
-    # same turn will replay next call (after the redo is resolved). turn_count
-    # still advances so the safety cap remains meaningful.
-    if not redo_pending:
+    # If the LLM emitted <<REDO_PENDING>> OR <<QUESTION_ANSWERED>>, it deferred
+    # teach/retrieval to either do a re-attempt (redo) or answer a content question
+    # and re-ask the pending drill (question). In both cases the current turn's
+    # planned state advancement should NOT happen — the same turn will replay next
+    # call and produce the actual drill answer then. turn_count still advances so
+    # the safety cap remains meaningful.
+    defer_state = redo_pending or question_answered
+    if not defer_state:
         if turn_type == "teach":
             mark_taught(state, teach_unit["id"])
             mark_drilled(state, teach_unit["id"], teach_person)
@@ -575,7 +603,7 @@ async def handle_teach_drill_turn(user, session, text: str) -> dict:
             state["last_turn_type"] = "retrieval"
         # wrap_up doesn't update taught/drilled; marker or force_complete handles completion.
     state["turn_count"] += 1
-    if marker_seen or force_complete or (turn_type == "wrap_up"):
+    if marker_seen or force_complete or (turn_type == "wrap_up" and not defer_state):
         mark_complete(state)
 
     await save_state(session, state)

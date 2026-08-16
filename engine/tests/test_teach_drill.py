@@ -963,3 +963,127 @@ class TestFeedbackCapture:
         assert "<<FEEDBACK>>" not in latest_event.content
         assert "<<END_FEEDBACK>>" not in latest_event.content
         assert "paraphrase" not in latest_event.content
+
+
+# ── QUESTION_ANSWERED marker: content-question deferral ──────────────────────
+
+class TestQuestionAnsweredMarker:
+    def test_strip_marker_present(self):
+        from engine.teach_drill import _strip_question_answered_marker
+        cleaned, present = _strip_question_answered_marker(
+            "Answering: estar is for locations. Volviendo: how would you say 'she went'?\n<<QUESTION_ANSWERED>>"
+        )
+        assert present is True
+        assert "<<QUESTION_ANSWERED>>" not in cleaned
+        assert "Volviendo" in cleaned
+
+    def test_strip_marker_absent(self):
+        from engine.teach_drill import _strip_question_answered_marker
+        cleaned, present = _strip_question_answered_marker("regular teach response")
+        assert present is False
+        assert cleaned == "regular teach response"
+
+    def test_continuation_suffix_documents_the_marker(self):
+        """The suffix must instruct the LLM about when to emit the marker."""
+        from engine.teach_drill import TEACH_DRILL_CONTINUATION_SUFFIX
+        assert "<<QUESTION_ANSWERED>>" in TEACH_DRILL_CONTINUATION_SUFFIX
+        # Must mention the re-ask requirement in Spanish.
+        assert "Volviendo" in TEACH_DRILL_CONTINUATION_SUFFIX
+        # Must forbid teaching new content on this turn.
+        assert "DEFERRED" in TEACH_DRILL_CONTINUATION_SUFFIX or "do NOT teach a new unit" in TEACH_DRILL_CONTINUATION_SUFFIX
+
+
+@pytest.mark.asyncio
+@pytest.mark.django_db(transaction=True)
+async def test_question_answered_defers_state_advancement(make_user, make_skill):
+    """When the LLM emits <<QUESTION_ANSWERED>>, code must NOT mark the
+    planned unit as taught or drilled — the same drill will re-fire next turn
+    and get its actual answer."""
+    from unittest.mock import patch, AsyncMock
+    from engine.teach_drill import handle_teach_drill_turn
+    from learner.models import Session
+
+    user = await sync_to_async(make_user)(discord_id='qa_defer1', cefr_level='B1')
+    skill = await sync_to_async(make_skill)(skill_id='sk_qa_defer1')
+    session = await sync_to_async(Session.objects.create)(
+        user=user, session_type='new_skill', target_skill=skill,
+        current_phase='teach_drill',
+        quiz_state={"teach_drill": {
+            "units": [{"id": "tener", "label": "tener", "note": "tuv-"},
+                      {"id": "hacer", "label": "hacer", "note": "hic-"}],
+            "taught": ["tener"], "drills": {"tener": ["yo"]},
+            "turn_count": 1, "lesson_complete": False,
+            "last_turn_type": "teach",
+        }},
+    )
+    # LLM classifies user's message as a content question and defers.
+    qa_response = (
+        "In preterite, 'poder' means 'managed to' more than 'was able to'.\n"
+        "Volviendo a lo que te preguntaba: how would you say 'she had'?\n"
+        "<<QUESTION_ANSWERED>>"
+    )
+    with patch('engine.teach_drill.call_llm', new=AsyncMock(return_value=qa_response)):
+        result = await handle_teach_drill_turn(
+            user, session, text="wait, does poder always mean managed-to?",
+        )
+
+    # Marker stripped from visible text.
+    assert "<<QUESTION_ANSWERED>>" not in result["text"]
+    assert "Volviendo" in result["text"]
+
+    session = await sync_to_async(
+        lambda: Session.objects.select_related('target_skill').get(pk=session.pk)
+    )()
+    state = session.quiz_state["teach_drill"]
+    # State must NOT have advanced — hacer stays un-taught, tener stays at 1 drill.
+    assert "hacer" not in state["taught"]
+    assert state["drills"] == {"tener": ["yo"]}
+    # last_turn_type unchanged (was "teach"), so next turn's alternation logic
+    # will still trigger retrieval, giving the pending drill another chance.
+    assert state["last_turn_type"] == "teach"
+    # turn_count advances so safety cap still applies.
+    assert state["turn_count"] == 2
+    # Not marked complete.
+    assert state["lesson_complete"] is False
+
+
+@pytest.mark.asyncio
+@pytest.mark.django_db(transaction=True)
+async def test_question_answered_and_feedback_coexist(make_user, make_skill):
+    """A single response may carry both <<QUESTION_ANSWERED>> AND
+    <<FEEDBACK>>...<<END_FEEDBACK>> — feedback logs independently while
+    state deferral fires normally."""
+    from unittest.mock import patch, AsyncMock
+    from engine.teach_drill import handle_teach_drill_turn
+    from learner.models import Session, SessionFeedback
+
+    user = await sync_to_async(make_user)(discord_id='qa_fb1', cefr_level='B1')
+    skill = await sync_to_async(make_skill)(skill_id='sk_qa_fb1')
+    session = await sync_to_async(Session.objects.create)(
+        user=user, session_type='new_skill', target_skill=skill,
+        current_phase='teach_drill',
+        quiz_state={"teach_drill": {
+            "units": [{"id": "a", "label": "a", "note": ""}],
+            "taught": [], "drills": {}, "turn_count": 0,
+            "lesson_complete": False, "last_turn_type": None,
+        }},
+    )
+    combined = (
+        "Answering: estar is used for locations.\n"
+        "Volviendo: how would you say 'I was at the wedding'?\n"
+        "<<FEEDBACK>>Student flagged the earlier cue as ambiguous.<<END_FEEDBACK>>\n"
+        "<<QUESTION_ANSWERED>>"
+    )
+    with patch('engine.teach_drill.call_llm', new=AsyncMock(return_value=combined)):
+        await handle_teach_drill_turn(user, session, text="wait, is estar for location?")
+
+    # Feedback row was created.
+    fb_count = await sync_to_async(SessionFeedback.objects.filter(session=session).count)()
+    assert fb_count == 1
+
+    # State deferred (unit a NOT marked taught despite this being a teach turn).
+    session = await sync_to_async(
+        lambda: Session.objects.select_related('target_skill').get(pk=session.pk)
+    )()
+    state = session.quiz_state["teach_drill"]
+    assert "a" not in state["taught"]
