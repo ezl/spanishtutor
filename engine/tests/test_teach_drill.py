@@ -979,6 +979,80 @@ class TestFeedbackCapture:
 
     @pytest.mark.asyncio
     @pytest.mark.django_db(transaction=True)
+    async def test_feedback_prepends_canonical_acknowledgment(self, make_user, make_skill):
+        """When FEEDBACK marker fires, code prepends the exact canonical
+        acknowledgment string — deterministic across every interaction."""
+        from unittest.mock import patch, AsyncMock
+        from engine.teach_drill import handle_teach_drill_turn, FEEDBACK_ACKNOWLEDGMENT
+        from learner.models import Session
+
+        user = await sync_to_async(make_user)(discord_id='fb_canon', cefr_level='B1')
+        skill = await sync_to_async(make_skill)(skill_id='sk_fb_canon')
+        session = await sync_to_async(Session.objects.create)(
+            user=user, session_type='new_skill', target_skill=skill,
+            current_phase='teach_drill',
+            quiz_state={"teach_drill": {
+                "units": [{"id": "a", "label": "a", "note": ""}],
+                "taught": [], "drills": {}, "turn_count": 0,
+                "lesson_complete": False, "last_turn_type": None,
+            }},
+        )
+        # LLM emits marker + lesson content, NO acknowledgment (per prompt).
+        llm_response = (
+            "<<FEEDBACK>>Student flagged X.<<END_FEEDBACK>>\n"
+            "Ahora, teaching content for unit a..."
+        )
+        with patch('engine.teach_drill.call_llm', new=AsyncMock(return_value=llm_response)):
+            result = await handle_teach_drill_turn(user, session, text="feedback text")
+
+        # The exact canonical string is prepended at the start of the response.
+        assert result["text"].startswith(FEEDBACK_ACKNOWLEDGMENT)
+        # The lesson content follows.
+        assert "Ahora, teaching content" in result["text"]
+
+    @pytest.mark.asyncio
+    @pytest.mark.django_db(transaction=True)
+    async def test_no_feedback_no_prepended_acknowledgment(self, make_user, make_skill):
+        """When no FEEDBACK marker, the acknowledgment must NOT appear."""
+        from unittest.mock import patch, AsyncMock
+        from engine.teach_drill import handle_teach_drill_turn, FEEDBACK_ACKNOWLEDGMENT
+        from learner.models import Session
+
+        user = await sync_to_async(make_user)(discord_id='fb_no_canon', cefr_level='B1')
+        skill = await sync_to_async(make_skill)(skill_id='sk_fb_no_canon')
+        session = await sync_to_async(Session.objects.create)(
+            user=user, session_type='new_skill', target_skill=skill,
+            current_phase='teach_drill',
+            quiz_state={"teach_drill": {
+                "units": [{"id": "a", "label": "a", "note": ""}],
+                "taught": [], "drills": {}, "turn_count": 0,
+                "lesson_complete": False, "last_turn_type": None,
+            }},
+        )
+        with patch('engine.teach_drill.call_llm', new=AsyncMock(return_value="just a teach turn")):
+            result = await handle_teach_drill_turn(user, session, text="tuve un día bueno")
+
+        assert FEEDBACK_ACKNOWLEDGMENT not in result["text"]
+
+    def test_canonical_acknowledgment_is_exact_string(self):
+        """Locks in the exact wording so it can't be changed accidentally."""
+        from engine.teach_drill import FEEDBACK_ACKNOWLEDGMENT
+        assert FEEDBACK_ACKNOWLEDGMENT == "Got it, thanks for the feedback. Sigamos."
+
+    def test_prompt_instructs_llm_not_to_write_own_acknowledgment(self):
+        """The prompt must tell the LLM to skip writing an ack — otherwise
+        we'd get duplicates (LLM ack + code-prepended canonical ack)."""
+        from engine.teach_drill import CLASSIFY_FIRST_CHECK
+        assert "Do NOT write any acknowledgment" in CLASSIFY_FIRST_CHECK
+
+    def test_prompt_forbids_change_promises(self):
+        """The LLM can't actually change its prompt, so promising behavior
+        change ('I'll drop the hybrid phrasing going forward') was misleading."""
+        from engine.teach_drill import CLASSIFY_FIRST_CHECK
+        assert "Do NOT promise to change your behavior" in CLASSIFY_FIRST_CHECK
+
+    @pytest.mark.asyncio
+    @pytest.mark.django_db(transaction=True)
     async def test_no_marker_creates_no_row(self, make_user, make_skill):
         from unittest.mock import patch, AsyncMock
         from engine.teach_drill import handle_teach_drill_turn

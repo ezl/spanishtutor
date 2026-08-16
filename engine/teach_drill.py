@@ -53,6 +53,11 @@ def _strip_end_lesson_early_marker(text: str) -> tuple:
 FEEDBACK_MARKER_OPEN = '<<FEEDBACK>>'
 FEEDBACK_MARKER_CLOSE = '<<END_FEEDBACK>>'
 
+# Canonical acknowledgment prepended by code when the LLM emits a FEEDBACK
+# marker. Prompt instructs the LLM NOT to write its own acknowledgment;
+# code guarantees the exact wording so it's deterministic across sessions.
+FEEDBACK_ACKNOWLEDGMENT = "Got it, thanks for the feedback. Sigamos."
+
 
 def _strip_feedback_marker(text: str) -> tuple:
     """Return (cleaned_text, interpretation_or_none). Extracts the LLM's
@@ -423,7 +428,9 @@ CLASSIFY_FIRST_CHECK = """FIRST DECISION (do this BEFORE anything else): classif
       Do NOT teach a new unit, do NOT introduce a new drill. The teach/drill steps below this check are DEFERRED to the next turn.
 
   (c) META-FEEDBACK — commenting on YOU, the pedagogy, the pacing, the cues, or the style. Examples: "that cue was ambiguous", "you keep asking me the same person", "this is going too fast", "shouldn't 'I was at the wedding' be estar?" (meta because the student is questioning YOUR choice).
-      → Emit <<FEEDBACK>>[one-sentence paraphrase]<<END_FEEDBACK>> block + one short acknowledgment ("Got it, logged that. Sigamos.") + CONTINUE with the teach/drill steps below this check. FEEDBACK is orthogonal — proceed normally with the lesson.
+      → Emit <<FEEDBACK>>[one-sentence paraphrase]<<END_FEEDBACK>> block, then CONTINUE with the teach/drill steps below this check. FEEDBACK is orthogonal — proceed normally with the lesson.
+      Do NOT write any acknowledgment yourself — code prepends a canonical acknowledgment automatically after the marker is stripped. Any acknowledgment you write will duplicate it.
+      Do NOT promise to change your behavior in future turns (e.g., "I'll drop the hybrid phrasing going forward"). You cannot actually change your prompt — feedback is logged for the developer to review offline. A promise you can't keep is worse than no promise.
 
   (d) AMBIENT ACKNOWLEDGMENT — short filler with no linguistic content. Examples: "ok", "hmm", "got it", "yeah", "sure", 👍, "makes sense", "cool". This is NOT an answer and NOT a question — it's a nudge to proceed. Critical: do NOT treat this as a wrong lesson answer.
       → Your ENTIRE response this turn is:
@@ -661,6 +668,14 @@ async def handle_teach_drill_turn(user, session, text: str) -> dict:
             user_message=text,
             interpretation=feedback_interpretation,
         )
+        # Prepend the canonical acknowledgment. Prompt tells the LLM to skip
+        # writing one; code guarantees the exact wording so the ack is
+        # deterministic across every feedback interaction (no LLM drift,
+        # no accidental change-promises).
+        if response.strip():
+            response = f"{FEEDBACK_ACKNOWLEDGMENT}\n\n{response}"
+        else:
+            response = FEEDBACK_ACKNOWLEDGMENT
 
     # Update state.
     # If the LLM emitted <<REDO_PENDING>> OR <<QUESTION_ANSWERED>>, it deferred
