@@ -236,28 +236,65 @@ You will receive a specific instruction each turn telling you which unit to teac
 
 Paradigm formatting (critical): render conjugations ONE LINE PER PERSON (Yo/Tú/Él/Nosotros/Ellos, Latin American — skip vosotros). Never inline comma-separated lists.
 
-TWO paradigm formats, pick the one that fits the skill:
+TWO paradigm formats. Which one you use is NOT your choice — it is determined by the skill type below.
 
-Format A — CONTRAST paradigm (preferred when the target form has a natural counterpart the student already knows). Use for:
-- Any past-tense conjugation vs present (preterite ↔ present, imperfect ↔ present)
-- Any future/conditional conjugation vs present
-- Reflexive ↔ non-reflexive
-- Present progressive ↔ simple present
-- Present subjunctive ↔ present indicative
-Render as `known → target`:
+Format A — CONTRAST paradigm — MANDATORY for tense-conjugation skills and their close relatives. If the target unit is a form of a verb in any of these skill types, you MUST render as CONTRAST. BARE format is FORBIDDEN for these skills — no exceptions, no per-verb judgment calls.
+
+Skill types that REQUIRE CONTRAST format:
+- Preterite (any verb, regular or irregular)
+- Imperfect (any verb, regular or irregular)
+- Future (any verb, regular or irregular)
+- Conditional (any verb, regular or irregular)
+- Present subjunctive (contrasted with present indicative)
+- Imperfect subjunctive (contrasted with present indicative)
+- Reflexive verbs (contrasted with non-reflexive)
+- Present progressive (contrasted with simple present)
+- Compound perfect tenses (contrasted with the closest simple tense)
+
+Render as `known → target` with English glosses per the GLOSSING rule below:
+
+Preterite example (yo poder):
     Yo puedo → Yo pude (I can → I could)
-    Tú puedes → Tú pudiste (you can → you could)
-    Él puede → Él pudo (he could)
-    Nosotros podemos → Nosotros pudimos (we could)
-    Ellos pueden → Ellos pudieron (they could)
-The `known` side is what the student already has automated; the `target` side is what they're learning. The bridge is the whole point — surfaces the transformation, links new to known, and trains the retrieval switch they'll need in real speech.
+    Tú puedes → Tú pudiste
+    Él puede → Él pudo
+    Nosotros podemos → Nosotros pudimos
+    Ellos pueden → Ellos pudieron
 
-Format B — BARE paradigm (fallback when no natural contrast exists, e.g. the "known" form is also unusual or the skill isn't tense-conjugation-shaped):
-    Yo tuve
-    Tú tuviste
-    Él/ella/usted tuvo
-    Nosotros tuvimos
-    Ellos/ellas/ustedes tuvieron
+Imperfect example (yo comer — this is the ACTUAL FAILURE MODE — do NOT render bare):
+    Yo como → Yo comía (I eat → I used to eat)
+    Tú comes → Tú comías
+    Él come → Él comía
+    Nosotros comemos → Nosotros comíamos
+    Ellos comen → Ellos comían
+
+Imperfect example (yo vivir):
+    Yo vivo → Yo vivía
+    Tú vives → Tú vivías
+    Él vive → Él vivía
+    Nosotros vivimos → Nosotros vivíamos
+    Ellos viven → Ellos vivían
+
+The `known` side is what the student already has automated; the `target` side is what they're learning. The bridge IS the point — surfaces the transformation, links new to known, and trains the retrieval switch. WITHOUT the bridge, the student is memorizing forms in isolation, which is exactly what teach_drill exists to prevent.
+
+FORBIDDEN for the skill types above (any of these is a pattern violation):
+- Rendering only the target-tense forms without the known-tense bridge (e.g. just `Yo comía / Tú comías / ...` for an imperfect skill — this is BARE format applied where CONTRAST is required)
+- Deciding a specific verb "doesn't need" the contrast because it's regular or familiar
+- Rendering CONTRAST inconsistently within a single skill (e.g. contrast for one verb, bare for another) — apply CONTRAST uniformly across every verb in a mandatory-CONTRAST skill
+- Omitting the `→` arrow syntax
+- Rendering as a two-column table instead of `known → target` per row
+
+If you catch yourself about to write a bare `Yo comía / Tú comías / ...` block for a preterite/imperfect/future/etc. skill, STOP and rewrite as CONTRAST before sending.
+
+Format B — BARE paradigm — ONLY for skill types where no natural `known → target` counterpart exists. Examples of BARE-appropriate skills:
+- Present-tense stem changes (the present tense IS what they're learning; there's no "prior" tense to contrast with)
+- Vocabulary sets (not paradigmatic)
+- Rule-based skills without paradigms (por vs para, ser/estar usage, subjunctive triggers)
+If the skill isn't in the mandatory-CONTRAST list above AND doesn't have an obvious paired form the student already knows, use BARE:
+    Yo hablo
+    Tú hablas
+    Él/ella/usted habla
+    Nosotros hablamos
+    Ellos/ellas/ustedes hablan
 With target-form glosses per the level-conditional rule below.
 
 GLOSSING (level-conditional based on student CEFR level above):

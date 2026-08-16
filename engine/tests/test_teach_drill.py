@@ -790,6 +790,37 @@ class TestParadigmAndGlossingRules:
         assert "b1" in lower
         assert "b2" in lower
 
+    def test_contrast_paradigm_is_mandatory_not_preferred(self):
+        """Loose 'preferred' language let the LLM skip CONTRAST intermittently.
+        Must be phrased as MANDATORY / MUST / FORBIDDEN to match the REDO-block
+        pattern that reliably enforces LLM compliance."""
+        from engine.teach_drill import TEACH_DRILL_CONTINUATION_SUFFIX
+        # Hard-requirement language, not soft preference.
+        assert "MANDATORY" in TEACH_DRILL_CONTINUATION_SUFFIX
+        assert "MUST" in TEACH_DRILL_CONTINUATION_SUFFIX
+        assert "FORBIDDEN" in TEACH_DRILL_CONTINUATION_SUFFIX
+
+    def test_contrast_paradigm_names_imperfect_specifically(self):
+        """The observed failure was imperfect skills (comer, vivir) — imperfect
+        must appear in the mandatory list AND in the concrete examples so the
+        LLM pattern-matches to that specific tense."""
+        from engine.teach_drill import TEACH_DRILL_CONTINUATION_SUFFIX
+        # Named in the required-skill-types list.
+        assert "Imperfect" in TEACH_DRILL_CONTINUATION_SUFFIX
+        # Concrete example uses the exact verb that misfired.
+        assert "comía" in TEACH_DRILL_CONTINUATION_SUFFIX
+        assert "vivía" in TEACH_DRILL_CONTINUATION_SUFFIX
+
+    def test_forbidden_block_names_the_failure_mode(self):
+        """The forbidden section must specifically call out the observed
+        failure mode (bare imperfect rows without the known-side bridge)."""
+        from engine.teach_drill import TEACH_DRILL_CONTINUATION_SUFFIX
+        lower = TEACH_DRILL_CONTINUATION_SUFFIX.lower()
+        # Named the anti-pattern.
+        assert "forbidden" in lower
+        # Called out the inconsistency case (contrast on one verb, bare on another).
+        assert "inconsistent" in lower or "uniformly" in lower
+
 
 class TestFeedbackCapture:
     @pytest.mark.asyncio
