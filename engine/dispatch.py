@@ -62,3 +62,54 @@ async def resolve_user(platform: str, external_id: str, display_name: str) -> tu
         defaults={'display_name': display_name},
     )
     return user, created
+
+
+# ── Entry point ──────────────────────────────────────────────────────────────
+
+
+FALLBACK_ERROR_TEXT = "Lo siento, tuve un problema. 😅 Try again in a moment!"
+
+
+async def handle(event: IncomingEvent) -> list:
+    """The single entry point every transport calls with a normalized event.
+
+    Owns:
+    - User resolution + creation
+    - First-message flow for brand-new users (returns [Reply(FIRST_MESSAGE)])
+    - Engine dispatch (routes text to engine.core.handle_message)
+    - Error wrapping (any exception returns a friendly fallback Reply)
+    - Building Reply list from the engine's response dict
+
+    Returns: list[Reply] the transport should send in order.
+
+    Commands (!reset, !translate, etc.) migrate into this dispatcher in a
+    subsequent step; today they're still handled at the transport layer.
+    """
+    import logging
+    from engine.core import handle_message
+    from engine.onboarding import FIRST_MESSAGE
+
+    logger = logging.getLogger('engine.dispatch')
+
+    try:
+        user, is_new = await resolve_user(
+            event.platform, event.external_id, event.display_name,
+        )
+
+        if is_new:
+            return [Reply(text=FIRST_MESSAGE)]
+
+        result = await handle_message(user, event.text, [])
+
+        replies = []
+        if result.get('text'):
+            replies.append(Reply(
+                text=result['text'],
+                follow_up=result.get('follow_up'),
+                session_ended=bool(result.get('session_ended', False)),
+            ))
+        return replies
+    except Exception:
+        logger.exception('dispatch.handle failed for %s/%s',
+                         event.platform, event.external_id)
+        return [Reply(text=FALLBACK_ERROR_TEXT)]

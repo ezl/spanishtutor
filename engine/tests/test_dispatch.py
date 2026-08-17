@@ -82,3 +82,98 @@ class TestResolveUser:
 
         with pytest.raises(ValueError, match="Unknown platform"):
             await resolve_user('signal', 'x', 'y')
+
+
+class TestDispatchHandle:
+    @pytest.mark.asyncio
+    @pytest.mark.django_db(transaction=True)
+    async def test_new_user_gets_first_message_reply(self):
+        from engine.dispatch import IncomingEvent, handle
+        from engine.onboarding import FIRST_MESSAGE
+        from learner.models import User
+
+        assert not await sync_to_async(User.objects.filter(discord_id='d_dispatch_new').exists)()
+
+        event = IncomingEvent(
+            platform='discord', external_id='d_dispatch_new',
+            display_name='NewOne', text='hi',
+        )
+        replies = await handle(event)
+
+        assert len(replies) == 1
+        assert replies[0].text == FIRST_MESSAGE
+        # User row was created.
+        assert await sync_to_async(User.objects.filter(discord_id='d_dispatch_new').exists)()
+
+    @pytest.mark.asyncio
+    @pytest.mark.django_db(transaction=True)
+    async def test_existing_user_routes_to_engine_and_returns_reply(self):
+        from unittest.mock import patch, AsyncMock
+        from engine.dispatch import IncomingEvent, handle
+        from learner.models import User
+
+        await sync_to_async(User.objects.create)(
+            discord_id='d_existing_2', display_name='Ex',
+        )
+
+        fake_result = {'text': 'engine reply', 'audio_url': None, 'session_ended': False}
+        with patch('engine.core.handle_message', new=AsyncMock(return_value=fake_result)):
+            event = IncomingEvent(
+                platform='discord', external_id='d_existing_2',
+                display_name='Ex', text='hola',
+            )
+            replies = await handle(event)
+
+        assert len(replies) == 1
+        assert replies[0].text == 'engine reply'
+        assert replies[0].follow_up is None
+
+    @pytest.mark.asyncio
+    @pytest.mark.django_db(transaction=True)
+    async def test_engine_follow_up_carried_on_reply(self):
+        from unittest.mock import patch, AsyncMock
+        from engine.dispatch import IncomingEvent, handle
+        from learner.models import User
+
+        await sync_to_async(User.objects.create)(
+            discord_id='d_followup', display_name='F',
+        )
+
+        fake_result = {
+            'text': 'intro', 'follow_up': 'lesson body',
+            'audio_url': None, 'session_ended': False,
+        }
+        with patch('engine.core.handle_message', new=AsyncMock(return_value=fake_result)):
+            event = IncomingEvent(
+                platform='discord', external_id='d_followup',
+                display_name='F', text='hi',
+            )
+            replies = await handle(event)
+
+        assert len(replies) == 1
+        assert replies[0].text == 'intro'
+        assert replies[0].follow_up == 'lesson body'
+
+    @pytest.mark.asyncio
+    @pytest.mark.django_db(transaction=True)
+    async def test_engine_exception_returns_fallback_reply(self):
+        """Engine failures must not surface to transport — dispatch wraps
+        them into a Reply so the user gets a message either way."""
+        from unittest.mock import patch, AsyncMock
+        from engine.dispatch import IncomingEvent, handle, FALLBACK_ERROR_TEXT
+        from learner.models import User
+
+        await sync_to_async(User.objects.create)(
+            discord_id='d_boom', display_name='B',
+        )
+
+        with patch('engine.core.handle_message',
+                   new=AsyncMock(side_effect=RuntimeError('kaboom'))):
+            event = IncomingEvent(
+                platform='discord', external_id='d_boom',
+                display_name='B', text='hola',
+            )
+            replies = await handle(event)
+
+        assert len(replies) == 1
+        assert replies[0].text == FALLBACK_ERROR_TEXT

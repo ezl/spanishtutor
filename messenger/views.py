@@ -60,27 +60,27 @@ def _run_async_in_background(coro) -> None:
 
 
 async def _process_message_async(psid: str, name: str, text: str) -> None:
-    """Background worker: resolve user, dispatch to engine, send reply.
-    Any exception is caught here and a fallback error message is sent to
-    the user, so a silent failure doesn't leave them wondering."""
-    from engine.core import handle_message
-    from engine.dispatch import resolve_user
+    """Background worker: build an IncomingEvent, hand to the dispatch layer,
+    send each Reply via the platform API.
+
+    Error handling now lives in dispatch.handle — this wrapper only handles
+    unexpected failures from the send_message path itself."""
+    from engine.dispatch import IncomingEvent, handle as dispatch_handle
 
     try:
-        user, is_new = await resolve_user('messenger', psid, name)
-
-        if is_new:
-            await sync_to_async(send_message)(psid, FIRST_MESSAGE)
-            return
-
-        result = await handle_message(user, text, [])
-
-        if result.get('text'):
-            await sync_to_async(send_message)(psid, result['text'])
-        if result.get('follow_up'):
-            await sync_to_async(send_message)(psid, result['follow_up'])
+        event = IncomingEvent(
+            platform='messenger', external_id=psid,
+            display_name=name, text=text,
+        )
+        replies = await dispatch_handle(event)
+        for reply in replies:
+            await sync_to_async(send_message)(psid, reply.text)
+            if reply.follow_up:
+                await sync_to_async(send_message)(psid, reply.follow_up)
     except Exception:
-        logger.exception('Error processing Messenger message from %s', psid)
+        # dispatch.handle already returns a Reply for engine-side errors;
+        # this catch covers only send_message / transport failures.
+        logger.exception('Messenger transport failure for %s', psid)
         try:
             await sync_to_async(send_message)(psid, FALLBACK_ERROR_MESSAGE)
         except Exception:
