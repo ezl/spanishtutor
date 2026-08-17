@@ -90,101 +90,10 @@ async def on_message(message: discord.Message):
         return
 
     text = message.content.strip()
-    attachments = message.attachments
 
-    if text.lower() == '!reset':
-        from learner.models import User
-        await sync_to_async(User.objects.filter(discord_id=str(message.author.id)).delete)()
-        await sync_to_async(User.objects.create)(discord_id=str(message.author.id), display_name='')
-        await message.channel.send(FIRST_MESSAGE)
-        return
-
-    if text.lower() == '!retest':
-        from learner.models import User, Session
-        user_obj = await sync_to_async(User.objects.filter(discord_id=str(message.author.id)).first)()
-        if user_obj:
-            await sync_to_async(
-                lambda: Session.objects.filter(user=user_obj, session_type='onboarding').delete()
-            )()
-            await sync_to_async(
-                User.objects.filter(pk=user_obj.pk).update
-            )(onboarding_complete=False, estimated_cefr_level='')
-        await message.channel.send(
-            "Starting fresh placement quiz! Let's see where you are now.\n\n"
-            "Say **listo** when you're ready."
-        )
-        return
-
-    if text.lower() == '!english':
-        from learner.models import User
-        await sync_to_async(
-            User.objects.filter(discord_id=str(message.author.id)).update
-        )(instruction_language='english')
-        await message.channel.send("Got it - I'll give all instructions in English from now on.")
-        return
-
-    if text.lower() == '!spanish':
-        from learner.models import User
-        await sync_to_async(
-            User.objects.filter(discord_id=str(message.author.id)).update
-        )(instruction_language='spanish')
-        await message.channel.send("¡Perfecto! De ahora en adelante, todo en español.")
-        return
-
-    if text.lower() == '!menu':
-        from learner.models import User
-        from learner.auth import make_progress_token
-        import django.conf
-        user_obj = await sync_to_async(User.objects.filter(discord_id=str(message.author.id)).first)()
-        base_url = django.conf.settings.BASE_URL
-        token = make_progress_token(user_obj.pk) if user_obj else None
-        grid_url = f"{base_url}/auth/{token}/" if token else None
-        level = f"**{user_obj.estimated_cefr_level}**" if user_obj and user_obj.estimated_cefr_level else "not yet assessed"
-        grid_line = f"**Skill grid (valid 1 hr):** {grid_url}\n" if grid_url else ""
-        menu = (
-            f"**Current level:** {level}\n"
-            f"{grid_line}\n"
-            f"**Commands:**\n"
-            f"`!translate` - translate between English and Spanish (times out after 10 min)\n"
-            f"`!retest` - retake the placement quiz\n"
-            f"`!english` - force English instructions\n"
-            f"`!spanish` - force Spanish instructions\n"
-            f"`!reset` - wipe everything and start over\n"
-        )
-        await message.channel.send(menu)
-        return
-
-    if text.lower() == '!translate':
-        uid = str(message.author.id)
-        if uid not in _user_locks:
-            _user_locks[uid] = asyncio.Lock()
-        async with _user_locks[uid]:
-            from learner.models import User
-            from django.utils import timezone
-            user_obj = await sync_to_async(User.objects.filter(discord_id=uid).first)()
-            if not user_obj:
-                await message.channel.send("Start a session first before using translate mode!")
-                return
-            # Close any active session silently
-            from learner.models import Session
-            active_session = await sync_to_async(
-                lambda: Session.objects.filter(user=user_obj, ended_at__isnull=True)
-                                       .exclude(session_type='onboarding')
-                                       .first()
-            )()
-            if active_session:
-                from engine.session import _close_session_record
-                await _close_session_record(active_session, user_obj)
-            # Enter translate mode
-            now = timezone.now()
-            await sync_to_async(
-                User.objects.filter(pk=user_obj.pk).update
-            )(translate_mode_entered_at=now)
-        await message.channel.send(
-            "Translation mode on. Send me anything in English and I'll give you the Spanish, "
-            "or Spanish and I'll give you the English. Times out after 10 minutes of inactivity."
-        )
-        return
+    # Commands are dispatched inside engine.dispatch — no need to intercept
+    # them here. Everything (regular messages + !reset/!translate/etc.) flows
+    # through the dispatcher.
 
     uid = str(message.author.id)
     if uid not in _user_locks:

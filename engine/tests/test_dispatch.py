@@ -183,6 +183,123 @@ class TestDispatchHandle:
 
     @pytest.mark.asyncio
     @pytest.mark.django_db(transaction=True)
+    async def test_command_dispatch_short_circuits_engine(self):
+        """When the incoming text matches a registered command, dispatch
+        runs the command handler and does NOT call the engine."""
+        from unittest.mock import patch, AsyncMock
+        from engine.dispatch import IncomingEvent, handle
+        from learner.models import User
+
+        await sync_to_async(User.objects.create)(
+            discord_id='d_cmd', display_name='C',
+            instruction_language='auto',
+        )
+
+        with patch('engine.core.handle_message', new=AsyncMock()) as mock_engine:
+            event = IncomingEvent(
+                platform='discord', external_id='d_cmd',
+                display_name='C', text='!english',
+            )
+            replies = await handle(event)
+
+        mock_engine.assert_not_called()
+        assert len(replies) == 1
+        assert 'English' in replies[0].text
+
+    @pytest.mark.asyncio
+    @pytest.mark.django_db(transaction=True)
+    async def test_command_case_insensitive(self):
+        """Commands match on lower-cased stripped text."""
+        from unittest.mock import patch, AsyncMock
+        from engine.dispatch import IncomingEvent, handle
+        from learner.models import User
+
+        await sync_to_async(User.objects.create)(
+            discord_id='d_case', display_name='C',
+        )
+
+        with patch('engine.core.handle_message', new=AsyncMock()) as mock_engine:
+            event = IncomingEvent(
+                platform='discord', external_id='d_case',
+                display_name='C', text='  !ENGLISH  ',
+            )
+            replies = await handle(event)
+
+        mock_engine.assert_not_called()
+        assert len(replies) == 1
+
+    @pytest.mark.asyncio
+    @pytest.mark.django_db(transaction=True)
+    async def test_reset_command_wipes_user_and_sends_first_message(self):
+        from engine.dispatch import IncomingEvent, handle
+        from engine.onboarding import FIRST_MESSAGE
+        from learner.models import User
+
+        original = await sync_to_async(User.objects.create)(
+            discord_id='d_reset', display_name='OriginalName',
+            estimated_cefr_level='B1', onboarding_complete=True,
+        )
+
+        event = IncomingEvent(
+            platform='discord', external_id='d_reset',
+            display_name='OriginalName', text='!reset',
+        )
+        replies = await handle(event)
+
+        assert len(replies) == 1
+        assert replies[0].text == FIRST_MESSAGE
+        # New row with same external_id but reset state.
+        new_user = await sync_to_async(User.objects.get)(discord_id='d_reset')
+        assert new_user.pk != original.pk
+        assert new_user.estimated_cefr_level == ''
+        assert new_user.onboarding_complete is False
+
+    @pytest.mark.asyncio
+    @pytest.mark.django_db(transaction=True)
+    async def test_english_command_updates_instruction_language(self):
+        from engine.dispatch import IncomingEvent, handle
+        from learner.models import User
+
+        await sync_to_async(User.objects.create)(
+            discord_id='d_lang', display_name='L',
+            instruction_language='spanish',
+        )
+
+        event = IncomingEvent(
+            platform='discord', external_id='d_lang',
+            display_name='L', text='!english',
+        )
+        replies = await handle(event)
+
+        assert len(replies) == 1
+        user = await sync_to_async(User.objects.get)(discord_id='d_lang')
+        assert user.instruction_language == 'english'
+
+    @pytest.mark.asyncio
+    @pytest.mark.django_db(transaction=True)
+    async def test_commands_work_uniformly_from_any_platform(self):
+        """The whole point: !english typed on Messenger works exactly like
+        !english typed on Discord — one implementation, all platforms."""
+        from engine.dispatch import IncomingEvent, handle
+        from learner.models import User
+
+        await sync_to_async(User.objects.create)(
+            messenger_psid='psid_lang', display_name='L',
+            instruction_language='spanish',
+        )
+
+        event = IncomingEvent(
+            platform='messenger', external_id='psid_lang',
+            display_name='L', text='!english',
+        )
+        replies = await handle(event)
+
+        assert len(replies) == 1
+        user = await sync_to_async(User.objects.get)(messenger_psid='psid_lang')
+        assert user.instruction_language == 'english'
+
+    @pytest.mark.asyncio
+    @pytest.mark.django_db(transaction=True)
     async def test_engine_exception_returns_fallback_reply(self):
         """Engine failures must not surface to transport — dispatch wraps
         them into a Reply so the user gets a message either way."""

@@ -70,6 +70,112 @@ async def resolve_user(platform: str, external_id: str, display_name: str) -> tu
 FALLBACK_ERROR_TEXT = "Lo siento, tuve un problema. 😅 Try again in a moment!"
 
 
+# ── Commands ─────────────────────────────────────────────────────────────────
+# Text-prefix commands the student can type in any chat platform. Handlers
+# receive (user, event) and return a list[Reply]. Registered in COMMANDS
+# below; dispatch.handle checks incoming text against the table before
+# routing to the engine.
+
+
+async def _cmd_reset(user, event: IncomingEvent) -> list:
+    """Wipe the current user row and start fresh with a new one on the same
+    external_id. Sends FIRST_MESSAGE so the user sees onboarding again."""
+    from engine.onboarding import FIRST_MESSAGE
+    from learner.models import User
+    field = PLATFORM_ID_FIELD[event.platform]
+    await sync_to_async(User.objects.filter(**{field: event.external_id}).delete)()
+    await sync_to_async(User.objects.create)(**{field: event.external_id}, display_name='')
+    return [Reply(text=FIRST_MESSAGE)]
+
+
+async def _cmd_retest(user, event: IncomingEvent) -> list:
+    """Clear onboarding state so the placement quiz runs again."""
+    from learner.models import Session, User
+    await sync_to_async(
+        lambda: Session.objects.filter(user=user, session_type='onboarding').delete()
+    )()
+    await sync_to_async(
+        User.objects.filter(pk=user.pk).update
+    )(onboarding_complete=False, estimated_cefr_level='')
+    return [Reply(text=(
+        "Starting fresh placement quiz! Let's see where you are now.\n\n"
+        "Say **listo** when you're ready."
+    ))]
+
+
+async def _cmd_english(user, event: IncomingEvent) -> list:
+    from learner.models import User
+    await sync_to_async(
+        User.objects.filter(pk=user.pk).update
+    )(instruction_language='english')
+    return [Reply(text="Got it - I'll give all instructions in English from now on.")]
+
+
+async def _cmd_spanish(user, event: IncomingEvent) -> list:
+    from learner.models import User
+    await sync_to_async(
+        User.objects.filter(pk=user.pk).update
+    )(instruction_language='spanish')
+    return [Reply(text="¡Perfecto! De ahora en adelante, todo en español.")]
+
+
+async def _cmd_menu(user, event: IncomingEvent) -> list:
+    """Show current level + skill grid link + command reference."""
+    from django.conf import settings
+    from learner.auth import make_progress_token
+    base_url = settings.BASE_URL
+    token = make_progress_token(user.pk)
+    grid_url = f"{base_url}/auth/{token}/" if token else None
+    level = f"**{user.estimated_cefr_level}**" if user.estimated_cefr_level else "not yet assessed"
+    grid_line = f"**Skill grid (valid 1 hr):** {grid_url}\n" if grid_url else ""
+    text = (
+        f"**Current level:** {level}\n"
+        f"{grid_line}\n"
+        f"**Commands:**\n"
+        f"`!translate` - translate between English and Spanish (times out after 10 min)\n"
+        f"`!retest` - retake the placement quiz\n"
+        f"`!english` - force English instructions\n"
+        f"`!spanish` - force Spanish instructions\n"
+        f"`!reset` - wipe everything and start over\n"
+    )
+    return [Reply(text=text)]
+
+
+async def _cmd_translate(user, event: IncomingEvent) -> list:
+    """Enter translate mode. Closes any active learning session first so we
+    don't corrupt state; user's next message will be handled by engine.translate."""
+    from django.utils import timezone
+    from engine.session import _close_session_record
+    from learner.models import Session, User
+
+    active_session = await sync_to_async(
+        lambda: Session.objects.filter(user=user, ended_at__isnull=True)
+                               .exclude(session_type='onboarding')
+                               .first()
+    )()
+    if active_session:
+        await _close_session_record(active_session, user)
+
+    await sync_to_async(
+        User.objects.filter(pk=user.pk).update
+    )(translate_mode_entered_at=timezone.now())
+
+    return [Reply(text=(
+        "Translation mode on. Send me anything in English and I'll give you the Spanish, "
+        "or Spanish and I'll give you the English. Times out after 10 minutes of inactivity."
+    ))]
+
+
+COMMANDS = {
+    '!reset': _cmd_reset,
+    '!retest': _cmd_retest,
+    '!english': _cmd_english,
+    '!spanish': _cmd_spanish,
+    '!menu': _cmd_menu,
+    '!translate': _cmd_translate,
+}
+
+
 async def handle(event: IncomingEvent) -> list:
     """The single entry point every transport calls with a normalized event.
 
@@ -98,6 +204,12 @@ async def handle(event: IncomingEvent) -> list:
 
         if is_new:
             return [Reply(text=FIRST_MESSAGE)]
+
+        # Command dispatch — text-prefix commands short-circuit the engine.
+        # Case-insensitive match on the exact stripped text.
+        cmd_key = event.text.strip().lower()
+        if cmd_key in COMMANDS:
+            return await COMMANDS[cmd_key](user, event)
 
         result = await handle_message(user, event.text, [])
 
