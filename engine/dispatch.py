@@ -108,6 +108,11 @@ async def handle(event: IncomingEvent) -> list:
                 follow_up=result.get('follow_up'),
                 session_ended=bool(result.get('session_ended', False)),
             ))
+        # dev_log (scoring transcript / debug output at session close) is a
+        # separate reply. Not surfaced to end users in prod, but kept intact
+        # for developer visibility on Discord.
+        if result.get('dev_log'):
+            replies.append(Reply(text=result['dev_log']))
         return replies
     except Exception:
         logger.exception('dispatch.handle failed for %s/%s',

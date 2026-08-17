@@ -191,25 +191,22 @@ async def on_message(message: discord.Message):
         _user_locks[uid] = asyncio.Lock()
 
     try:
+        from engine.dispatch import IncomingEvent, handle as dispatch_handle
         async with _user_locks[uid]:
             async with message.channel.typing():
-                user, is_new = await get_or_create_user(message.author)
+                event = IncomingEvent(
+                    platform='discord',
+                    external_id=uid,
+                    display_name=message.author.display_name,
+                    text=text,
+                )
+                replies = await dispatch_handle(event)
 
-                if is_new:
-                    await _send(message.channel, FIRST_MESSAGE)
-                    return
-
-                from engine.core import handle_message
-                result = await handle_message(user, text, list(attachments))
-
-        if result.get('text'):
-            await _send(message.channel, result['text'])
-
-        if result.get('follow_up'):
-            await _send(message.channel, result['follow_up'])
-
-        if result.get('dev_log'):
-            await _send(message.channel, result['dev_log'])
+        for reply in replies:
+            if reply.text:
+                await _send(message.channel, reply.text)
+            if reply.follow_up:
+                await _send(message.channel, reply.follow_up)
 
     except Exception as e:
         logger.error('Error handling message from %s: %s\n%s',

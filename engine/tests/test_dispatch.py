@@ -156,6 +156,33 @@ class TestDispatchHandle:
 
     @pytest.mark.asyncio
     @pytest.mark.django_db(transaction=True)
+    async def test_dev_log_becomes_separate_reply(self):
+        """When the engine returns dev_log (scoring transcript at session
+        close), it lands as an additional Reply — transport sends both."""
+        from unittest.mock import patch, AsyncMock
+        from engine.dispatch import IncomingEvent, handle
+        from learner.models import User
+
+        await sync_to_async(User.objects.create)(
+            discord_id='d_devlog', display_name='D',
+        )
+        fake_result = {
+            'text': 'close message', 'audio_url': None, 'session_ended': True,
+            'dev_log': 'DEV: [scored a1_greetings=4]',
+        }
+        with patch('engine.core.handle_message', new=AsyncMock(return_value=fake_result)):
+            event = IncomingEvent(
+                platform='discord', external_id='d_devlog',
+                display_name='D', text='adios',
+            )
+            replies = await handle(event)
+
+        assert len(replies) == 2
+        assert replies[0].text == 'close message'
+        assert replies[1].text == 'DEV: [scored a1_greetings=4]'
+
+    @pytest.mark.asyncio
+    @pytest.mark.django_db(transaction=True)
     async def test_engine_exception_returns_fallback_reply(self):
         """Engine failures must not surface to transport — dispatch wraps
         them into a Reply so the user gets a message either way."""
