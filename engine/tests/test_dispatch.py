@@ -1,4 +1,6 @@
 """Tests for the transport-agnostic dispatch layer."""
+import pytest
+from asgiref.sync import sync_to_async
 
 
 class TestDataclasses:
@@ -33,3 +35,50 @@ class TestDataclasses:
         assert r.text == 'hi'
         assert r.follow_up == 'and again'
         assert r.session_ended is True
+
+
+class TestResolveUser:
+    @pytest.mark.asyncio
+    @pytest.mark.django_db(transaction=True)
+    async def test_creates_new_discord_user(self):
+        from engine.dispatch import resolve_user
+        from learner.models import User
+
+        user, is_new = await resolve_user('discord', 'd_new_1', 'Alice')
+        assert is_new is True
+        assert user.discord_id == 'd_new_1'
+        assert user.messenger_psid is None
+        assert user.display_name == 'Alice'
+
+    @pytest.mark.asyncio
+    @pytest.mark.django_db(transaction=True)
+    async def test_finds_existing_discord_user(self):
+        from engine.dispatch import resolve_user
+        from learner.models import User
+
+        await sync_to_async(User.objects.create)(
+            discord_id='d_existing', display_name='Bob',
+        )
+        user, is_new = await resolve_user('discord', 'd_existing', 'IgnoredName')
+        assert is_new is False
+        assert user.discord_id == 'd_existing'
+        # display_name is only set on create, not update — matches prior behavior.
+        assert user.display_name == 'Bob'
+
+    @pytest.mark.asyncio
+    @pytest.mark.django_db(transaction=True)
+    async def test_creates_new_messenger_user(self):
+        from engine.dispatch import resolve_user
+
+        user, is_new = await resolve_user('messenger', 'psid_new_1', 'Carol')
+        assert is_new is True
+        assert user.messenger_psid == 'psid_new_1'
+        assert user.discord_id is None
+        assert user.display_name == 'Carol'
+
+    @pytest.mark.asyncio
+    async def test_unknown_platform_raises(self):
+        from engine.dispatch import resolve_user
+
+        with pytest.raises(ValueError, match="Unknown platform"):
+            await resolve_user('signal', 'x', 'y')

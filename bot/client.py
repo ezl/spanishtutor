@@ -71,12 +71,10 @@ client = discord.Client(intents=intents)
 
 
 async def get_or_create_user(discord_user: discord.User):
-    from learner.models import User
-    user, created = await sync_to_async(User.objects.get_or_create)(
-        discord_id=str(discord_user.id),
-        defaults={'display_name': discord_user.display_name},
-    )
-    return user, created
+    """Thin wrapper — resolution logic lives in engine.dispatch so all
+    platforms share one implementation."""
+    from engine.dispatch import resolve_user
+    return await resolve_user('discord', str(discord_user.id), discord_user.display_name)
 
 
 @client.event

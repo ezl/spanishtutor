@@ -29,11 +29,12 @@ def _valid_signature(body: bytes, header: str) -> bool:
 
 
 def _get_or_create_user(psid: str, name: str):
-    from learner.models import User
-    return User.objects.get_or_create(
-        messenger_psid=psid,
-        defaults={'display_name': name},
-    )
+    """Sync wrapper — resolution logic lives in engine.dispatch. Used by the
+    GET_STARTED postback handler (which is sync); the async message-processing
+    path calls engine.dispatch.resolve_user directly."""
+    from asgiref.sync import async_to_sync
+    from engine.dispatch import resolve_user
+    return async_to_sync(resolve_user)('messenger', psid, name)
 
 
 def _run_async_in_background(coro) -> None:
@@ -63,9 +64,10 @@ async def _process_message_async(psid: str, name: str, text: str) -> None:
     Any exception is caught here and a fallback error message is sent to
     the user, so a silent failure doesn't leave them wondering."""
     from engine.core import handle_message
+    from engine.dispatch import resolve_user
 
     try:
-        user, is_new = await sync_to_async(_get_or_create_user)(psid, name)
+        user, is_new = await resolve_user('messenger', psid, name)
 
         if is_new:
             await sync_to_async(send_message)(psid, FIRST_MESSAGE)
