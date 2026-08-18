@@ -321,3 +321,53 @@ class TestDispatchHandle:
 
         assert len(replies) == 1
         assert replies[0].text == FALLBACK_ERROR_TEXT
+
+
+class TestHandleWelcome:
+    """handle_welcome() backs a platform's explicit 'start' affordance
+    (Messenger's Get Started button) — no user text involved."""
+
+    @pytest.mark.asyncio
+    @pytest.mark.django_db(transaction=True)
+    async def test_creates_user_and_returns_first_message(self):
+        from engine.dispatch import handle_welcome
+        from engine.onboarding import FIRST_MESSAGE
+        from learner.models import User
+
+        replies = await handle_welcome('messenger', 'psid_welcome', 'Nueva')
+
+        assert len(replies) == 1
+        assert replies[0].text == FIRST_MESSAGE
+        user = await sync_to_async(User.objects.get)(messenger_psid='psid_welcome')
+        assert user.display_name == 'Nueva'
+
+    @pytest.mark.asyncio
+    @pytest.mark.django_db(transaction=True)
+    async def test_is_idempotent_for_existing_user(self):
+        """Tapping Get Started again must not create a second row or wipe
+        the existing user's progress — it just re-greets them."""
+        from engine.dispatch import handle_welcome
+        from engine.onboarding import FIRST_MESSAGE
+        from learner.models import User
+
+        existing = await sync_to_async(User.objects.create)(
+            messenger_psid='psid_repeat', display_name='Vuelta',
+            estimated_cefr_level='B1', onboarding_complete=True,
+        )
+
+        replies = await handle_welcome('messenger', 'psid_repeat', 'Vuelta')
+
+        assert replies[0].text == FIRST_MESSAGE
+        count = await sync_to_async(User.objects.filter(messenger_psid='psid_repeat').count)()
+        assert count == 1
+        unchanged = await sync_to_async(User.objects.get)(pk=existing.pk)
+        assert unchanged.estimated_cefr_level == 'B1'
+        assert unchanged.onboarding_complete is True
+
+    @pytest.mark.asyncio
+    @pytest.mark.django_db(transaction=True)
+    async def test_unknown_platform_raises(self):
+        from engine.dispatch import handle_welcome
+
+        with pytest.raises(ValueError):
+            await handle_welcome('carrier_pigeon', 'x', 'y')

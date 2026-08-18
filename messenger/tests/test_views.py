@@ -150,3 +150,33 @@ async def test_process_message_async_sends_follow_up_when_present(make_user):
     calls = [c[0] for c in mock_send.call_args_list]
     assert calls[0] == ('psid_followup', 'intro line')
     assert calls[1] == ('psid_followup', 'lesson content')
+
+
+@pytest.mark.django_db(transaction=True)
+def test_get_started_postback_creates_user_and_sends_first_message():
+    """Get Started button tap routes through dispatch.handle_welcome — the
+    transport must not build the greeting itself."""
+    from engine.onboarding import FIRST_MESSAGE
+    from learner.models import User
+
+    payload = {
+        'object': 'page',
+        'entry': [{
+            'messaging': [{
+                'sender': {'id': 'psid_getstarted', 'name': 'Tester'},
+                'postback': {'payload': 'GET_STARTED'},
+            }],
+        }],
+    }
+
+    with patch('messenger.views.send_message') as mock_send:
+        with patch('messenger.views._valid_signature', return_value=True):
+            response = Client().post(
+                '/webhook/messenger/',
+                data=json.dumps(payload),
+                content_type='application/json',
+            )
+
+    assert response.status_code == 200
+    mock_send.assert_called_once_with('psid_getstarted', FIRST_MESSAGE)
+    assert User.objects.filter(messenger_psid='psid_getstarted').exists()

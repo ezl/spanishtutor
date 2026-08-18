@@ -48,15 +48,15 @@ See V1 tickets below.
 
 ---
 
-## Phase 5 — Voice Channels
+## Phase 5 — Voice (web-first)
 
-- Real-time voice conversation (bot joins Discord voice channel)
-- Live STT streaming, real-time response
+**Scope decision, 2026-08-17:** voice gets built on the web app first, not on a chat platform. We have maximal control there — real-time streaming, capture quality, latency, pronunciation scoring. Chat platforms stay **text-only**; `dispatch.IncomingEvent` has no attachments field on purpose. If a platform later gets voice, it becomes a thin interface onto the web version, by which point we'll already have the reps.
+
+- Real-time voice conversation in the browser (live STT streaming, real-time response)
 - Pronunciation scoring
-- Replaces voice message approximation from V1
+- Replaces the voice-message approximation from V1
+- *(Deferred, likely YAGNI until asked for:* bot joining a Discord voice channel*)*
 - **Multi-modal SRS reinforcement**: after a skill is scored in one mode (writing), schedule subsequent reviews to test the same skill in a *different* mode (listening, spoken_interaction, spoken_production). Blocks on voice being available. Currently `_select_session` and `next_new_skill` in `engine/session.py`/`engine/curriculum.py` only look at `mode='writing'` scores — expand to consider the full skill × mode grid once voice input/output is wired up.
-
----
 
 ## Phase 6 — Personalization
 
@@ -76,19 +76,28 @@ See V1 tickets below.
 
 ---
 
-## Phase 8 — Messenger Migration
+## Phase 8 — Multi-Platform Transport ✅ *(done — 2026-08-17)*
 
-Discord was the right channel for early development but Facebook Messenger is the right channel for US users learning Spanish. The engine is already interface-agnostic — the migration is an I/O swap, not an architecture change.
+Originally scoped as a *migration* off Discord onto Messenger. That framing is obsolete: rather than swapping one platform for another, the transport layer was decoupled so both run side by side and a third costs almost nothing.
 
-**What changes:**
-- Replace `bot/client.py` (Discord socket) with a Django webhook view (Messenger HTTP callbacks)
-- Rename `User.discord_id` → `User.external_id` (one migration)
-- Remove `discord.py` dependency, add `requests` or `httpx` for Meta Graph API calls
-- Update magic link auth to use Messenger identity instead of Discord
+**What actually shipped** (the `refactor(n/…)` dispatch-layer commit series):
+- `engine/dispatch.py` — a transport-agnostic layer between platform I/O and the engine. Transports normalize into `IncomingEvent`, call `dispatch.handle()`, and send back the returned `list[Reply]`.
+- Dispatch owns user resolution, the first-message flow, all six commands, and error wrapping. `bot/client.py` (115 LOC) and `messenger/views.py` (141 LOC) are I/O shims whose only engine import is `engine.dispatch`.
+- Discord and Messenger both live, sharing one code path. Every command works on every platform automatically.
 
-**What doesn't change:** engine, session logic, scoring, curriculum — everything below the I/O layer.
+**How the original plan changed:**
 
-**When to do it:** when ready to grow beyond the initial test user(s). Not worth the Meta app review friction until the product is proven.
+| Originally planned | What we did instead |
+|---|---|
+| Replace `bot/client.py` with a Messenger webhook | Both transports coexist; neither is privileged |
+| Rename `User.discord_id` → `User.external_id` | Obviated — `dispatch.PLATFORM_ID_FIELD` maps platform → identity column, so each platform keeps its own field. The schema allows one `User` row to hold both ids, but no account-linking flow exists yet |
+| Remove the `discord.py` dependency | Kept — Discord is still a supported surface |
+| Update magic-link auth for Messenger identity | Already platform-agnostic; `make_progress_token` signs `user.pk`, not a platform id |
+
+**Adding a platform now:** write a transport module that does the platform's I/O, add one `PLATFORM_ID_FIELD` entry, add its identity column to `User`. No engine or dispatch changes. See the Architecture section of `CLAUDE.md`.
+
+**Still open:** Meta app review is required before Messenger can serve users beyond the app's test accounts.
+
 
 ---
 

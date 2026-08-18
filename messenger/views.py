@@ -14,9 +14,8 @@ from engine.dispatch import (
     FALLBACK_ERROR_TEXT,
     IncomingEvent,
     handle as dispatch_handle,
-    resolve_user,
+    handle_welcome,
 )
-from engine.onboarding import FIRST_MESSAGE
 from messenger.client import send_message
 
 logger = logging.getLogger('messenger')
@@ -117,8 +116,11 @@ def webhook(request):
             postback = event.get('postback', {})
             if postback.get('payload') == 'GET_STARTED':
                 try:
-                    async_to_sync(resolve_user)('messenger', psid, sender.get('name', ''))
-                    send_message(psid, FIRST_MESSAGE)
+                    replies = async_to_sync(handle_welcome)(
+                        'messenger', psid, sender.get('name', ''),
+                    )
+                    for reply in replies:
+                        send_message(psid, reply.text)
                 except Exception:
                     logger.exception('Error processing GET_STARTED from %s', psid)
                 continue

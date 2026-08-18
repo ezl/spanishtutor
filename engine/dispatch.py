@@ -176,6 +176,22 @@ COMMANDS = {
 }
 
 
+async def handle_welcome(platform: str, external_id: str, display_name: str = '') -> list:
+    """Entry point for a platform's explicit "start" affordance — Messenger's
+    Get Started button tap, or any future equivalent — where there is no user
+    text to route.
+
+    Ensures the User row exists and returns the onboarding greeting. Separate
+    from handle() because the trigger carries no message: handle() would have
+    to invent one. Idempotent for an existing user (they just get the greeting
+    again), which matches how the button behaves.
+    """
+    from engine.onboarding import FIRST_MESSAGE
+
+    await resolve_user(platform, external_id, display_name)
+    return [Reply(text=FIRST_MESSAGE)]
+
+
 async def handle(event: IncomingEvent) -> list:
     """The single entry point every transport calls with a normalized event.
 
