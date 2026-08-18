@@ -4,7 +4,28 @@
 
 ## V1 — Foundation (current)
 
-**Goal:** Luz Angela working end-to-end for a single user. Full evaluation, all 5 language modes including voice, skill grid populated progressively, daily reminders, progress view.
+**Goal:** Luz Angela working end-to-end for a single user. Full evaluation, skill grid populated progressively, daily reminders, progress view — delivered over chat, **text only**.
+
+### This phase is text-only, on a transport-agnostic engine
+
+Two decisions define the shape of V1. They are deliberate, and they hold until Phase 5.
+
+**1. Text only, on every chat platform.** No voice, no images, no attachments of any kind. There is no STT/TTS code in the repo and none is planned for a chat surface — voice is built web-first in Phase 5, where we control capture quality, streaming, and latency. `dispatch.IncomingEvent` therefore has no attachments field, on purpose. A transport that receives a non-text message should tell the user we're text-only, not silently drop it.
+
+**2. The engine is separated from the transport layer.** Luz is an engine; a messaging platform is an implementation detail. Three layers, each aware only of the one below:
+
+```
+bot/client.py (Discord)  ┐
+                         ├──▶ engine/dispatch.py ──▶ engine/core.py ──▶ Postgres
+messenger/views.py (Meta)┘     handle(IncomingEvent)   handle_message()
+                                  -> list[Reply]
+```
+
+`engine/dispatch.py` owns everything that is not platform-specific: user resolution, the first-message/welcome flow, all commands, error wrapping, and building the reply list. A transport does platform I/O and nothing else — its only engine import is `engine.dispatch`.
+
+**Why this matters for the roadmap:** adding a platform (WhatsApp, SMS, Telegram, in-app web chat) is a new transport module, one `PLATFORM_ID_FIELD` entry, and an identity column on `User`. No engine or dispatch changes, and every existing command works on the new platform the day it ships. Any feature that isn't purely about how a platform sends bytes belongs in dispatch or below — if it gets written into `bot/` or `messenger/`, it will have to be written again for the next platform.
+
+See the Architecture section of `CLAUDE.md` for the detail, and Phase 8 for how this shipped.
 
 See V1 tickets below.
 
@@ -13,7 +34,7 @@ See V1 tickets below.
 - Payment / Stripe
 - Public website / landing page
 - Web UI
-- Voice channels (DM voice messages only in V1)
+- **All voice and attachments** — voice arrives in Phase 5, web-first. Chat platforms stay text-only.
 
 ---
 
