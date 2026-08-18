@@ -5,17 +5,25 @@ import json
 import logging
 import threading
 
-from asgiref.sync import sync_to_async
+from asgiref.sync import async_to_sync, sync_to_async
 from django.conf import settings
 from django.http import HttpResponse
 from django.views.decorators.csrf import csrf_exempt
 
+from engine.dispatch import (
+    FALLBACK_ERROR_TEXT,
+    IncomingEvent,
+    handle as dispatch_handle,
+    resolve_user,
+)
 from engine.onboarding import FIRST_MESSAGE
 from messenger.client import send_message
 
 logger = logging.getLogger('messenger')
 
-FALLBACK_ERROR_MESSAGE = 'Lo siento, tuve un problema. 😅 Try again in a moment!'
+# Single source of truth lives in engine.dispatch — the transport only needs it
+# for failures in its own send path (dispatch already wraps engine errors).
+FALLBACK_ERROR_MESSAGE = FALLBACK_ERROR_TEXT
 
 
 def _valid_signature(body: bytes, header: str) -> bool:
@@ -26,15 +34,6 @@ def _valid_signature(body: bytes, header: str) -> bool:
         return True  # skip validation in dev if secret not set
     mac = hmac.new(secret.encode(), body, hashlib.sha256)
     return hmac.compare_digest(mac.hexdigest(), header[7:])
-
-
-def _get_or_create_user(psid: str, name: str):
-    """Sync wrapper — resolution logic lives in engine.dispatch. Used by the
-    GET_STARTED postback handler (which is sync); the async message-processing
-    path calls engine.dispatch.resolve_user directly."""
-    from asgiref.sync import async_to_sync
-    from engine.dispatch import resolve_user
-    return async_to_sync(resolve_user)('messenger', psid, name)
 
 
 def _run_async_in_background(coro) -> None:
@@ -65,8 +64,6 @@ async def _process_message_async(psid: str, name: str, text: str) -> None:
 
     Error handling now lives in dispatch.handle — this wrapper only handles
     unexpected failures from the send_message path itself."""
-    from engine.dispatch import IncomingEvent, handle as dispatch_handle
-
     try:
         event = IncomingEvent(
             platform='messenger', external_id=psid,
@@ -120,7 +117,7 @@ def webhook(request):
             postback = event.get('postback', {})
             if postback.get('payload') == 'GET_STARTED':
                 try:
-                    user, is_new = _get_or_create_user(psid, sender.get('name', ''))
+                    async_to_sync(resolve_user)('messenger', psid, sender.get('name', ''))
                     send_message(psid, FIRST_MESSAGE)
                 except Exception:
                     logger.exception('Error processing GET_STARTED from %s', psid)

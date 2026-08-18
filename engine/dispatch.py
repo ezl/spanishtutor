@@ -182,14 +182,12 @@ async def handle(event: IncomingEvent) -> list:
     Owns:
     - User resolution + creation
     - First-message flow for brand-new users (returns [Reply(FIRST_MESSAGE)])
+    - Command dispatch (the COMMANDS table above — works on every platform)
     - Engine dispatch (routes text to engine.core.handle_message)
     - Error wrapping (any exception returns a friendly fallback Reply)
     - Building Reply list from the engine's response dict
 
     Returns: list[Reply] the transport should send in order.
-
-    Commands (!reset, !translate, etc.) migrate into this dispatcher in a
-    subsequent step; today they're still handled at the transport layer.
     """
     import logging
     from engine.core import handle_message

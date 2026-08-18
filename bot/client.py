@@ -3,20 +3,18 @@ import logging
 import traceback
 import discord
 import django.conf
-from asgiref.sync import sync_to_async
-from engine.onboarding import FIRST_MESSAGE
+
+from engine.dispatch import FALLBACK_ERROR_TEXT, IncomingEvent, handle as dispatch_handle
 
 logger = logging.getLogger('bot')
 
 DISCORD_RETRIES = 1
 DISCORD_RETRY_DELAY = 2.0
-USER_ERROR_MESSAGE = "Lo siento, tuve un problema. 😅 Try again in a moment!"
+# Single source of truth lives in engine.dispatch — the transport only needs it
+# for failures in its own send path (dispatch already wraps engine errors).
+USER_ERROR_MESSAGE = FALLBACK_ERROR_TEXT
 
 _user_locks: dict[str, asyncio.Lock] = {}
-
-
-def _is_retryable_discord_error(exc) -> bool:
-    return isinstance(exc, discord.DiscordServerError)
 
 
 _DISCORD_MAX = 1990
@@ -48,13 +46,11 @@ async def _send(channel, text: str) -> None:
     """Send a message (chunked if needed) with one retry on transient Discord errors."""
     text = _discord_safe(text)
     for chunk in _chunk(text):
-        last_exc = None
         for attempt in range(DISCORD_RETRIES + 1):
             try:
                 await channel.send(chunk)
                 break
             except discord.DiscordServerError as exc:
-                last_exc = exc
                 if attempt < DISCORD_RETRIES:
                     logger.warning('Discord send failed (attempt %d/%d), retrying in %.0fs: %s',
                                    attempt + 1, DISCORD_RETRIES + 1, DISCORD_RETRY_DELAY, exc)
@@ -68,13 +64,6 @@ intents.message_content = True
 intents.dm_messages = True
 
 client = discord.Client(intents=intents)
-
-
-async def get_or_create_user(discord_user: discord.User):
-    """Thin wrapper — resolution logic lives in engine.dispatch so all
-    platforms share one implementation."""
-    from engine.dispatch import resolve_user
-    return await resolve_user('discord', str(discord_user.id), discord_user.display_name)
 
 
 @client.event
@@ -91,16 +80,11 @@ async def on_message(message: discord.Message):
 
     text = message.content.strip()
 
-    # Commands are dispatched inside engine.dispatch — no need to intercept
-    # them here. Everything (regular messages + !reset/!translate/etc.) flows
-    # through the dispatcher.
-
     uid = str(message.author.id)
     if uid not in _user_locks:
         _user_locks[uid] = asyncio.Lock()
 
     try:
-        from engine.dispatch import IncomingEvent, handle as dispatch_handle
         async with _user_locks[uid]:
             async with message.channel.typing():
                 event = IncomingEvent(
