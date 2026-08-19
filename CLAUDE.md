@@ -44,6 +44,7 @@ Three layers. Each one only knows about the layer directly below it.
 
 - **User resolution** — `resolve_user(platform, external_id, display_name)`. `PLATFORM_ID_FIELD` maps a platform name to the `User` column holding its identity (`discord_id`, `messenger_psid`). Adding a platform means adding one entry here, not a new lookup path.
 - **First-message flow** — a brand-new user gets `FIRST_MESSAGE` before the engine ever sees the text.
+- **The non-text guard** — voice clips, photos and stickers reach dispatch as empty `text` and get `NON_TEXT_NOTICE_TEXT`. It sits above command and engine routing (an attachment must never be scored as a blank answer) and below the first-message check (a new user sending a sticker gets onboarded, not corrected). Transports pass empty text through; none of them knows what an attachment is.
 - **Commands** — the `COMMANDS` table (`!reset`, `!retest`, `!english`, `!spanish`, `!menu`, `!translate`). Commands live here, never in a transport, so every command works on every platform for free.
 - **Error wrapping** — any exception below dispatch becomes a friendly `Reply`, so no transport needs its own engine-error handling.
 - **Welcome flow** — `handle_welcome(platform, external_id, display_name)` for a platform's explicit "start" affordance (Messenger's Get Started button), where there's no user text to route.

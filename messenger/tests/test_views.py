@@ -180,3 +180,78 @@ def test_get_started_postback_creates_user_and_sends_first_message():
     assert response.status_code == 200
     mock_send.assert_called_once_with('psid_getstarted', FIRST_MESSAGE)
     assert User.objects.filter(messenger_psid='psid_getstarted').exists()
+
+
+def _non_text_payload(psid: str = 'psid_sticker', name: str = 'Tester') -> dict:
+    """What Meta sends for a sticker, photo or voice clip: a message event
+    carrying attachments and no 'text' key at all."""
+    return {
+        'object': 'page',
+        'entry': [{
+            'messaging': [{
+                'sender': {'id': psid, 'name': name},
+                'message': {
+                    'mid': 'm_1',
+                    'attachments': [{'type': 'image', 'payload': {'sticker_id': 369239263222822}}],
+                },
+            }],
+        }],
+    }
+
+
+def _run_coro_inline(coro):
+    """Stand-in for _run_async_in_background that runs the coroutine to
+    completion, so a test can assert on what the user actually receives."""
+    import asyncio
+    asyncio.run(coro)
+
+
+@pytest.mark.django_db(transaction=True)
+def test_non_text_message_gets_the_text_only_notice():
+    """A thumbs-up sticker is the most common non-text message on Messenger —
+    people send it to mean 'ok'. It used to be dropped in silence."""
+    from engine.dispatch import NON_TEXT_NOTICE_TEXT
+    from learner.models import User
+
+    User.objects.create(messenger_psid='psid_sticker', display_name='Tester')
+
+    with patch('messenger.views.send_message') as mock_send:
+        with patch('messenger.views._valid_signature', return_value=True):
+            with patch('messenger.views._run_async_in_background', new=_run_coro_inline):
+                response = Client().post(
+                    '/webhook/messenger/',
+                    data=json.dumps(_non_text_payload()),
+                    content_type='application/json',
+                )
+
+    assert response.status_code == 200
+    mock_send.assert_called_once_with('psid_sticker', NON_TEXT_NOTICE_TEXT)
+
+
+@pytest.mark.django_db(transaction=True)
+def test_delivery_and_read_receipts_are_ignored():
+    """Meta fires delivery/read events for every message the page sends. They
+    carry no 'message' key — routing them to dispatch would answer each one
+    with the non-text notice, i.e. reply to our own replies forever."""
+    receipts = {
+        'object': 'page',
+        'entry': [{
+            'messaging': [
+                {'sender': {'id': 'psid_receipt'}, 'delivery': {'mids': ['m_1'], 'watermark': 1}},
+                {'sender': {'id': 'psid_receipt'}, 'read': {'watermark': 1}},
+            ],
+        }],
+    }
+
+    with patch('messenger.views.send_message') as mock_send:
+        with patch('messenger.views._valid_signature', return_value=True):
+            with patch('messenger.views._run_async_in_background') as bg:
+                response = Client().post(
+                    '/webhook/messenger/',
+                    data=json.dumps(receipts),
+                    content_type='application/json',
+                )
+
+    assert response.status_code == 200
+    bg.assert_not_called()
+    mock_send.assert_not_called()

@@ -10,7 +10,7 @@
 
 Two decisions define the shape of V1. They are deliberate, and they hold until Phase 5.
 
-**1. Text only, on every chat platform.** No voice, no images, no attachments of any kind. There is no STT/TTS code in the repo and none is planned for a chat surface — voice is built web-first in Phase 5, where we control capture quality, streaming, and latency. `dispatch.IncomingEvent` therefore has no attachments field, on purpose. A transport that receives a non-text message should tell the user we're text-only, not silently drop it.
+**1. Text only, on every chat platform.** No voice, no images, no attachments of any kind. There is no STT/TTS code in the repo and none is planned for a chat surface — voice is built web-first in Phase 5, where we control capture quality, streaming, and latency. `dispatch.IncomingEvent` therefore has no attachments field, on purpose. A non-text message is answered with `dispatch.NON_TEXT_NOTICE_TEXT` rather than silently dropped — the guard lives in dispatch, so every platform inherits it.
 
 **2. The engine is separated from the transport layer.** Luz is an engine; a messaging platform is an implementation detail. Three layers, each aware only of the one below:
 

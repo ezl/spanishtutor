@@ -371,3 +371,72 @@ class TestHandleWelcome:
 
         with pytest.raises(ValueError):
             await handle_welcome('carrier_pigeon', 'x', 'y')
+
+
+class TestNonTextGuard:
+    """Non-text messages (voice clips, photos, stickers) arrive at dispatch as
+    empty text. The guard lives here, not in transports, so every platform —
+    present and future — inherits the same behavior."""
+
+    @pytest.mark.asyncio
+    @pytest.mark.django_db(transaction=True)
+    async def test_empty_text_never_reaches_the_engine(self):
+        """Regression: an image-only Discord DM used to reach handle_message as
+        '' — consuming a teach_drill turn and being scored as a wrong answer."""
+        from unittest.mock import patch, AsyncMock
+        from engine.dispatch import IncomingEvent, NON_TEXT_NOTICE_TEXT, handle
+        from learner.models import User
+
+        await sync_to_async(User.objects.create)(
+            discord_id='d_empty_text', display_name='Quiet',
+        )
+
+        with patch('engine.core.handle_message', new=AsyncMock()) as engine_call:
+            event = IncomingEvent(
+                platform='discord', external_id='d_empty_text',
+                display_name='Quiet', text='',
+            )
+            replies = await handle(event)
+
+        engine_call.assert_not_called()
+        assert len(replies) == 1
+        assert replies[0].text == NON_TEXT_NOTICE_TEXT
+        assert replies[0].session_ended is False
+
+    @pytest.mark.asyncio
+    @pytest.mark.django_db(transaction=True)
+    async def test_whitespace_only_text_gets_the_notice(self):
+        from unittest.mock import patch, AsyncMock
+        from engine.dispatch import IncomingEvent, NON_TEXT_NOTICE_TEXT, handle
+        from learner.models import User
+
+        await sync_to_async(User.objects.create)(
+            messenger_psid='psid_whitespace', display_name='Space',
+        )
+
+        with patch('engine.core.handle_message', new=AsyncMock()) as engine_call:
+            event = IncomingEvent(
+                platform='messenger', external_id='psid_whitespace',
+                display_name='Space', text='   \n  ',
+            )
+            replies = await handle(event)
+
+        engine_call.assert_not_called()
+        assert replies[0].text == NON_TEXT_NOTICE_TEXT
+
+    @pytest.mark.asyncio
+    @pytest.mark.django_db(transaction=True)
+    async def test_brand_new_user_is_greeted_not_scolded(self):
+        """Someone whose very first message is a sticker should be onboarded,
+        not told about the text-only limitation — the guard sits below the
+        first-message check on purpose."""
+        from engine.dispatch import IncomingEvent, handle
+        from engine.onboarding import FIRST_MESSAGE
+
+        event = IncomingEvent(
+            platform='messenger', external_id='psid_sticker_first',
+            display_name='Primera', text='',
+        )
+        replies = await handle(event)
+
+        assert replies[0].text == FIRST_MESSAGE

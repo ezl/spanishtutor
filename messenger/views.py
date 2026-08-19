@@ -128,10 +128,16 @@ def webhook(request):
             # Ignore echo events (messages sent by the page itself)
             if event.get('message', {}).get('is_echo'):
                 continue
-            message = event.get('message', {})
-            text = message.get('text', '').strip()
-            if not text:
+            # Only message events reach dispatch. Delivery/read receipts and
+            # other postbacks carry no 'message' key — routing those through
+            # would answer each one with the non-text notice.
+            if 'message' not in event:
                 continue
+            message = event['message']
+            # Stickers, photos and voice clips arrive with no 'text'. They pass
+            # through as empty text and dispatch answers them, so this shim
+            # never has to know what an attachment is.
+            text = message.get('text', '').strip()
             name = sender.get('name', '')
             # Fire-and-forget: return 200 to Meta immediately, process the
             # message in a background thread. Reply comes back to the user via

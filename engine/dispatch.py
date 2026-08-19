@@ -69,6 +69,15 @@ async def resolve_user(platform: str, external_id: str, display_name: str) -> tu
 
 FALLBACK_ERROR_TEXT = "Lo siento, tuve un problema. 😅 Try again in a moment!"
 
+# Chat platforms deliver voice clips, photos and stickers as a message with no
+# text. Every transport normalizes that to an empty IncomingEvent.text, and the
+# guard in handle() below turns it into this notice — so no transport needs to
+# know what an attachment is, and none can leak an empty turn into the engine.
+NON_TEXT_NOTICE_TEXT = (
+    "¡Ay! I can only read text right now. 📝 Voice and photos are coming to "
+    "the web app later — for now, type it out and I'll help!"
+)
+
 
 # ── Commands ─────────────────────────────────────────────────────────────────
 # Text-prefix commands the student can type in any chat platform. Handlers
@@ -198,6 +207,7 @@ async def handle(event: IncomingEvent) -> list:
     Owns:
     - User resolution + creation
     - First-message flow for brand-new users (returns [Reply(FIRST_MESSAGE)])
+    - The non-text guard (empty text -> NON_TEXT_NOTICE_TEXT, engine untouched)
     - Command dispatch (the COMMANDS table above — works on every platform)
     - Engine dispatch (routes text to engine.core.handle_message)
     - Error wrapping (any exception returns a friendly fallback Reply)
@@ -218,6 +228,13 @@ async def handle(event: IncomingEvent) -> list:
 
         if is_new:
             return [Reply(text=FIRST_MESSAGE)]
+
+        # Non-text guard. Sits above command dispatch and the engine so an
+        # attachment-only message can never be scored as a (blank) answer.
+        # Below the is_new check on purpose: someone whose first ever message
+        # is a sticker should be onboarded, not corrected.
+        if not event.text.strip():
+            return [Reply(text=NON_TEXT_NOTICE_TEXT)]
 
         # Command dispatch — text-prefix commands short-circuit the engine.
         # Case-insensitive match on the exact stripped text.
