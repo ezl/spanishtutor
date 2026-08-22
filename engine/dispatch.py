@@ -83,10 +83,17 @@ NON_TEXT_NOTICE_TEXT = (
 # CTA). Deliberately dumb: it starts no session and calls no model, so the
 # engine's own returning-user check-in still fires on their next message and
 # stays the only thing that knows what a check-in is.
-WELCOME_BACK_TEXT = (
-    "¡Aquí estoy! 🌟 Escríbeme cuando quieras seguir.\n"
-    "(I'm here — say the word whenever you're ready.)"
-)
+#
+# Spanish first with an English gloss, matching FIRST_MESSAGE — a returning
+# student may still be A1, and the one thing they must understand is how to
+# begin.
+def welcome_back_text(name: str) -> str:
+    greeting = f"¡Hola de nuevo, {name}!" if name else "¡Hola de nuevo!"
+    return (
+        f"👋 {greeting}\n"
+        "¿Comenzamos una nueva lección? Di «sí».\n\n"
+        "(Ready for a new lesson? Say \"sí\" to start.)"
+    )
 
 
 # ── Commands ─────────────────────────────────────────────────────────────────
@@ -264,7 +271,7 @@ async def handle_welcome(platform: str, external_id: str, display_name: str = ''
     if has_open_session:
         return []
 
-    return [Reply(text=WELCOME_BACK_TEXT)]
+    return [Reply(text=welcome_back_text(user.display_name))]
 
 
 async def handle(event: IncomingEvent) -> list:

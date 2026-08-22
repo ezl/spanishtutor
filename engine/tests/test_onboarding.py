@@ -313,3 +313,20 @@ class TestMenuStartOver:
         assert not await sync_to_async(SkillScore.objects.filter(user=user).exists)()
         assert not await sync_to_async(UserInterest.objects.filter(user=user).exists)()
         assert not await sync_to_async(Session.objects.filter(user=user).exists)()
+
+
+class TestFirstMessage:
+    def test_introduces_the_assessment_and_still_asks_for_a_name(self):
+        """FIRST_MESSAGE is the de-facto greeting: Meta won't let a Page speak
+        first, so this is the earliest thing a stranger from the website can
+        see. It has to set up the assessment AND ask for a name — the very next
+        message is stored verbatim as display_name by _step_collect_name, so a
+        greeting ending in "Ready to start?" would name the user "Yes"."""
+        from engine.onboarding import FIRST_MESSAGE
+        t = FIRST_MESSAGE.lower()
+        assert 'luz angela' in t
+        assert 'assessment' in t
+        assert 'name' in t or 'call you' in t, (
+            'FIRST_MESSAGE must end by asking for a name; the next message is '
+            'stored verbatim as display_name'
+        )

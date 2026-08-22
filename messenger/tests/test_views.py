@@ -281,7 +281,7 @@ def _referral_payload(psid: str = 'psid_referral', ref: str = 'web_hero') -> dic
 def test_referral_event_answers_a_returning_student():
     """Regression: this event used to be dropped, so a returning student who
     clicked the site's only CTA landed in a silent thread."""
-    from engine.dispatch import WELCOME_BACK_TEXT
+    from engine.dispatch import welcome_back_text
     from learner.models import User
 
     User.objects.create(
@@ -298,7 +298,7 @@ def test_referral_event_answers_a_returning_student():
             )
 
     assert response.status_code == 200
-    mock_send.assert_called_once_with('psid_referral', WELCOME_BACK_TEXT)
+    mock_send.assert_called_once_with('psid_referral', welcome_back_text('Ana'))
 
 
 @pytest.mark.django_db(transaction=True)
@@ -338,3 +338,94 @@ def test_referral_event_does_not_interrupt_an_open_lesson():
             )
 
     mock_send.assert_not_called()
+
+
+# ── Ice breaker postbacks ────────────────────────────────────────────────────
+
+def _postback_payload(psid: str, payload: str) -> dict:
+    """A tapped ice breaker arrives as a messaging_postbacks event, same shape
+    as Get Started but with our own payload string."""
+    return {
+        'object': 'page',
+        'entry': [{
+            'messaging': [{
+                'sender': {'id': psid},
+                'recipient': {'id': 'page_1'},
+                'postback': {'title': 'Start assessment', 'payload': payload},
+            }],
+        }],
+    }
+
+
+@pytest.mark.django_db(transaction=True)
+def test_ice_breaker_postback_starts_onboarding():
+    """Regression: the webhook only matched the literal GET_STARTED payload, so
+    any other postback fell through to `if 'message' not in event: continue`
+    and was silently dropped — a tapped ice breaker did nothing."""
+    from engine.onboarding import FIRST_MESSAGE
+    from learner.models import User
+
+    with patch('messenger.views.send_message') as mock_send:
+        with patch('messenger.views._valid_signature', return_value=True):
+            resp = Client().post(
+                '/webhook/messenger/',
+                data=json.dumps(_postback_payload('psid_ice', 'START_ASSESSMENT')),
+                content_type='application/json',
+            )
+
+    assert resp.status_code == 200
+    mock_send.assert_called_once_with('psid_ice', FIRST_MESSAGE)
+    assert User.objects.filter(messenger_psid='psid_ice').exists()
+
+
+@pytest.mark.django_db(transaction=True)
+def test_unknown_postback_payload_is_ignored_not_answered():
+    """A postback we don't recognise must not be answered as if it were a
+    start affordance — that would let any future button we add silently
+    re-onboard people."""
+    with patch('messenger.views.send_message') as mock_send:
+        with patch('messenger.views._valid_signature', return_value=True):
+            Client().post(
+                '/webhook/messenger/',
+                data=json.dumps(_postback_payload('psid_unknown', 'SOME_FUTURE_THING')),
+                content_type='application/json',
+            )
+
+    mock_send.assert_not_called()
+
+
+# ── Signature validation fails closed in production ──────────────────────────
+
+class TestSignatureFailsClosed:
+    """The webhook URL is registered with Meta and appears in logs — it is not
+    a secret. If MESSENGER_APP_SECRET goes missing in production, accepting
+    unsigned POSTs lets anyone forge a message from any PSID."""
+
+    def test_missing_secret_rejects_when_debug_is_off(self, settings):
+        from messenger.views import _valid_signature
+        settings.DEBUG = False
+        settings.MESSENGER_APP_SECRET = ''
+        assert _valid_signature(b'{}', 'sha256=whatever') is False
+
+    def test_missing_secret_still_allowed_in_local_dev(self, settings):
+        """Local development has no app secret and no tunnel; requiring one
+        would make the webhook untestable offline."""
+        from messenger.views import _valid_signature
+        settings.DEBUG = True
+        settings.MESSENGER_APP_SECRET = ''
+        assert _valid_signature(b'{}', 'sha256=whatever') is True
+
+    def test_correct_signature_is_accepted(self, settings):
+        import hashlib, hmac
+        from messenger.views import _valid_signature
+        settings.DEBUG = False
+        settings.MESSENGER_APP_SECRET = 'topsecret'
+        body = b'{"object":"page"}'
+        sig = hmac.new(b'topsecret', body, hashlib.sha256).hexdigest()
+        assert _valid_signature(body, f'sha256={sig}') is True
+
+    def test_wrong_signature_is_rejected(self, settings):
+        from messenger.views import _valid_signature
+        settings.DEBUG = False
+        settings.MESSENGER_APP_SECRET = 'topsecret'
+        assert _valid_signature(b'{"object":"page"}', 'sha256=deadbeef') is False

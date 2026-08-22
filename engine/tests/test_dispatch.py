@@ -516,7 +516,7 @@ class TestWelcomeIsLevelAware:
     @pytest.mark.asyncio
     @pytest.mark.django_db(transaction=True)
     async def test_returning_user_is_not_asked_to_onboard_again(self):
-        from engine.dispatch import WELCOME_BACK_TEXT, handle_welcome
+        from engine.dispatch import welcome_back_text, handle_welcome
         from learner.models import User
 
         await sync_to_async(User.objects.create)(
@@ -527,7 +527,23 @@ class TestWelcomeIsLevelAware:
         replies = await handle_welcome('messenger', 'psid_back', 'Ana')
 
         assert len(replies) == 1
-        assert replies[0].text == WELCOME_BACK_TEXT
+        assert replies[0].text == welcome_back_text('Ana')
+
+    @pytest.mark.asyncio
+    @pytest.mark.django_db(transaction=True)
+    async def test_welcome_back_greets_the_student_by_name(self):
+        from engine.dispatch import handle_welcome
+        from learner.models import User
+
+        await sync_to_async(User.objects.create)(
+            messenger_psid='psid_named', display_name='Ana',
+            estimated_cefr_level='B1', onboarding_complete=True,
+        )
+
+        replies = await handle_welcome('messenger', 'psid_named', 'Ana')
+
+        assert 'Ana' in replies[0].text
+        assert 'sí' in replies[0].text.lower()
 
     @pytest.mark.asyncio
     @pytest.mark.django_db(transaction=True)

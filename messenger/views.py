@@ -25,12 +25,31 @@ logger = logging.getLogger('messenger')
 FALLBACK_ERROR_MESSAGE = FALLBACK_ERROR_TEXT
 
 
+# Postback payloads that mean "start a conversation". Kept in sync with the
+# ice breakers registered in messenger/setup.py — a payload configured there
+# and missing here is delivered and then dropped.
+WELCOME_POSTBACK_PAYLOADS = frozenset({
+    'GET_STARTED',
+    'START_ASSESSMENT',
+})
+
+
 def _valid_signature(body: bytes, header: str) -> bool:
     if not header.startswith('sha256='):
         return False
     secret = settings.MESSENGER_APP_SECRET
     if not secret:
-        return True  # skip validation in dev if secret not set
+        # Fail closed in production. This endpoint's URL is registered with
+        # Meta and shows up in logs, so trusting unsigned POSTs would let
+        # anyone forge a message from any PSID. Only local dev, which has no
+        # app secret and no tunnel, is allowed to skip the check.
+        if not settings.DEBUG:
+            logger.error(
+                'MESSENGER_APP_SECRET is not set — rejecting webhook request. '
+                'Set it on the service that serves this endpoint.'
+            )
+            return False
+        return True
     mac = hmac.new(secret.encode(), body, hashlib.sha256)
     return hmac.compare_digest(mac.hexdigest(), header[7:])
 
@@ -129,10 +148,15 @@ def webhook(request):
             if not psid:
                 continue
 
-            # Get Started button tap. Carries postback.referral when the user
+            # Start affordances that arrive as postbacks: the Get Started
+            # button and any ice breaker. Both mean "this person is opening a
+            # conversation with no text to route", which is what handle_welcome
+            # exists for. Matched against an explicit table rather than "any
+            # postback" so a future button can't silently re-onboard someone.
+            # Get Started additionally carries postback.referral when the user
             # arrived from an m.me?ref= link (i.e. the website CTA).
             postback = event.get('postback', {})
-            if postback.get('payload') == 'GET_STARTED':
+            if postback.get('payload') in WELCOME_POSTBACK_PAYLOADS:
                 _welcome(psid, sender, postback.get('referral', {}).get('ref', ''))
                 continue
 

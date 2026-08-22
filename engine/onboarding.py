@@ -24,10 +24,19 @@ def _fix_blanks(text: str) -> str:
 # Hardcoded strings — never LLM-generated
 # ---------------------------------------------------------------------------
 
-FIRST_MESSAGE = """👋 Hola! Soy Luz Angela, tu profesora de español!
-(Hi! I'm Luz Angela, your Spanish teacher!)
+# The de-facto greeting. Meta forbids a Page messaging first, so this is the
+# earliest thing a stranger arriving from the website can be shown — it fires
+# the moment they tap Get Started or the "Hola!" ice breaker.
+#
+# It MUST end by asking for a name: _step_collect_name stores the very next
+# message verbatim as display_name. A greeting ending "Ready to start?" would
+# name the user "Yes".
+FIRST_MESSAGE = """👋 ¡Hola! Soy Luz Angela, tu profesora de español.
+(Hi! I'm Luz Angela, your personalized Spanish teacher.)
 
-I'm excited to start our Spanish language journey. What's your name?"""
+We'll start with a quick assessment so I know where to begin — it takes about 3 minutes.
+
+First, what should I call you?"""
 
 LISTO_WORDS = {'listo', 'lista', 'ready', 'vamos', 'ok', 'okay', 'yes', 'si', 'sí', 'go', "let's go", 'dale'}
 
