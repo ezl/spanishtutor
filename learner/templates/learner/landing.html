@@ -5,7 +5,31 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>MiniSpanish — Learn Spanish faster, five minutes at a time</title>
   <meta name="description" content="Mini Spanish lessons over chat: teaching, quizzes, and conversation with a tutor who corrects you as you go. Five minutes at a time, personalized to you.">
-  <link rel="icon" href="{% static 'favicon.ico' %}">
+  <link rel="icon" href="{% static 'learner/img/favicon.svg' %}" type="image/svg+xml">
+  <link rel="icon" href="{% static 'learner/img/favicon-32.png' %}" sizes="32x32" type="image/png">
+  {# Separate cut: the wave inside the bubble does not resolve at 16px. #}
+  <link rel="icon" href="{% static 'learner/img/favicon-16.png' %}" sizes="16x16" type="image/png">
+  <link rel="apple-touch-icon" href="{% static 'learner/img/apple-touch-icon.png' %}" sizes="180x180">
+  <meta name="theme-color" content="#f4623a">
+
+  {% comment %}
+    Absolute URLs: scrapers do not resolve relative ones. Facebook, Slack and
+    iMessage cache these hard, so changing og.png later often will not refresh
+    a preview that has already been fetched.
+  {% endcomment %}
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="MiniSpanish">
+  <meta property="og:title" content="Learn Spanish Faster.">
+  <meta property="og:description" content="Mini Spanish lessons over chat. Five minutes at a time.">
+  <meta property="og:url" content="{{ site_url }}">
+  <meta property="og:image" content="{{ site_url }}{% static 'learner/img/og.png' %}">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Learn Spanish Faster. Mini Spanish lessons over chat, five minutes at a time.">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Learn Spanish Faster.">
+  <meta name="twitter:description" content="Mini Spanish lessons over chat. Five minutes at a time.">
+  <meta name="twitter:image" content="{{ site_url }}{% static 'learner/img/og.png' %}">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Karla:wght@300;400;500;600&display=swap" rel="stylesheet">

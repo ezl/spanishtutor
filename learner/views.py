@@ -60,6 +60,8 @@ def landing(request):
         'messenger_url': settings.MESSENGER_LINK,
         'discord_url': settings.DISCORD_INVITE,
         'contact_email': settings.CONTACT_EMAIL,
+        # Social scrapers do not resolve relative URLs.
+        'site_url': settings.BASE_URL.rstrip('/'),
         'year': timezone.now().year,
     })
 

@@ -77,3 +77,28 @@ def test_no_pricing_claims():
 
     assert '$' not in body
     assert 'free' not in body
+
+
+@pytest.mark.django_db
+def test_social_image_url_is_absolute(settings):
+    """Scrapers do not resolve relative URLs. A relative og:image silently
+    yields no preview at all."""
+    settings.BASE_URL = 'https://example.test'
+
+    body = _render()
+
+    assert 'content="https://example.test/static/learner/img/og.png"' in body
+    assert 'property="og:image:width" content="1200"' in body
+    assert 'name="twitter:card" content="summary_large_image"' in body
+
+
+@pytest.mark.django_db
+def test_favicon_ships_a_separate_16px_cut():
+    """The wave inside the bubble does not resolve at 16px, so the small size
+    is its own simplified file rather than the same one scaled."""
+    body = _render()
+
+    assert 'favicon-16.png' in body
+    assert 'favicon-32.png' in body
+    assert 'favicon.svg' in body
+    assert 'apple-touch-icon.png' in body
