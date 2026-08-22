@@ -1591,3 +1591,60 @@ class TestContrastSpecCoversTwoPastTenseSkills:
     def test_spec_forbids_an_identical_known_and_target_side(self):
         from engine.teach_drill import TEACH_DRILL_CONTINUATION_SUFFIX
         assert "identical" in TEACH_DRILL_CONTINUATION_SUFFIX.lower()
+
+
+class TestEveryParadigmRowIsGlossed:
+    """The student asked for `spanish → spanish (english → english)` on every row
+    and got row 1 only. The prompt gave three conflicting signals and the model
+    followed the demonstrations, which glossed row 1 or nothing at all."""
+
+    def _contrast_example_rows(self):
+        from engine.teach_drill import (
+            TEACH_DRILL_CONTINUATION_SUFFIX, CONTRAST_ROW_PERSONS)
+        rows = []
+        for line in TEACH_DRILL_CONTINUATION_SUFFIX.splitlines():
+            row = line.strip()
+            if '→' not in row or not row:
+                continue
+            if row.split()[0].strip('*_:.`').casefold() not in CONTRAST_ROW_PERSONS:
+                continue
+            rows.append(row)
+        return rows
+
+    def test_the_examples_are_actually_found(self):
+        """Guards the parser itself — a silent zero would make the next test vacuous."""
+        assert len(self._contrast_example_rows()) >= 10
+
+    def test_every_demonstrated_row_carries_a_gloss(self):
+        unglossed = [r for r in self._contrast_example_rows()
+                     if not r.rstrip().endswith(')')]
+        assert unglossed == [], f"examples still demonstrate ungloassed rows: {unglossed}"
+
+    def test_the_rule_says_every_row(self):
+        from engine.teach_drill import TEACH_DRILL_CONTINUATION_SUFFIX
+        assert "every row" in TEACH_DRILL_CONTINUATION_SUFFIX.lower()
+
+    def test_the_less_glossing_tiebreak_excludes_paradigm_rows(self):
+        """The tie-breaker is what the model followed. It must no longer apply."""
+        from engine.teach_drill import TEACH_DRILL_CONTINUATION_SUFFIX
+        sentences = [s for s in TEACH_DRILL_CONTINUATION_SUFFIX.lower().split('.')
+                     if "err on less glossing" in s]
+        assert sentences, "the tie-break sentence is gone entirely"
+        # The sentence carrying the tie-break must itself carve out paradigm rows,
+        # otherwise it still competes with the rule the model is meant to follow.
+        assert all("paradigm row" in s for s in sentences), sentences
+
+
+class TestGlossDirectiveIsExplicit:
+    def test_paradigm_turn_is_told_to_gloss_every_row(self):
+        from engine.teach_drill import build_teach_instruction
+        unit = {"id": "ir", "label": "ir", "note": "", "kind": "paradigm"}
+        instr = build_teach_instruction(unit, person_new="yo", is_final=False)
+        assert "gloss" in instr.lower()
+        assert "every row" in instr.lower()
+
+    def test_usage_turn_is_not_given_a_paradigm_gloss_order(self):
+        from engine.teach_drill import build_teach_instruction
+        unit = {"id": "trig", "label": "Trigger words", "note": "", "kind": "usage"}
+        instr = build_teach_instruction(unit, person_new="yo", is_final=False)
+        assert "every row" not in instr.lower()

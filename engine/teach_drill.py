@@ -333,26 +333,26 @@ Skill types that REQUIRE CONTRAST format:
 
 Render as `known → target` with English glosses per the GLOSSING rule below:
 
-Preterite example (yo poder):
-    Yo puedo → Yo pude (I can → I could)
-    Tú puedes → Tú pudiste
-    Él puede → Él pudo
-    Nosotros podemos → Nosotros pudimos
-    Ellos pueden → Ellos pudieron
+Preterite example (yo poder — note the preterite meaning shift, which is exactly why every row needs its gloss):
+    Yo puedo → Yo pude (I can → I managed to)
+    Tú puedes → Tú pudiste (you can → you managed to)
+    Él puede → Él pudo (he can → he managed to)
+    Nosotros podemos → Nosotros pudimos (we can → we managed to)
+    Ellos pueden → Ellos pudieron (they can → they managed to)
 
 Imperfect example (yo comer — this is the ACTUAL FAILURE MODE — do NOT render bare):
     Yo como → Yo comía (I eat → I used to eat)
-    Tú comes → Tú comías
-    Él come → Él comía
-    Nosotros comemos → Nosotros comíamos
-    Ellos comen → Ellos comían
+    Tú comes → Tú comías (you eat → you used to eat)
+    Él come → Él comía (he eats → he used to eat)
+    Nosotros comemos → Nosotros comíamos (we eat → we used to eat)
+    Ellos comen → Ellos comían (they eat → they used to eat)
 
 Imperfect example (yo vivir):
-    Yo vivo → Yo vivía
-    Tú vives → Tú vivías
-    Él vive → Él vivía
-    Nosotros vivimos → Nosotros vivíamos
-    Ellos viven → Ellos vivían
+    Yo vivo → Yo vivía (I live → I used to live)
+    Tú vives → Tú vivías (you live → you used to live)
+    Él vive → Él vivía (he lives → he used to live)
+    Nosotros vivimos → Nosotros vivíamos (we live → we used to live)
+    Ellos viven → Ellos vivían (they live → they used to live)
 
 Preterite vs. imperfect (and any skill contrasting two PAST tenses with each other): the contrast is about USAGE, not conjugation. Neither past tense is the "known" side of the other. Teach when each one applies with example sentences. If you do show a paradigm for such a skill, the known side is the PRESENT tense — never the other past tense.
 
@@ -382,10 +382,11 @@ If the skill isn't in the mandatory-CONTRAST list above AND doesn't have an obvi
 With target-form glosses per the level-conditional rule below.
 
 GLOSSING (level-conditional based on student CEFR level above):
+- ALWAYS, at EVERY level: every row of a paradigm carries its own gloss in parens. Never gloss only the first row and leave the rest bare. The row format is `Spanish → Spanish (English → English)`.
 - A1 or A2: gloss ALL Spanish content in parens. Paradigm rows, drill cues, correction lines, example sentences. Meaning-first.
-- B1: gloss target-form content (paradigm rows, drill cues that use the target form, correction lines showing the target form). Do NOT gloss vocabulary the student already knows or example sentences whose meaning is transparent from cognates/context.
-- B2 or higher (C1, C2): minimal glossing. Only exotic vocabulary or idiomatic phrases whose meaning isn't inferable. Push toward Spanish-only processing (desirable difficulty).
-When in doubt at B1+, err on LESS glossing rather than more — over-glossing at higher levels reduces retention.
+- B1: every paradigm row, plus drill cues that use the target form and correction lines showing the target form. Do NOT gloss vocabulary the student already knows or example sentences whose meaning is transparent from cognates/context.
+- B2 or higher (C1, C2): every paradigm row, and otherwise minimal glossing — only exotic vocabulary or idiomatic phrases whose meaning isn't inferable. Push toward Spanish-only processing (desirable difficulty) everywhere EXCEPT the paradigm.
+When in doubt at B1+, err on LESS glossing rather than more, EXCEPT for paradigm rows, which are always fully glossed at every level.
 
 LANGUAGE CONSISTENCY (critical — applies to all prose you write this turn):
 - A1 or A2: respond in English. Spanish appears in paradigm rows, quoted example sentences, and drill/target-form content. Prose framing ("Now for X", "Try this one") stays in English.
@@ -581,6 +582,8 @@ def build_teach_instruction(unit: dict, person_new: str, is_final: bool) -> str:
     else:
         paradigm_lines = (
             f"   - Show the full paradigm one line per person (Yo/Tú/Él/Nosotros/Ellos).\n"
+            f"   - Gloss EVERY row, not just the first: "
+            f"`Spanish → Spanish (English → English)` on every single line.\n"
         )
         known_forms = unit.get("known_forms") or {}
         if known_forms:
