@@ -248,9 +248,12 @@ class TestDispatchHandle:
 
         assert len(replies) == 1
         assert replies[0].text == FIRST_MESSAGE
-        # New row with same external_id but reset state.
+        # Same row, reset state. The row is kept rather than recreated so the
+        # platform identity and the pk (which outstanding magic links are
+        # signed against) both survive.
         new_user = await sync_to_async(User.objects.get)(discord_id='d_reset')
-        assert new_user.pk != original.pk
+        assert new_user.pk == original.pk
+        assert new_user.display_name == ''
         assert new_user.estimated_cefr_level == ''
         assert new_user.onboarding_complete is False
 

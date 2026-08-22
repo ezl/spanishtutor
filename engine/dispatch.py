@@ -87,13 +87,10 @@ NON_TEXT_NOTICE_TEXT = (
 
 
 async def _cmd_reset(user, event: IncomingEvent) -> list:
-    """Wipe the current user row and start fresh with a new one on the same
-    external_id. Sends FIRST_MESSAGE so the user sees onboarding again."""
-    from engine.onboarding import FIRST_MESSAGE
-    from learner.models import User
-    field = PLATFORM_ID_FIELD[event.platform]
-    await sync_to_async(User.objects.filter(**{field: event.external_id}).delete)()
-    await sync_to_async(User.objects.create)(**{field: event.external_id}, display_name='')
+    """Wipe the user's learning state and start onboarding over. Keeps the row
+    (and its platform identity) — see engine.onboarding.reset_user."""
+    from engine.onboarding import FIRST_MESSAGE, reset_user
+    await reset_user(user)
     return [Reply(text=FIRST_MESSAGE)]
 
 

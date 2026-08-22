@@ -193,3 +193,123 @@ async def test_step_adaptive_quiz_concludes_when_done(make_user, make_skill):
     call_kwargs = mock_conclude.call_args
     passed_state = call_kwargs.args[2] if call_kwargs.args else call_kwargs.kwargs.get('quiz_state')
     assert passed_state['question_count'] == 20
+
+
+# ── Menu: "start over" ───────────────────────────────────────────────────────
+
+class TestMenuStartOver:
+    """The 'start over' branch of the placement-quiz menu.
+
+    Regression guard: this branch used to delete by discord_id, which is NULL
+    for every Messenger user — so Django turned it into `WHERE discord_id IS
+    NULL` and one Messenger user typing '1' wiped every Messenger user in the
+    database.
+    """
+
+    @pytest.mark.django_db(transaction=True)
+    async def test_start_over_does_not_delete_unrelated_messenger_users(self):
+        from engine.onboarding import _step_adaptive_quiz
+        from learner.models import Session, SessionEvent, User
+
+        bystander = await sync_to_async(User.objects.create)(
+            messenger_psid='psid_bystander', display_name='Bystander',
+            estimated_cefr_level='B1', onboarding_complete=True,
+        )
+        user = await sync_to_async(User.objects.create)(
+            messenger_psid='psid_resetter', display_name='Resetter',
+        )
+        session = await sync_to_async(Session.objects.create)(
+            user=user, session_type='onboarding',
+        )
+        await sync_to_async(SessionEvent.objects.create)(
+            session=session, event_type='menu', content='menu', user_response='',
+        )
+
+        await _step_adaptive_quiz(user, '1')
+
+        assert await sync_to_async(User.objects.filter(pk=bystander.pk).exists)(), \
+            'start over deleted an unrelated Messenger user'
+
+    @pytest.mark.django_db(transaction=True)
+    async def test_start_over_clears_the_users_learning_state(self):
+        from engine.onboarding import _step_adaptive_quiz
+        from learner.models import Session, SessionEvent, User
+
+        user = await sync_to_async(User.objects.create)(
+            messenger_psid='psid_state', display_name='Ana',
+            estimated_cefr_level='B1', onboarding_complete=True,
+            instruction_language='english', interests='fútbol, cocina',
+        )
+        session = await sync_to_async(Session.objects.create)(
+            user=user, session_type='onboarding',
+        )
+        await sync_to_async(SessionEvent.objects.create)(
+            session=session, event_type='menu', content='menu', user_response='',
+        )
+
+        await _step_adaptive_quiz(user, '1')
+
+        refreshed = await sync_to_async(User.objects.get)(pk=user.pk)
+        assert refreshed.display_name == ''
+        assert refreshed.estimated_cefr_level == ''
+        assert refreshed.onboarding_complete is False
+        assert refreshed.instruction_language == 'auto'
+        assert refreshed.interests == ''
+
+    @pytest.mark.django_db(transaction=True)
+    async def test_start_over_preserves_the_row_and_its_platform_identity(self):
+        """Guard against reverting to delete-and-recreate: that path rebuilt the
+        row from discord_id, so a Messenger user lost their PSID and their pk
+        (invalidating any outstanding magic link)."""
+        from engine.onboarding import _step_adaptive_quiz
+        from learner.models import Session, SessionEvent, User
+
+        user = await sync_to_async(User.objects.create)(
+            messenger_psid='psid_identity', display_name='Ana',
+        )
+        session = await sync_to_async(Session.objects.create)(
+            user=user, session_type='onboarding',
+        )
+        await sync_to_async(SessionEvent.objects.create)(
+            session=session, event_type='menu', content='menu', user_response='',
+        )
+
+        await _step_adaptive_quiz(user, '1')
+
+        survivors = await sync_to_async(
+            lambda: list(User.objects.filter(messenger_psid='psid_identity'))
+        )()
+        assert len(survivors) == 1
+        assert survivors[0].pk == user.pk
+
+    @pytest.mark.django_db(transaction=True)
+    async def test_start_over_discards_sessions_scores_and_interests(self, make_skill):
+        """Deleting the row used to cascade all of this away. In-place reset has
+        to do it explicitly or !reset silently stops wiping progress."""
+        from engine.onboarding import _step_adaptive_quiz
+        from learner.models import (
+            Session, SessionEvent, SkillScore, User, UserInterest,
+        )
+
+        user = await sync_to_async(User.objects.create)(
+            messenger_psid='psid_cascade', display_name='Ana',
+        )
+        skill = await sync_to_async(make_skill)(skill_id='a1_cascade', cefr_level='A1')
+        await sync_to_async(SkillScore.objects.create)(
+            user=user, skill=skill, mode='writing', score=3,
+        )
+        await sync_to_async(UserInterest.objects.create)(
+            user=user, topic='fútbol', category='sport',
+        )
+        session = await sync_to_async(Session.objects.create)(
+            user=user, session_type='onboarding',
+        )
+        await sync_to_async(SessionEvent.objects.create)(
+            session=session, event_type='menu', content='menu', user_response='',
+        )
+
+        await _step_adaptive_quiz(user, '1')
+
+        assert not await sync_to_async(SkillScore.objects.filter(user=user).exists)()
+        assert not await sync_to_async(UserInterest.objects.filter(user=user).exists)()
+        assert not await sync_to_async(Session.objects.filter(user=user).exists)()

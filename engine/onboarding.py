@@ -100,6 +100,47 @@ def _classify_input(text: str) -> str:
     return 'answer'
 
 # ---------------------------------------------------------------------------
+# User reset
+# ---------------------------------------------------------------------------
+
+async def reset_user(user) -> None:
+    """Wipe a user's learning state, keeping the row and its platform identity.
+
+    Deliberately an in-place update rather than delete-and-recreate. The row
+    holds whichever identity column its platform uses, and only that transport
+    knows which one — so recreating from below the dispatch layer meant
+    guessing. Guessing `discord_id` is what let a Messenger user's "start over"
+    run `DELETE WHERE discord_id IS NULL` and take every Messenger user with it.
+    Keeping the row sidesteps the question entirely, and preserves the pk any
+    outstanding magic link was signed against.
+    """
+    from learner.models import User
+
+    def _wipe():
+        user.sessions.all().delete()
+        user.skill_scores.all().delete()
+        user.skill_score_events.all().delete()
+        user.user_interests.all().delete()
+        user.evaluation_phases.all().delete()
+        User.objects.filter(pk=user.pk).update(
+            display_name='',
+            native_language='',
+            interests='',
+            why_learning='',
+            target_use='',
+            estimated_cefr_level='',
+            reminder_enabled=True,
+            reminder_schedule={},
+            onboarding_complete=False,
+            instruction_language='auto',
+            translate_mode_entered_at=None,
+            resume_pending=False,
+        )
+
+    await sync_to_async(_wipe)()
+
+
+# ---------------------------------------------------------------------------
 # Menu helpers
 # ---------------------------------------------------------------------------
 
@@ -117,7 +158,7 @@ async def _show_menu(session, uid: str) -> dict:
 
 async def _handle_menu_response(user, session, text: str, menu_event, quiz_events: list) -> dict:
     from learner.models import SessionEvent, User
-    uid = user.discord_id
+    uid = user.pk
     t = text.strip().lower()
 
     await sync_to_async(
@@ -127,9 +168,7 @@ async def _handle_menu_response(user, session, text: str, menu_event, quiz_event
 
     if t in ('1', 'start over', 'restart', 'reset'):
         log.info('[%s] menu: start over', uid)
-        discord_id = user.discord_id
-        await sync_to_async(User.objects.filter(discord_id=discord_id).delete)()
-        await sync_to_async(User.objects.create)(discord_id=discord_id, display_name='')
+        await reset_user(user)
         return {"text": FIRST_MESSAGE, "audio_url": None, "session_ended": False}
 
     elif t in ('2', 'english', 'english mode'):
@@ -156,7 +195,7 @@ async def _handle_menu_response(user, session, text: str, menu_event, quiz_event
 # ---------------------------------------------------------------------------
 
 async def handle_onboarding(user, text: str, attachments: list = None) -> dict:
-    uid = user.discord_id
+    uid = user.pk
     if not user.display_name:
         log.info('[%s] onboarding: collecting name', uid)
         return await _step_collect_name(user, text)
@@ -175,7 +214,7 @@ async def handle_onboarding(user, text: str, attachments: list = None) -> dict:
 
 async def _step_collect_name(user, text: str) -> dict:
     name = text.strip().split()[-1].capitalize() if text.strip() else text.strip()
-    log.info('[%s] onboarding: name collected — %r', user.discord_id, name)
+    log.info('[%s] onboarding: name collected — %r', user.pk, name)
     await sync_to_async(user.__class__.objects.filter(pk=user.pk).update)(display_name=name)
     welcome = (
         f"Hola, **{name}**!\n\n"
@@ -187,7 +226,7 @@ async def _step_collect_name(user, text: str) -> dict:
 
 async def _step_listo_gate(user, text: str) -> dict:
     if text.strip().lower() in LISTO_WORDS:
-        log.info('[%s] quiz: starting — listo received', user.discord_id)
+        log.info('[%s] quiz: starting — listo received', user.pk)
         return await _step_adaptive_quiz(user, QUIZ_START_SENTINEL)
     return {"text": "Say **listo** when you're ready to start!", "audio_url": None, "session_ended": False}
 
@@ -392,7 +431,7 @@ async def _step_adaptive_quiz(user, text: str) -> dict:
     from .quiz_flow import quiz_initial_state, quiz_select_skill_idx, quiz_update_state, quiz_is_done
     from .quiz_evaluator import evaluate_answer
 
-    uid = user.discord_id
+    uid = user.pk
     is_first = text == QUIZ_START_SENTINEL
 
     # Get or create quiz session
