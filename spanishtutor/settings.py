@@ -9,9 +9,16 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'dev-insecure-key-change-in-production')
 DEBUG = os.environ.get('DEBUG', 'true').lower() == 'true'
 _allowed = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1')
-ALLOWED_HOSTS = _allowed.split(',') + ['.up.railway.app']
+ALLOWED_HOSTS = [h.strip() for h in _allowed.split(',') if h.strip()] + ['.up.railway.app']
 
-CSRF_TRUSTED_ORIGINS = ['https://*.up.railway.app']
+# Derived from ALLOWED_HOSTS rather than listed separately: the two drifting
+# apart is a silent failure — the site serves fine and only form POSTs and the
+# admin break, on the new domain only. The railway.app wildcard stays as a
+# permanent fallback host.
+CSRF_TRUSTED_ORIGINS = ['https://*.up.railway.app'] + [
+    f'https://{h.lstrip(".")}' for h in ALLOWED_HOSTS
+    if h not in ('localhost', '127.0.0.1') and not h.endswith('up.railway.app')
+]
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 INSTALLED_APPS = [
