@@ -350,7 +350,6 @@ class TestHandleWelcome:
         """Tapping Get Started again must not create a second row or wipe
         the existing user's progress — it just re-greets them."""
         from engine.dispatch import handle_welcome
-        from engine.onboarding import FIRST_MESSAGE
         from learner.models import User
 
         existing = await sync_to_async(User.objects.create)(
@@ -358,9 +357,8 @@ class TestHandleWelcome:
             estimated_cefr_level='B1', onboarding_complete=True,
         )
 
-        replies = await handle_welcome('messenger', 'psid_repeat', 'Vuelta')
+        await handle_welcome('messenger', 'psid_repeat', 'Vuelta')
 
-        assert replies[0].text == FIRST_MESSAGE
         count = await sync_to_async(User.objects.filter(messenger_psid='psid_repeat').count)()
         assert count == 1
         unchanged = await sync_to_async(User.objects.get)(pk=existing.pk)
@@ -507,3 +505,76 @@ class TestLearnCommand:
         with patch('engine.core.handle_message', new=AsyncMock()) as engine:
             await self._run('d_learn4', '!learn subjunctive', make_skill)
         engine.assert_not_called()
+
+
+class TestWelcomeIsLevelAware:
+    """The website CTA is one URL for everybody, so handle_welcome is hit by
+    brand-new visitors and long-time students alike. It has to answer each
+    correctly — FIRST_MESSAGE opens with "What's your name?", which to an
+    onboarded student reads as having lost all their progress."""
+
+    @pytest.mark.asyncio
+    @pytest.mark.django_db(transaction=True)
+    async def test_returning_user_is_not_asked_to_onboard_again(self):
+        from engine.dispatch import WELCOME_BACK_TEXT, handle_welcome
+        from learner.models import User
+
+        await sync_to_async(User.objects.create)(
+            messenger_psid='psid_back', display_name='Ana',
+            estimated_cefr_level='B1', onboarding_complete=True,
+        )
+
+        replies = await handle_welcome('messenger', 'psid_back', 'Ana')
+
+        assert len(replies) == 1
+        assert replies[0].text == WELCOME_BACK_TEXT
+
+    @pytest.mark.asyncio
+    @pytest.mark.django_db(transaction=True)
+    async def test_mid_lesson_user_is_not_interrupted(self):
+        """Clicking the site's CTA while a lesson is open (to go check the skill
+        grid, say) must not drop a greeting on top of Luz's pending question."""
+        from engine.dispatch import handle_welcome
+        from learner.models import Session, User
+
+        user = await sync_to_async(User.objects.create)(
+            messenger_psid='psid_busy', display_name='Ana',
+            estimated_cefr_level='B1', onboarding_complete=True,
+        )
+        await sync_to_async(Session.objects.create)(
+            user=user, session_type='new_skill',
+        )
+
+        replies = await handle_welcome('messenger', 'psid_busy', 'Ana')
+
+        assert replies == []
+
+    @pytest.mark.asyncio
+    @pytest.mark.django_db(transaction=True)
+    async def test_user_who_never_gave_a_name_still_onboards(self):
+        """Guard: a row can exist without onboarding having started (an earlier
+        referral they ignored). That user still needs FIRST_MESSAGE."""
+        from engine.dispatch import handle_welcome
+        from engine.onboarding import FIRST_MESSAGE
+        from learner.models import User
+
+        await sync_to_async(User.objects.create)(
+            messenger_psid='psid_noname', display_name='',
+        )
+
+        replies = await handle_welcome('messenger', 'psid_noname', '')
+
+        assert replies[0].text == FIRST_MESSAGE
+
+    @pytest.mark.asyncio
+    @pytest.mark.django_db(transaction=True)
+    async def test_brand_new_user_onboards_even_when_platform_supplies_a_name(self):
+        """Discord seeds display_name from the platform profile at creation
+        (bot/client.py passes message.author.display_name), so a name-only gate
+        would skip onboarding for every new Discord user."""
+        from engine.dispatch import handle_welcome
+        from engine.onboarding import FIRST_MESSAGE
+
+        replies = await handle_welcome('discord', 'd_named_new', 'Alice')
+
+        assert replies[0].text == FIRST_MESSAGE

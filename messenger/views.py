@@ -83,6 +83,23 @@ async def _process_message_async(psid: str, name: str, text: str) -> None:
             logger.exception('Failed to send fallback error message to %s', psid)
 
 
+def _welcome(psid: str, sender: dict, ref: str) -> None:
+    """Run a platform 'start' affordance (Get Started tap or m.me referral)
+    through dispatch and send whatever it returns.
+
+    Synchronous, unlike regular messages: handle_welcome does no LLM work, so
+    it comfortably fits Meta's ~20s webhook SLA. It may legitimately return no
+    replies (user is mid-lesson) — sending nothing is the correct outcome."""
+    try:
+        replies = async_to_sync(handle_welcome)(
+            'messenger', psid, sender.get('name', ''), ref,
+        )
+        for reply in replies:
+            send_message(psid, reply.text)
+    except Exception:
+        logger.exception('Error processing welcome for %s (ref=%r)', psid, ref)
+
+
 @csrf_exempt
 def webhook(request):
     if request.method == 'GET':
@@ -112,17 +129,19 @@ def webhook(request):
             if not psid:
                 continue
 
-            # Get Started button tap
+            # Get Started button tap. Carries postback.referral when the user
+            # arrived from an m.me?ref= link (i.e. the website CTA).
             postback = event.get('postback', {})
             if postback.get('payload') == 'GET_STARTED':
-                try:
-                    replies = async_to_sync(handle_welcome)(
-                        'messenger', psid, sender.get('name', ''),
-                    )
-                    for reply in replies:
-                        send_message(psid, reply.text)
-                except Exception:
-                    logger.exception('Error processing GET_STARTED from %s', psid)
+                _welcome(psid, sender, postback.get('referral', {}).get('ref', ''))
+                continue
+
+            # Standalone referral (messaging_referrals): someone who ALREADY has
+            # a thread reopened it via m.me?ref=. Carries neither 'message' nor
+            # 'postback', so without this branch it falls through both checks
+            # below and the returning student lands in a silent thread.
+            if 'referral' in event:
+                _welcome(psid, sender, event['referral'].get('ref', ''))
                 continue
 
             # Ignore echo events (messages sent by the page itself)

@@ -255,3 +255,86 @@ def test_delivery_and_read_receipts_are_ignored():
     assert response.status_code == 200
     bg.assert_not_called()
     mock_send.assert_not_called()
+
+
+# ── Standalone referral events (messaging_referrals) ─────────────────────────
+
+def _referral_payload(psid: str = 'psid_referral', ref: str = 'web_hero') -> dict:
+    """What Meta sends when someone who ALREADY has a thread opens it via an
+    m.me?ref= link — the website CTA clicked by a returning student. Per the
+    messaging_referrals docs there is no 'message' and no 'postback' key, so
+    this event falls through both of the webhook's other branches."""
+    return {
+        'object': 'page',
+        'entry': [{
+            'messaging': [{
+                'sender': {'id': psid},
+                'recipient': {'id': 'page_1'},
+                'timestamp': 1458692752478,
+                'referral': {'ref': ref, 'source': 'SHORTLINK', 'type': 'OPEN_THREAD'},
+            }],
+        }],
+    }
+
+
+@pytest.mark.django_db(transaction=True)
+def test_referral_event_answers_a_returning_student():
+    """Regression: this event used to be dropped, so a returning student who
+    clicked the site's only CTA landed in a silent thread."""
+    from engine.dispatch import WELCOME_BACK_TEXT
+    from learner.models import User
+
+    User.objects.create(
+        messenger_psid='psid_referral', display_name='Ana',
+        estimated_cefr_level='B1', onboarding_complete=True,
+    )
+
+    with patch('messenger.views.send_message') as mock_send:
+        with patch('messenger.views._valid_signature', return_value=True):
+            response = Client().post(
+                '/webhook/messenger/',
+                data=json.dumps(_referral_payload()),
+                content_type='application/json',
+            )
+
+    assert response.status_code == 200
+    mock_send.assert_called_once_with('psid_referral', WELCOME_BACK_TEXT)
+
+
+@pytest.mark.django_db(transaction=True)
+def test_referral_event_onboards_a_first_time_visitor():
+    """A thread can exist without onboarding (an earlier referral they ignored)."""
+    from engine.onboarding import FIRST_MESSAGE
+    from learner.models import User
+
+    with patch('messenger.views.send_message') as mock_send:
+        with patch('messenger.views._valid_signature', return_value=True):
+            Client().post(
+                '/webhook/messenger/',
+                data=json.dumps(_referral_payload(psid='psid_ref_new')),
+                content_type='application/json',
+            )
+
+    mock_send.assert_called_once_with('psid_ref_new', FIRST_MESSAGE)
+    assert User.objects.filter(messenger_psid='psid_ref_new').exists()
+
+
+@pytest.mark.django_db(transaction=True)
+def test_referral_event_does_not_interrupt_an_open_lesson():
+    from learner.models import Session, User
+
+    user = User.objects.create(
+        messenger_psid='psid_ref_busy', display_name='Ana',
+        estimated_cefr_level='B1', onboarding_complete=True,
+    )
+    Session.objects.create(user=user, session_type='new_skill')
+
+    with patch('messenger.views.send_message') as mock_send:
+        with patch('messenger.views._valid_signature', return_value=True):
+            Client().post(
+                '/webhook/messenger/',
+                data=json.dumps(_referral_payload(psid='psid_ref_busy')),
+                content_type='application/json',
+            )
+
+    mock_send.assert_not_called()

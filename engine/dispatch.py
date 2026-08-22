@@ -78,6 +78,16 @@ NON_TEXT_NOTICE_TEXT = (
     "the web app later — for now, type it out and I'll help!"
 )
 
+# Shown when someone with an existing thread re-enters via a platform's start
+# affordance (Messenger's Get Started, or an m.me referral from the website
+# CTA). Deliberately dumb: it starts no session and calls no model, so the
+# engine's own returning-user check-in still fires on their next message and
+# stays the only thing that knows what a check-in is.
+WELCOME_BACK_TEXT = (
+    "¡Aquí estoy! 🌟 Escríbeme cuando quieras seguir.\n"
+    "(I'm here — say the word whenever you're ready.)"
+)
+
 
 # ── Commands ─────────────────────────────────────────────────────────────────
 # Text-prefix commands the student can type in any chat platform. Handlers
@@ -214,20 +224,47 @@ ARG_COMMANDS = {
 }
 
 
-async def handle_welcome(platform: str, external_id: str, display_name: str = '') -> list:
+async def handle_welcome(platform: str, external_id: str, display_name: str = '',
+                         ref: str = '') -> list:
     """Entry point for a platform's explicit "start" affordance — Messenger's
-    Get Started button tap, or any future equivalent — where there is no user
-    text to route.
+    Get Started tap, or an m.me referral from the website CTA — where there is
+    no user text to route. Separate from handle() because the trigger carries
+    no message: handle() would have to invent one.
 
-    Ensures the User row exists and returns the onboarding greeting. Separate
-    from handle() because the trigger carries no message: handle() would have
-    to invent one. Idempotent for an existing user (they just get the greeting
-    again), which matches how the button behaves.
+    `ref` is the arbitrary payload the platform passes through (m.me's ?ref=),
+    logged for attribution only.
+
+    The reply depends on who showed up. One website CTA serves brand-new
+    visitors and long-time students alike, so this cannot always answer with
+    FIRST_MESSAGE — that opens with "What's your name?", which to an onboarded
+    student reads as having lost all their progress.
     """
+    import logging
     from engine.onboarding import FIRST_MESSAGE
+    from learner.models import Session
 
-    await resolve_user(platform, external_id, display_name)
-    return [Reply(text=FIRST_MESSAGE)]
+    logger = logging.getLogger('engine.dispatch')
+
+    user, created = await resolve_user(platform, external_id, display_name)
+    if ref:
+        logger.info('welcome: %s/%s via ref=%r', platform, external_id, ref)
+
+    # Onboarding never started. Both halves are load-bearing: Discord seeds
+    # display_name from the platform profile at creation, so `created` is the
+    # only signal there; Messenger sends no name, so a row can persist with an
+    # empty one and still need the name prompt.
+    if created or not user.display_name:
+        return [Reply(text=FIRST_MESSAGE)]
+
+    # Mid-lesson. Their thread already shows Luz's pending turn — dropping a
+    # greeting on top of it is the thing that would actually look broken.
+    has_open_session = await sync_to_async(
+        lambda: Session.objects.filter(user=user, ended_at__isnull=True).exists()
+    )()
+    if has_open_session:
+        return []
+
+    return [Reply(text=WELCOME_BACK_TEXT)]
 
 
 async def handle(event: IncomingEvent) -> list:
