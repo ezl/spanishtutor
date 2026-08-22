@@ -13,3 +13,7 @@ dist/
 build/
 eric.txt
 staticfiles/
+
+# Claude Design canvases: 41KB of content wrapped in ~2.2MB of editor code,
+# rewritten throughout on every republish, so git stores a fresh blob each time.
+docs/design/**/*-directions.html
