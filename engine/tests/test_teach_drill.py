@@ -1678,15 +1678,71 @@ class TestGlossDirectiveIsExplicit:
         assert "every row" not in instr.lower()
 
 
-class TestUnitExtractionTokenBudget:
+class TestUnitExtractionTruncation:
     """Adding known_forms to the extraction prompt pushed its output past the
     1024-token default, so every response was cut mid-array, parsed to zero
     units, and silently fell back to the legacy dense lesson."""
 
+    GOOD = '[{"id":"ser_ir","label":"ser / ir","note":""}]'
+    # Cut mid-object, exactly as the real failures were.
+    TRUNCATED = ('[{"id":"ser_ir","label":"ser / ir","note":"","kind":"paradigm",'
+                 '"known_forms":{"yo":"voy","tú":"v')
+
     @pytest.mark.asyncio
     async def test_asks_for_enough_tokens(self):
         from engine.teach_drill import extract_units
-        mock = AsyncMock(return_value='[{"id":"ser_ir","label":"ser / ir","note":""}]')
+        mock = AsyncMock(return_value=self.GOOD)
         with patch('engine.teach_drill.call_llm', new=mock):
             await extract_units('Preterite', 'ser, ir, estar', 'B1')
         assert mock.await_args.kwargs.get('max_tokens', 1024) >= 4096
+
+    @pytest.mark.asyncio
+    async def test_truncated_response_is_retried(self):
+        from engine.teach_drill import extract_units
+        mock = AsyncMock(side_effect=[self.TRUNCATED, self.GOOD])
+        with patch('engine.teach_drill.call_llm', new=mock):
+            units = await extract_units('Preterite', 'ser, ir, estar', 'B1')
+        assert len(units) == 1
+        assert mock.await_count == 2
+
+    @pytest.mark.asyncio
+    async def test_a_genuinely_empty_array_is_not_retried(self):
+        """An empty array is a real answer, not a truncation — don't burn a call."""
+        from engine.teach_drill import extract_units
+        mock = AsyncMock(side_effect=['[]', self.GOOD])
+        with patch('engine.teach_drill.call_llm', new=mock):
+            units = await extract_units('Preterite', 'x', 'B1')
+        assert units == []
+        assert mock.await_count == 1
+
+    def test_incomplete_array_is_detected(self):
+        from engine.teach_drill import _is_incomplete_array
+        assert _is_incomplete_array(self.TRUNCATED) is True
+        assert _is_incomplete_array(self.GOOD) is False
+        assert _is_incomplete_array('[]') is False
+        assert _is_incomplete_array('no json here') is False
+
+
+class TestDenseFallbackObeysTheSameRules:
+    """A single extraction failure silently reverted every paradigm fix, because
+    the legacy dense prompt has none of them."""
+
+    def test_fallback_demands_contrast_format(self):
+        from engine.session import GRAMMAR_PRESENT_PROMPT
+        assert '→' in GRAMMAR_PRESENT_PROMPT
+
+    def test_fallback_demands_glosses(self):
+        from engine.session import GRAMMAR_PRESENT_PROMPT
+        assert 'gloss' in GRAMMAR_PRESENT_PROMPT.lower()
+
+    def test_fallback_shows_no_bare_paradigm_rows(self):
+        from engine.session import GRAMMAR_PRESENT_PROMPT
+        from engine.teach_drill import CONTRAST_ROW_PERSONS
+        bare = []
+        for line in GRAMMAR_PRESENT_PROMPT.splitlines():
+            row = line.strip()
+            if not row or row.split()[0].strip('*_:.`').casefold() not in CONTRAST_ROW_PERSONS:
+                continue
+            if '→' not in row:
+                bare.append(row)
+        assert bare == [], f"dense prompt still demonstrates bare rows: {bare}"

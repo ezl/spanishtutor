@@ -74,12 +74,14 @@ Structure for this opening turn:
 1. Outcome-framing (1-2 sentences) — tell the student what they'll be able to DO after learning this, illustrated with 1-2 concrete example target sentences in Spanish (with English translation in parens). Example style: "You'll learn to talk about things that happened in the past — sentences like 'Ayer fui al cine' (I went to the movies yesterday) or 'No pude ir al gimnasio' (I couldn't go to the gym)."
 2. If the skill has a shared pattern (endings, spelling rule, conjugation frame), teach that pattern here in compact form.
 3. Introduce EXACTLY ONE stem/verb/item — unless multiple items share the identical paradigm (e.g. ser/ir both conjugate as fui/fuiste/fue/...), in which case teach that natural pair as one item.
-4. Show the full paradigm ONE LINE PER PERSON:
-     Yo tuve
-     Tú tuviste
-     Él/ella/usted tuvo
-     Nosotros tuvimos
-     Ellos/ellas/ustedes tuvieron
+4. Show the full paradigm ONE LINE PER PERSON as a CONTRAST (`known → target`), with an English gloss on EVERY row — never only the first:
+     Yo tengo → Yo tuve (I have → I had)
+     Tú tienes → Tú tuviste (you have → you had)
+     Él/ella/usted tiene → Él/ella/usted tuvo (he has → he had)
+     Nosotros tenemos → Nosotros tuvimos (we have → we had)
+     Ellos/ellas/ustedes tienen → Ellos/ellas/ustedes tuvieron (they have → they had)
+   The known side is the tense the student already has automated (usually the present); the target side is what they are learning. The two sides must NEVER be identical — a row like `Yo tuve → Yo tuve` shows no transformation and is a hard error.
+   If the skill genuinely has no known-tense counterpart (vocabulary, por/para, ser/estar usage), show the target forms alone — still with a gloss on every row.
    (Latin American Spanish — skip vosotros.) Never inline comma-separated.
 5. ONE natural example sentence using the item just introduced. Draw from student interests where natural.
 

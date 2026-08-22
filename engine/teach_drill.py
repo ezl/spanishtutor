@@ -9,6 +9,8 @@ import re
 
 from .core import call_llm
 
+logger = logging.getLogger(__name__)
+
 
 REDO_PENDING_MARKER = '<<REDO_PENDING>>'
 
@@ -113,11 +115,23 @@ Return ONLY the JSON array. No prose, no markdown fences, no explanation. Exampl
 [{{"id":"ser_ir","label":"ser / ir","note":"share fui/fuiste/fue conjugation","kind":"paradigm","verb":"ir","known_tense":"presente","known_forms":{{"yo":"voy","tú":"vas","él":"va","nosotros":"vamos","ellos":"van"}}}},{{"id":"trigger_words","label":"Trigger words","note":"ayer, una vez","kind":"usage"}}]"""
 
 
-# The extraction prompt asks for known_forms (five conjugated forms per verb),
-# which puts a realistic response around 1250 tokens. call_llm's 1024 default
-# truncated every response mid-array, so nothing parsed and every grammar lesson
-# silently fell back to the legacy dense prompt. Sized with headroom.
+# The prompt asks for known_forms (five conjugated forms per verb), which puts a
+# realistic response around 1250 tokens. call_llm's 1024 default truncated every
+# response mid-array, so nothing parsed and every grammar lesson silently fell
+# back to the legacy dense prompt. Sized with headroom rather than to fit.
 UNIT_EXTRACTION_MAX_TOKENS = 4096
+
+
+def _is_incomplete_array(raw: str) -> bool:
+    """True when the response opened a JSON array but never closed it.
+
+    Distinguishes a cut-off response (worth retrying) from a well-formed empty
+    array (a real answer). Without this the two are indistinguishable and a
+    truncation is silently reported as "this skill has no units".
+    """
+    cleaned = re.sub(r'^```(?:json)?\s*|\s*```$', '', (raw or '').strip(),
+                     flags=re.MULTILINE)
+    return '[' in cleaned and re.search(r'\[.*\]', cleaned, flags=re.DOTALL) is None
 
 
 async def extract_units(skill_name: str, skill_description: str, cefr_level: str) -> list[dict]:
@@ -127,9 +141,21 @@ async def extract_units(skill_name: str, skill_description: str, cefr_level: str
         skill_description=skill_description,
         cefr_level=cefr_level,
     )
-    raw = await call_llm([{"role": "user", "content": prompt}],
-                         max_tokens=UNIT_EXTRACTION_MAX_TOKENS)
-    return _parse_units_json(raw)
+    messages = [{"role": "user", "content": prompt}]
+    raw = await call_llm(messages, max_tokens=UNIT_EXTRACTION_MAX_TOKENS)
+    units = _parse_units_json(raw)
+
+    if not units and _is_incomplete_array(raw):
+        # Log the evidence: a bare "returned empty" warning gave no way to tell
+        # truncation from a genuine empty result.
+        logger.warning(
+            "unit extraction truncated for %s (%d chars, array never closed); retrying. tail=%r",
+            skill_name, len(raw), raw[-120:],
+        )
+        raw = await call_llm(messages, max_tokens=UNIT_EXTRACTION_MAX_TOKENS)
+        units = _parse_units_json(raw)
+
+    return units
 
 
 def _parse_units_json(raw: str) -> list[dict]:
