@@ -1,4 +1,5 @@
 import json
+import logging
 import pytest
 from unittest.mock import patch, AsyncMock
 
@@ -1551,6 +1552,33 @@ class TestParadigmDemandMatchesUnit:
         instr = build_teach_instruction(unit, person_new="yo", is_final=False)
 
         assert "full paradigm" in instr.lower()
+
+    def test_legacy_unit_without_kind_is_logged(self, engine_caplog):
+        """The fallback is otherwise silent: if extraction stops emitting "kind",
+        every unit reverts to paradigm behaviour with nothing to show for it. That
+        is exactly what shipped an `ir` paradigm into a usage lesson on 2026-08-22,
+        when a session opened on the pre-fix build and its stored units carried no
+        kind."""
+        from engine.teach_drill import build_teach_instruction
+        unit = {"id": "tener", "label": "tener", "note": "stem tuv-"}
+
+        with engine_caplog.at_level(logging.WARNING, logger="engine.teach_drill"):
+            build_teach_instruction(unit, person_new="yo", is_final=False)
+
+        assert any(
+            "kind" in r.getMessage() and "tener" in r.getMessage()
+            for r in engine_caplog.records
+        ), f"no warning naming the unit; got {[r.getMessage() for r in engine_caplog.records]}"
+
+    def test_unit_with_kind_logs_nothing(self, engine_caplog):
+        """Only the legacy path is noisy — the normal path must stay quiet."""
+        from engine.teach_drill import build_teach_instruction
+        unit = {"id": "completed", "label": "Completed events", "note": "", "kind": "usage"}
+
+        with engine_caplog.at_level(logging.WARNING, logger="engine.teach_drill"):
+            build_teach_instruction(unit, person_new="yo", is_final=False)
+
+        assert engine_caplog.records == []
 
 
 class TestUnitExtractionCarriesTheKnownSide:

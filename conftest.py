@@ -36,3 +36,19 @@ def make_skill():
             order=sorder, description=description, active=active,
         )
     return factory
+
+
+@pytest.fixture
+def engine_caplog(caplog):
+    """caplog wired to the `engine` logger tree.
+
+    settings.LOGGING gives `engine` its own console handler with propagate=False,
+    so its records never reach caplog's root handler on their own.
+    """
+    import logging
+    logger = logging.getLogger('engine')
+    logger.addHandler(caplog.handler)
+    try:
+        yield caplog
+    finally:
+        logger.removeHandler(caplog.handler)

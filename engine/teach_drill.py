@@ -4,6 +4,7 @@ Replaces the present + questions + guided_practice phases for grammar
 new_skill sessions.
 """
 import json
+import logging
 import re
 
 from .core import call_llm
@@ -580,6 +581,16 @@ def build_teach_instruction(unit: dict, person_new: str, is_final: bool) -> str:
             f"   - Keep it under 100 words for this step."
         )
     else:
+        if "kind" not in unit:
+            # Silent otherwise: if extraction stops emitting "kind", every unit
+            # reverts to paradigm behaviour and nothing says so. That is how an
+            # `ir` paradigm reached a usage lesson on 2026-08-22 -- the session
+            # opened on the pre-fix build, so its stored units had no kind.
+            logging.getLogger(__name__).warning(
+                "teach unit %r has no 'kind'; falling back to the paradigm "
+                "instruction. Stale session state, or extraction dropped the field.",
+                unit.get("id", ""),
+            )
         paradigm_lines = (
             f"   - Show the full paradigm one line per person (Yo/Tú/Él/Nosotros/Ellos).\n"
             f"   - Gloss EVERY row, not just the first: "
