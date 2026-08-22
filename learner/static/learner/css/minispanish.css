@@ -42,7 +42,7 @@
   --ms-discord:      #5865f2;
   --ms-inactive:     #d5cfc2;
 
-  --ms-measure:      620px;     /* readable line length */
+  --ms-measure:      660px;     /* readable line length at the body size below */
   --ms-page:         880px;     /* content column */
   --ms-gutter:       64px;
 }
@@ -54,6 +54,7 @@ body {
   background: var(--ms-paper);
   color: var(--ms-ink);
   font-family: 'Karla', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  font-size: 1.0625rem;
   font-weight: 300;
   -webkit-font-smoothing: antialiased;
 }
@@ -84,14 +85,14 @@ a:hover { color: var(--ms-coral-dark); }
 }
 
 .ms-lead {
-  font-size: clamp(1.05rem, 2.4vw, 1.1875rem);
-  line-height: 1.65;
+  font-size: clamp(1.1875rem, 2.6vw, 1.375rem);
+  line-height: 1.6;
   font-weight: 300;
   margin: 0;
 }
 
 .ms-p {
-  font-size: 1.0625rem;
+  font-size: 1.1875rem;
   line-height: 1.75;
   font-weight: 300;
   max-width: var(--ms-measure);
@@ -130,7 +131,7 @@ a:hover { color: var(--ms-coral-dark); }
   display: inline-block;
   font-family: 'Karla', Helvetica, Arial, sans-serif;
   font-weight: 600;
-  font-size: 1rem;
+  font-size: 1.0625rem;
   line-height: 1;
   background: var(--ms-coral);
   color: var(--ms-paper);
@@ -162,8 +163,8 @@ a:hover { color: var(--ms-coral-dark); }
   gap: 10px;
   border: 1px solid var(--ms-rule);
   border-radius: 999px;
-  padding: 12px 22px;
-  font-size: 0.9375rem;
+  padding: 13px 22px;
+  font-size: 1.0625rem;
   background: var(--ms-surface);
   color: inherit;
   text-decoration: none;
@@ -184,7 +185,7 @@ a:hover { color: var(--ms-coral-dark); }
   font-size: 2.5rem;
   line-height: 1;
 }
-.ms-tile__label { font-size: 0.875rem; margin-top: 8px; }
+.ms-tile__label { font-size: 1rem; margin-top: 8px; }
 .ms-tile--coral { background: var(--ms-tint-coral); }
 .ms-tile--coral .ms-tile__n { color: var(--ms-coral); }
 .ms-tile--teal  { background: var(--ms-tint-teal); }
@@ -198,7 +199,7 @@ a:hover { color: var(--ms-coral-dark); }
 
 .ms-bubble {
   padding: 13px 17px;
-  font-size: 0.9375rem;
+  font-size: 1.0625rem;
   line-height: 1.5;
   max-width: 92%;
 }
@@ -221,8 +222,8 @@ a:hover { color: var(--ms-coral-dark); }
   gap: 10px;
   align-items: center;
 }
-.ms-grid__head { font-size: 0.75rem; color: #8d8779; text-align: center; }
-.ms-grid__skill { font-size: 0.875rem; }
+.ms-grid__head { font-size: 0.8125rem; color: #8d8779; text-align: center; }
+.ms-grid__skill { font-size: 0.9375rem; }
 .ms-grid__cell { height: 22px; border-radius: 5px; }
 .ms-grid__cell--mastered   { background: var(--ms-teal-deep); }
 .ms-grid__cell--confident  { background: var(--ms-teal); }
@@ -250,10 +251,11 @@ a:hover { color: var(--ms-coral-dark); }
 
 .ms-footer { padding: 44px var(--ms-gutter) 32px; display: flex; flex-direction: column; gap: 26px; }
 .ms-footer__top { display: flex; justify-content: space-between; gap: 48px; flex-wrap: wrap; }
-.ms-footer__cols { display: flex; gap: 56px; font-size: 0.875rem; flex-wrap: wrap; }
+.ms-footer__cols { display: flex; gap: 56px; font-size: 0.9375rem; flex-wrap: wrap; }
 .ms-footer__col { display: flex; flex-direction: column; gap: 9px; }
 .ms-footer__head {
-  font-size: 0.6875rem;
+  /* 11px was below the readable floor on a phone. */
+  font-size: 0.8125rem;
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--ms-ink-faint);
@@ -262,7 +264,7 @@ a:hover { color: var(--ms-coral-dark); }
 .ms-footer__legal {
   border-top: 1px solid var(--ms-rule);
   padding-top: 18px;
-  font-size: 0.75rem;
+  font-size: 0.8125rem;
   color: var(--ms-ink-faint);
 }
 
@@ -290,7 +292,7 @@ a:hover { color: var(--ms-coral-dark); }
   gap: 24px;
 }
 .ms-dialog__title { font-family: 'Instrument Serif', Georgia, serif; font-weight: 400; font-size: 1.5rem; }
-.ms-dialog__sub { font-size: 0.9375rem; line-height: 1.55; color: var(--ms-ink-soft); }
+.ms-dialog__sub { font-size: 1.0625rem; line-height: 1.55; color: var(--ms-ink-soft); }
 
 /* Logo leads, word supports. */
 .ms-picks { display: flex; gap: 12px; }
@@ -309,7 +311,7 @@ a:hover { color: var(--ms-coral-dark); }
 }
 .ms-pick:hover { border-color: var(--ms-ink-faint); color: inherit; }
 .ms-pick:focus-visible { outline: 3px solid var(--ms-teal); outline-offset: 2px; }
-.ms-pick__label { font-size: 0.8125rem; font-weight: 500; color: var(--ms-ink-muted); }
+.ms-pick__label { font-size: 0.9375rem; font-weight: 500; color: var(--ms-ink-muted); }
 .ms-pick--soon { border-color: var(--ms-rule-soft); background: #f6f4f1; cursor: default; }
 .ms-pick--soon .ms-pick__label { color: #b8b1a2; }
 
@@ -342,9 +344,13 @@ a:hover { color: var(--ms-coral-dark); }
      to fractions rather than letting the skill names crush. */
   .ms-grid { padding: 16px; }
   .ms-grid__rows { grid-template-columns: 1fr 48px 48px; gap: 8px; }
-  .ms-grid__skill { font-size: 0.8125rem; }
+  .ms-grid__skill { font-size: 0.875rem; }
 
-  .ms-tiles { flex-direction: column; }
+  /* One row, not a cascade: three short pairs read as a unit. */
+  .ms-tiles { gap: 8px; }
+  .ms-tile { padding: 14px 10px; text-align: center; }
+  .ms-tile__n { font-size: 2rem; }
+  .ms-tile__label { font-size: 0.875rem; margin-top: 4px; }
   .ms-bubble { max-width: 100%; }
   .ms-footer__cols { gap: 28px; }
   .ms-picks { flex-direction: column; }

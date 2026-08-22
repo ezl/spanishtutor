@@ -15,8 +15,11 @@
 
 <div class="ms-page">
 
-  {# No header. The only way in is the chat, and a nav on a single-scroll page
-     mostly gives people a way to leave. The wordmark lives in the footer. #}
+  {% comment %}
+    No header. The only way in is the chat, and a nav on a single-scroll page
+    mostly gives people a way to leave. The wordmark lives in the footer.
+    {# #} is single-line only in Django; a multi-line one renders as text.
+  {% endcomment %}
 
   <!-- Hero -->
   <div style="padding: 76px var(--ms-gutter) 56px;">
@@ -56,9 +59,9 @@
     <p class="ms-p">A lesson is one small thing: taught, drilled, done. Not a forty-five minute block you have to find room for. Open the chat while the coffee brews, learn one thing properly, close it again.</p>
     <p class="ms-p">Most days, five minutes will get you further than the Sunday marathon you keep putting off.</p>
     <div class="ms-tiles" style="margin-top: 8px;">
-      <div class="ms-tile ms-tile--coral"><div class="ms-tile__n">1</div><div class="ms-tile__label">one skill</div></div>
+      <div class="ms-tile ms-tile--coral"><div class="ms-tile__n">1</div><div class="ms-tile__label">skill</div></div>
       <div class="ms-tile ms-tile--teal"><div class="ms-tile__n">5</div><div class="ms-tile__label">minutes</div></div>
-      <div class="ms-tile ms-tile--amber"><div class="ms-tile__n">0</div><div class="ms-tile__label">decisions to make</div></div>
+      <div class="ms-tile ms-tile--amber"><div class="ms-tile__n">0</div><div class="ms-tile__label">decisions</div></div>
     </div>
   </section>
 
