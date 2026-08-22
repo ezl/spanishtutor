@@ -15,6 +15,10 @@ ALLOWED_HOSTS = [h.strip() for h in _allowed.split(',') if h.strip()] + ['.up.ra
 # apart is a silent failure — the site serves fine and only form POSTs and the
 # admin break, on the new domain only. The railway.app wildcard stays as a
 # permanent fallback host.
+# Bare apex requests get redirected here. Unset (the default) disables the
+# redirect entirely, so local dev and any other deployment are unaffected.
+CANONICAL_HOST = os.environ.get('CANONICAL_HOST', '')
+
 CSRF_TRUSTED_ORIGINS = ['https://*.up.railway.app'] + [
     f'https://{h.lstrip(".")}' for h in ALLOWED_HOSTS
     if h not in ('localhost', '127.0.0.1') and not h.endswith('up.railway.app')
@@ -36,6 +40,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'learner.middleware.CanonicalHostMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
