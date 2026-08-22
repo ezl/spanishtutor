@@ -1,4 +1,6 @@
+from django.conf import settings
 from django.shortcuts import render, redirect, get_object_or_404
+from django.utils import timezone
 from .models import User, Skill, SkillScore
 from .auth import validate_progress_token
 
@@ -54,11 +56,20 @@ def _bracket_infer(skill_ids, raw_scores, mode_id):
 
 
 def landing(request):
-    return render(request, 'learner/landing.html')
+    return render(request, 'learner/landing.html', {
+        'messenger_url': settings.MESSENGER_LINK,
+        'discord_url': settings.DISCORD_INVITE,
+        'contact_email': settings.CONTACT_EMAIL,
+        'year': timezone.now().year,
+    })
 
 
 def privacy(request):
     return render(request, 'learner/privacy.html')
+
+
+def terms(request):
+    return render(request, 'learner/terms.html')
 
 
 def auth_link(request, token):

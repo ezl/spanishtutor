@@ -1,0 +1,79 @@
+"""Landing page tests.
+
+The page is the only public entry point to the product, so these guard the
+things that silently break a signup: the platform links, and per-CTA
+attribution.
+"""
+import re
+import pytest
+from django.test import RequestFactory
+from django.urls import reverse
+
+from learner.views import landing
+
+
+def _render():
+    """Call the view directly.
+
+    Django's test client copies the template Context on render, which raises on
+    Python 3.14 (Context.__copy__ touches super().dicts). Every other view test
+    in this repo POSTs JSON and never renders, so it has not bitten before.
+    """
+    return landing(RequestFactory().get('/')).content.decode()
+
+
+@pytest.mark.django_db
+def test_landing_renders():
+    response = landing(RequestFactory().get('/'))
+    assert response.status_code == 200
+
+
+@pytest.mark.django_db
+def test_platform_links_come_from_settings(settings):
+    settings.MESSENGER_LINK = 'https://m.me/test-page'
+    settings.DISCORD_INVITE = 'https://discord.gg/test-invite'
+
+    body = _render()
+
+    assert 'https://m.me/test-page' in body
+    assert 'https://discord.gg/test-invite' in body
+
+
+@pytest.mark.django_db
+def test_every_cta_carries_a_distinct_ref():
+    """One CTA repeats five times. Without a per-position ref every signup
+    attributes to the hero and the page cannot be read."""
+    body = _render()
+
+    refs = re.findall(r'data-open-picker data-ref="([^"]+)"', body)
+
+    assert len(refs) >= 4, f'expected several CTAs, found {refs}'
+    assert len(set(refs)) == len(refs), f'duplicate refs: {refs}'
+
+
+@pytest.mark.django_db
+def test_legal_and_contact_links_are_real(settings):
+    settings.CONTACT_EMAIL = 'someone@example.com'
+
+    body = _render()
+
+    assert reverse('privacy') in body
+    assert reverse('terms') in body
+    assert 'mailto:someone@example.com' in body
+
+
+@pytest.mark.django_db
+def test_no_placeholders_survived():
+    body = _render()
+
+    for placeholder in ('[LEGAL ENTITY]', '[YOUR PRICE]', '[portrait]', 'lorem'):
+        assert placeholder.lower() not in body.lower()
+
+
+@pytest.mark.django_db
+def test_no_pricing_claims():
+    """Testing with friends only; the page must not promise a price or a trial."""
+    body = _render().lower()
+
+    assert '$' not in body
+    assert 'free' not in body

@@ -1,0 +1,361 @@
+/*
+ * MiniSpanish design system.
+ *
+ * One stylesheet for every public page. Pages should reach for these tokens and
+ * component classes rather than inventing their own values, so a colour or a
+ * type decision changes in one place. Only page-specific layout belongs in a
+ * template's own <style> block.
+ *
+ * Fonts are Instrument Serif (display) over Karla (text), loaded from Google
+ * Fonts in the template head. Every stack names real fallbacks, because a
+ * blocked font request must not leave the page unreadable.
+ */
+
+:root {
+  /* Ground and ink */
+  --ms-paper:        #fffdf8;
+  --ms-paper-warm:   #fff6ea;   /* CTA bands, closing panel */
+  --ms-surface:      #ffffff;
+  --ms-ink:          #17150f;
+  --ms-ink-soft:     #4a4740;
+  --ms-ink-muted:    #7d7768;
+  --ms-ink-faint:    #a39c8c;
+  --ms-rule:         #ece7dc;
+  --ms-rule-soft:    #f2eee4;
+
+  /* Brights. Picked at a shared lightness so none of them dominates. */
+  --ms-coral:        #f4623a;
+  --ms-coral-deep:   #d9482a;   /* link text: coral fails contrast on paper */
+  --ms-coral-dark:   #ab3419;
+  --ms-teal:         #34b8a8;
+  --ms-teal-deep:    #17a58f;
+  --ms-amber:        #f5b32e;
+  --ms-amber-deep:   #d99a12;
+
+  /* Bright tints */
+  --ms-tint-coral:   #ffeede;
+  --ms-tint-teal:    #e2f6f3;
+  --ms-tint-amber:   #fff3d6;
+
+  /* Platform brand colours, only ever used on their own logos */
+  --ms-messenger:    #0084ff;
+  --ms-discord:      #5865f2;
+  --ms-inactive:     #d5cfc2;
+
+  --ms-measure:      620px;     /* readable line length */
+  --ms-page:         880px;     /* content column */
+  --ms-gutter:       64px;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--ms-paper);
+  color: var(--ms-ink);
+  font-family: 'Karla', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  font-weight: 300;
+  -webkit-font-smoothing: antialiased;
+}
+
+a { color: var(--ms-coral-deep); }
+a:hover { color: var(--ms-coral-dark); }
+
+/* ── Type ─────────────────────────────────────────────────────────────── */
+
+.ms-display,
+.ms-h1,
+.ms-h2 {
+  font-family: 'Instrument Serif', Georgia, 'Times New Roman', serif;
+  font-weight: 400;
+}
+
+.ms-h1 {
+  font-size: clamp(2.75rem, 8vw, 5rem);
+  line-height: 0.94;
+  letter-spacing: -0.015em;
+  margin: 0;
+}
+
+.ms-h2 {
+  font-size: clamp(2rem, 5vw, 2.75rem);
+  line-height: 1.02;
+  margin: 0;
+}
+
+.ms-lead {
+  font-size: clamp(1.05rem, 2.4vw, 1.1875rem);
+  line-height: 1.65;
+  font-weight: 300;
+  margin: 0;
+}
+
+.ms-p {
+  font-size: 1.0625rem;
+  line-height: 1.75;
+  font-weight: 300;
+  max-width: var(--ms-measure);
+  margin: 0;
+}
+
+.ms-em { font-style: italic; color: var(--ms-coral); }
+.ms-strong { font-weight: 500; }
+
+/* ── Layout ───────────────────────────────────────────────────────────── */
+
+.ms-page {
+  max-width: var(--ms-page);
+  margin: 0 auto;
+}
+
+.ms-section {
+  padding: 52px var(--ms-gutter);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.ms-split {
+  padding: 52px var(--ms-gutter);
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 44px;
+  align-items: start;
+}
+
+/* ── Button. Repeated five times down the page, so its shape carries more
+      of the tone than any other single element. ─────────────────────────── */
+
+.ms-btn {
+  display: inline-block;
+  font-family: 'Karla', Helvetica, Arial, sans-serif;
+  font-weight: 600;
+  font-size: 1rem;
+  line-height: 1;
+  background: var(--ms-coral);
+  color: var(--ms-paper);
+  padding: 16px 34px;
+  border: 0;
+  border-radius: 999px;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background-color 120ms ease, transform 120ms ease;
+}
+.ms-btn:hover { background: var(--ms-coral-deep); color: var(--ms-paper); transform: translateY(-1px); }
+.ms-btn:active { transform: translateY(0); }
+.ms-btn:focus-visible { outline: 3px solid var(--ms-teal); outline-offset: 3px; }
+
+.ms-band {
+  background: var(--ms-paper-warm);
+  padding: 46px var(--ms-gutter);
+  display: flex;
+  justify-content: center;
+}
+
+/* ── Platform chips ───────────────────────────────────────────────────── */
+
+.ms-chips { display: flex; flex-wrap: wrap; gap: 12px; }
+
+.ms-chip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--ms-rule);
+  border-radius: 999px;
+  padding: 12px 22px;
+  font-size: 0.9375rem;
+  background: var(--ms-surface);
+  color: inherit;
+  text-decoration: none;
+}
+.ms-chip:hover { border-color: var(--ms-ink-faint); color: inherit; }
+.ms-chip--inactive {
+  border-color: var(--ms-rule-soft);
+  background: #faf8f2;
+  color: #b8b1a2;
+}
+
+/* ── Stat tiles ───────────────────────────────────────────────────────── */
+
+.ms-tiles { display: flex; gap: 14px; }
+.ms-tile { border-radius: 14px; padding: 18px 22px; flex: 1 1 0; }
+.ms-tile__n {
+  font-family: 'Instrument Serif', Georgia, serif;
+  font-size: 2.5rem;
+  line-height: 1;
+}
+.ms-tile__label { font-size: 0.875rem; margin-top: 8px; }
+.ms-tile--coral { background: var(--ms-tint-coral); }
+.ms-tile--coral .ms-tile__n { color: var(--ms-coral); }
+.ms-tile--teal  { background: var(--ms-tint-teal); }
+.ms-tile--teal .ms-tile__n { color: var(--ms-teal); }
+.ms-tile--amber { background: var(--ms-tint-amber); }
+.ms-tile--amber .ms-tile__n { color: var(--ms-amber-deep); }
+
+/* ── Chat transcript ──────────────────────────────────────────────────── */
+
+.ms-thread { display: flex; flex-direction: column; gap: 11px; }
+
+.ms-bubble {
+  padding: 13px 17px;
+  font-size: 0.9375rem;
+  line-height: 1.5;
+  max-width: 92%;
+}
+.ms-bubble--them { align-self: flex-start; background: var(--ms-rule-soft); border-radius: 16px 16px 16px 5px; }
+.ms-bubble--luz  { align-self: flex-end; background: var(--ms-ink); color: var(--ms-paper); border-radius: 16px 16px 5px 16px; }
+.ms-bubble--fix  { align-self: flex-end; background: var(--ms-coral); color: var(--ms-paper); border-radius: 16px 16px 5px 16px; }
+
+/* ── Skill grid. Indicative, not a live readout. ──────────────────────── */
+
+.ms-grid {
+  border: 1px solid var(--ms-rule);
+  border-radius: 14px;
+  background: var(--ms-surface);
+  padding: 22px;
+  max-width: 470px;
+}
+.ms-grid__rows {
+  display: grid;
+  grid-template-columns: 1fr 74px 74px;
+  gap: 10px;
+  align-items: center;
+}
+.ms-grid__head { font-size: 0.75rem; color: #8d8779; text-align: center; }
+.ms-grid__skill { font-size: 0.875rem; }
+.ms-grid__cell { height: 22px; border-radius: 5px; }
+.ms-grid__cell--mastered   { background: var(--ms-teal-deep); }
+.ms-grid__cell--confident  { background: var(--ms-teal); }
+.ms-grid__cell--developing { background: var(--ms-amber); }
+.ms-grid__cell--shaky      { background: var(--ms-coral); }
+.ms-grid__cell--untested   { background: var(--ms-rule); }
+
+/* ── Wavy rules. The hand shows up here and never in the type. ────────── */
+
+.ms-wave { display: block; width: 100%; height: 20px; }
+
+/* ── Closing panel ────────────────────────────────────────────────────── */
+
+.ms-close {
+  background: var(--ms-paper-warm);
+  padding: 64px var(--ms-gutter);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  text-align: center;
+}
+
+/* ── Footer ───────────────────────────────────────────────────────────── */
+
+.ms-footer { padding: 44px var(--ms-gutter) 32px; display: flex; flex-direction: column; gap: 26px; }
+.ms-footer__top { display: flex; justify-content: space-between; gap: 48px; flex-wrap: wrap; }
+.ms-footer__cols { display: flex; gap: 56px; font-size: 0.875rem; flex-wrap: wrap; }
+.ms-footer__col { display: flex; flex-direction: column; gap: 9px; }
+.ms-footer__head {
+  font-size: 0.6875rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ms-ink-faint);
+}
+.ms-footer__col span { color: #b8b1a2; }
+.ms-footer__legal {
+  border-top: 1px solid var(--ms-rule);
+  padding-top: 18px;
+  font-size: 0.75rem;
+  color: var(--ms-ink-faint);
+}
+
+/* ── Platform picker ──────────────────────────────────────────────────── */
+
+.ms-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(23, 21, 15, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  z-index: 100;
+}
+.ms-modal[hidden] { display: none; }
+
+.ms-dialog {
+  width: min(460px, 100%);
+  background: var(--ms-paper);
+  border-radius: 16px;
+  padding: 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+.ms-dialog__title { font-family: 'Instrument Serif', Georgia, serif; font-weight: 400; font-size: 1.5rem; }
+.ms-dialog__sub { font-size: 0.9375rem; line-height: 1.55; color: var(--ms-ink-soft); }
+
+/* Logo leads, word supports. */
+.ms-picks { display: flex; gap: 12px; }
+.ms-pick {
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  border: 1px solid var(--ms-rule);
+  border-radius: 12px;
+  padding: 26px 12px;
+  background: var(--ms-surface);
+  text-decoration: none;
+  color: inherit;
+}
+.ms-pick:hover { border-color: var(--ms-ink-faint); color: inherit; }
+.ms-pick:focus-visible { outline: 3px solid var(--ms-teal); outline-offset: 2px; }
+.ms-pick__label { font-size: 0.8125rem; font-weight: 500; color: var(--ms-ink-muted); }
+.ms-pick--soon { border-color: var(--ms-rule-soft); background: #f6f4f1; cursor: default; }
+.ms-pick--soon .ms-pick__label { color: #b8b1a2; }
+
+.ms-dialog__close {
+  align-self: flex-end;
+  background: none;
+  border: 0;
+  font: inherit;
+  font-size: 0.875rem;
+  color: var(--ms-ink-muted);
+  cursor: pointer;
+  padding: 4px;
+}
+
+/* ── Phone ────────────────────────────────────────────────────────────── */
+
+@media (max-width: 640px) {
+  :root { --ms-gutter: 24px; }
+
+  .ms-section { padding: 40px var(--ms-gutter); gap: 16px; }
+  .ms-split {
+    padding: 40px var(--ms-gutter);
+    grid-template-columns: 1fr;   /* transcript drops below its heading */
+    gap: 28px;
+  }
+  .ms-band { padding: 36px var(--ms-gutter); }
+  .ms-close { padding: 48px var(--ms-gutter); }
+
+  /* The grid is the element most likely to break: drop the fixed mode columns
+     to fractions rather than letting the skill names crush. */
+  .ms-grid { padding: 16px; }
+  .ms-grid__rows { grid-template-columns: 1fr 48px 48px; gap: 8px; }
+  .ms-grid__skill { font-size: 0.8125rem; }
+
+  .ms-tiles { flex-direction: column; }
+  .ms-bubble { max-width: 100%; }
+  .ms-footer__cols { gap: 28px; }
+  .ms-picks { flex-direction: column; }
+  .ms-pick { flex-direction: row; justify-content: flex-start; gap: 16px; padding: 16px 20px; }
+
+  /* 44px minimum hit target on touch. */
+  .ms-btn { padding: 15px 30px; }
+  .ms-chip { padding: 13px 20px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ms-btn { transition: none; }
+  .ms-btn:hover { transform: none; }
+}

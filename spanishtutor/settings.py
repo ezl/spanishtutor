@@ -91,6 +91,12 @@ ANTHROPIC_MODEL = os.environ.get('ANTHROPIC_MODEL', 'claude-sonnet-4-6')
 OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY', '')
 
 BASE_URL = os.environ.get('BASE_URL', 'https://spanish.up.railway.app')
+
+# Public entry points. The landing page renders these rather than hardcoding
+# them, so a page move or a new invite is an env change, not a deploy.
+MESSENGER_LINK = os.environ.get('MESSENGER_LINK', 'https://m.me/61590505591195')
+DISCORD_INVITE = os.environ.get('DISCORD_INVITE', 'https://discord.gg/7MB73HYd')
+CONTACT_EMAIL = os.environ.get('CONTACT_EMAIL', 'ericzliu@gmail.com')
 DEV_MODE = os.environ.get('DEV_MODE', 'true').lower() == 'true'
 
 # Messenger
