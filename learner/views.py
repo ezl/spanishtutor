@@ -57,7 +57,10 @@ def _bracket_infer(skill_ids, raw_scores, mode_id):
 
 def landing(request):
     return render(request, 'learner/landing.html', {
-        'messenger_url': settings.MESSENGER_LINK,
+        # Stripped of any query the env var carries: the deployed
+        # MESSENGER_LINK ends in ?ref=web_hero, and appending a per-position ref
+        # to that produced ...?ref=web_hero?ref=web_chips in production.
+        'messenger_url': settings.MESSENGER_LINK.split('?')[0].split('#')[0],
         'discord_url': settings.DISCORD_INVITE,
         'contact_email': settings.CONTACT_EMAIL,
         # Social scrapers do not resolve relative URLs.

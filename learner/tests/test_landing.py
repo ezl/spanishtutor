@@ -125,3 +125,17 @@ def test_whatsapp_chip_is_not_a_link():
     whatsapp = body[body.index('ms-chip--inactive'):]
     whatsapp = whatsapp[:whatsapp.index('</span>')]
     assert 'href' not in whatsapp
+
+
+@pytest.mark.django_db
+def test_messenger_link_with_a_baked_in_ref_does_not_double_up(settings):
+    """The deployed MESSENGER_LINK carries ?ref=web_hero. Appending a second
+    ?ref produced m.me/...?ref=web_hero?ref=web_chips in production: a malformed
+    URL, and every per-position ref silently lost."""
+    settings.MESSENGER_LINK = 'https://m.me/test-page?ref=baked_in'
+
+    body = _render()
+
+    for url in re.findall(r'https://m\.me/[^"\']*', body):
+        assert url.count('?') <= 1, f'malformed: {url}'
+        assert 'baked_in' not in url, f'stale ref survived: {url}'
