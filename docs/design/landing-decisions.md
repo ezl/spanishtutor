@@ -44,11 +44,16 @@ detail inside it.
 is answered by the page. A nav bar on a single-scroll page mostly gives people a
 way to leave. The wordmark lives in the footer only.
 
-**Every CTA opens the platform picker; nothing links straight to a platform.**
-Dropping a non-Messenger visitor on `m.me` is a silent dead end: they hit a
-login wall for an app they may not have, and nothing on the page told them
-Discord exists. The extra click is worth it because the failure it prevents is
-total. Logo leads, word supports.
+**Every CTA opens the platform picker.** Dropping a non-Messenger visitor on
+`m.me` is a silent dead end: they hit a login wall for an app they may not have,
+and nothing on the page told them Discord exists. The extra click is worth it
+because the failure it prevents is total. Logo leads, word supports.
+
+**The one exception is the chips in "Learn via chat", which link straight
+through.** The rule above exists for a generic "Start Learning" where the
+visitor has not chosen. Clicking a labelled logo *is* the choice, so routing it
+via the picker would ask a question already answered. WhatsApp stays a `span`
+with no `href` until the transport exists; a test enforces that.
 
 **Five CTAs, identical wording, each with its own `ref`.** Hero, three bands
 after sections 4, 6 and 8, and the close. `web_hero` / `web_correction` /

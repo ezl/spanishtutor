@@ -102,3 +102,26 @@ def test_favicon_ships_a_separate_16px_cut():
     assert 'favicon-32.png' in body
     assert 'favicon.svg' in body
     assert 'apple-touch-icon.png' in body
+
+
+@pytest.mark.django_db
+def test_platform_chips_are_live_links(settings):
+    """The chips in "Learn via chat" start that platform directly. Clicking a
+    labelled logo IS the choice, so it skips the picker."""
+    settings.MESSENGER_LINK = 'https://m.me/test-page'
+    settings.DISCORD_INVITE = 'https://discord.gg/test-invite'
+
+    body = _render()
+
+    assert 'href="https://m.me/test-page?ref=web_chips"' in body
+    assert 'href="https://discord.gg/test-invite"' in body
+
+
+@pytest.mark.django_db
+def test_whatsapp_chip_is_not_a_link():
+    """No transport exists yet, so it must not be clickable."""
+    body = _render()
+
+    whatsapp = body[body.index('ms-chip--inactive'):]
+    whatsapp = whatsapp[:whatsapp.index('</span>')]
+    assert 'href' not in whatsapp

@@ -170,6 +170,7 @@ a:hover { color: var(--ms-coral-dark); }
   text-decoration: none;
 }
 .ms-chip:hover { border-color: var(--ms-ink-faint); color: inherit; }
+.ms-chip:focus-visible { outline: 3px solid var(--ms-teal); outline-offset: 2px; }
 .ms-chip--inactive {
   border-color: var(--ms-rule-soft);
   background: #faf8f2;
