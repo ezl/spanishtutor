@@ -1676,3 +1676,17 @@ class TestGlossDirectiveIsExplicit:
         unit = {"id": "trig", "label": "Trigger words", "note": "", "kind": "usage"}
         instr = build_teach_instruction(unit, person_new="yo", is_final=False)
         assert "every row" not in instr.lower()
+
+
+class TestUnitExtractionTokenBudget:
+    """Adding known_forms to the extraction prompt pushed its output past the
+    1024-token default, so every response was cut mid-array, parsed to zero
+    units, and silently fell back to the legacy dense lesson."""
+
+    @pytest.mark.asyncio
+    async def test_asks_for_enough_tokens(self):
+        from engine.teach_drill import extract_units
+        mock = AsyncMock(return_value='[{"id":"ser_ir","label":"ser / ir","note":""}]')
+        with patch('engine.teach_drill.call_llm', new=mock):
+            await extract_units('Preterite', 'ser, ir, estar', 'B1')
+        assert mock.await_args.kwargs.get('max_tokens', 1024) >= 4096

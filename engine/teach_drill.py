@@ -113,6 +113,13 @@ Return ONLY the JSON array. No prose, no markdown fences, no explanation. Exampl
 [{{"id":"ser_ir","label":"ser / ir","note":"share fui/fuiste/fue conjugation","kind":"paradigm","verb":"ir","known_tense":"presente","known_forms":{{"yo":"voy","tú":"vas","él":"va","nosotros":"vamos","ellos":"van"}}}},{{"id":"trigger_words","label":"Trigger words","note":"ayer, una vez","kind":"usage"}}]"""
 
 
+# The extraction prompt asks for known_forms (five conjugated forms per verb),
+# which puts a realistic response around 1250 tokens. call_llm's 1024 default
+# truncated every response mid-array, so nothing parsed and every grammar lesson
+# silently fell back to the legacy dense prompt. Sized with headroom.
+UNIT_EXTRACTION_MAX_TOKENS = 4096
+
+
 async def extract_units(skill_name: str, skill_description: str, cefr_level: str) -> list[dict]:
     """Ask the LLM to enumerate teachable units for a skill. Returns [] on parse failure."""
     prompt = UNIT_EXTRACTION_PROMPT.format(
@@ -120,7 +127,8 @@ async def extract_units(skill_name: str, skill_description: str, cefr_level: str
         skill_description=skill_description,
         cefr_level=cefr_level,
     )
-    raw = await call_llm([{"role": "user", "content": prompt}])
+    raw = await call_llm([{"role": "user", "content": prompt}],
+                         max_tokens=UNIT_EXTRACTION_MAX_TOKENS)
     return _parse_units_json(raw)
 
 
