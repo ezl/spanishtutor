@@ -205,7 +205,6 @@ a:hover { color: var(--ms-coral-dark); }
 }
 .ms-bubble--them { align-self: flex-start; background: var(--ms-rule-soft); border-radius: 16px 16px 16px 5px; }
 .ms-bubble--luz  { align-self: flex-end; background: var(--ms-ink); color: var(--ms-paper); border-radius: 16px 16px 5px 16px; }
-.ms-bubble--fix  { align-self: flex-end; background: var(--ms-coral); color: var(--ms-paper); border-radius: 16px 16px 5px 16px; }
 
 /* ── Skill grid. Indicative, not a live readout. ──────────────────────── */
 
