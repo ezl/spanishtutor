@@ -47,7 +47,7 @@ Three layers. Each one only knows about the layer directly below it.
 - **The non-text guard** — voice clips, photos and stickers reach dispatch as empty `text` and get `NON_TEXT_NOTICE_TEXT`. It sits above command and engine routing (an attachment must never be scored as a blank answer) and below the first-message check (a new user sending a sticker gets onboarded, not corrected). Transports pass empty text through; none of them knows what an attachment is.
 - **Commands** — the `COMMANDS` table (`!reset`, `!retest`, `!english`, `!spanish`, `!menu`, `!translate`) and `ARG_COMMANDS` for commands taking an argument (`!learn <topic>`), matched on the first word. Commands live here, never in a transport, so every command works on every platform for free.
 - **Error wrapping** — any exception below dispatch becomes a friendly `Reply`, so no transport needs its own engine-error handling.
-- **Welcome flow** — `handle_welcome(platform, external_id, display_name)` for a platform's explicit "start" affordance (Messenger's Get Started button), where there's no user text to route.
+- **Welcome flow** — `handle_welcome(platform, external_id, display_name, ref)` for a platform's explicit "start" affordance (Messenger's Get Started tap, an `m.me?ref=` referral from the website CTA), where there's no user text to route. One website CTA serves everyone, so the reply is level-aware: never-onboarded → `FIRST_MESSAGE`; open session → no reply at all (their thread already shows Luz's pending turn); otherwise `WELCOME_BACK_TEXT`, which starts no session and calls no model so the engine's own returning-user check-in still owns that job. `ref` is logged for attribution only.
 - **Normalizing the engine's response dict** into an ordered `list[Reply]`.
 
 **`IncomingEvent`** (`platform`, `external_id`, `display_name`, `text`) and **`Reply`** (`text`, `follow_up`, `session_ended`) are the only two types crossing the transport/dispatch boundary. `IncomingEvent` is text-only by design — see the voice constraint below.
@@ -55,6 +55,8 @@ Three layers. Each one only knows about the layer directly below it.
 **A transport is pure I/O.** Its entire job is: receive a platform event → build an `IncomingEvent` → `await dispatch.handle(event)` → send each `Reply` back via the native API. Anything a transport does beyond that must be genuinely platform-specific — Discord's 2000-char chunking and markdown escaping, Messenger's HMAC signature check and 20-second webhook SLA. `engine.dispatch` is the only module either transport imports — nothing in `bot/` or `messenger/` touches `engine.core`, `engine.onboarding`, or the models.
 
 **Adding a platform** is: a new transport module doing the I/O, plus one `PLATFORM_ID_FIELD` entry and its `User` identity column. No engine or dispatch changes.
+
+**Channels do not share an account.** `resolve_user` creates one `User` per platform identity, and that is the intended design, not a gap — see the constraint below.
 
 ## Project Structure
 
@@ -91,6 +93,7 @@ curriculum/            # skills.yaml, config.yaml (runtime reload)
 - **Text-only on chat platforms**: `IncomingEvent` has no attachments field on purpose. Voice gets built on the web app first, where we have full control; if a chat platform ever gets voice, it becomes an interface to the web version. This is a deliberate scope decision (2026-08-17), not an oversight.
 - **Stateless per request**: no in-memory user state. Everything read from DB on each message.
 - **Multi-tenant from day one**: every DB query scoped to `user_id`.
+- **One channel, one user — no account linking** (decided 2026-08-22): a person who uses both Messenger and Discord has two `User` rows, two skill grids, and two placement quizzes, and they never merge. The common case is a single channel, and merging two independently-measured skill grids has no correct answer — you would be discarding someone's history or reconciling scores taken under different conditions. Do not build a linking or merge flow without revisiting this. **Before Stripe ships**, note that billing attaches to a `User`: either Discord stops being a public entry point, or billing has to attach to something that outlives a channel — otherwise a paying Messenger customer hits the paywall again on Discord.
 - **The model never reasons about the curriculum**: what skills exist, what they require, and which one a request maps to are decided in code (`curriculum.py`, `skill_request.py`). The model classifies intent and relays the student's words; it is never asked to judge the skill graph. Letting it do so produced a confidently false claim to a student that subjunctive required solid preterite.
 - **Config over code**: skill taxonomy, SRS weights, Luz Angela's system prompt — all in config files. Changes to these don't require a redeploy, just a restart.
 

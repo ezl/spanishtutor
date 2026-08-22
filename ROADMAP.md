@@ -111,11 +111,15 @@ Originally scoped as a *migration* off Discord onto Messenger. That framing is o
 | Originally planned | What we did instead |
 |---|---|
 | Replace `bot/client.py` with a Messenger webhook | Both transports coexist; neither is privileged |
-| Rename `User.discord_id` → `User.external_id` | Obviated — `dispatch.PLATFORM_ID_FIELD` maps platform → identity column, so each platform keeps its own field. The schema allows one `User` row to hold both ids, but no account-linking flow exists yet |
+| Rename `User.discord_id` → `User.external_id` | Obviated — `dispatch.PLATFORM_ID_FIELD` maps platform → identity column, so each platform keeps its own field. The schema allows one `User` row to hold both ids, but **nothing ever writes both**: account linking was considered and rejected on 2026-08-22 (see below) |
 | Remove the `discord.py` dependency | Kept — Discord is still a supported surface |
 | Update magic-link auth for Messenger identity | Already platform-agnostic; `make_progress_token` signs `user.pk`, not a platform id |
 
 **Adding a platform now:** write a transport module that does the platform's I/O, add one `PLATFORM_ID_FIELD` entry, add its identity column to `User`. No engine or dispatch changes. See the Architecture section of `CLAUDE.md`.
+
+**Channels are independent accounts — decided 2026-08-22, not a gap.** Cross-channel progress (finish a lesson on Messenger, see it on Discord) was scoped and rejected. A person on two channels gets two `User` rows, two skill grids, two placement quizzes, and they never merge. Reasoning: the overwhelmingly common case is a single channel, and two independently-measured skill grids have no correct merge — you would either discard someone's history or reconcile scores taken under different conditions. Not building it is strictly better than building it badly.
+
+**Open constraint this creates:** billing attaches to a `User` row. With independent channels, a paying Messenger customer who messages on Discord hits the paywall again, and a free trial can be claimed once per channel. Before the Stripe work in Phase 3, either Discord stops being a public entry point or billing attaches to something that outlives a channel.
 
 **Still open:** Meta app review is required before Messenger can serve users beyond the app's test accounts.
 
