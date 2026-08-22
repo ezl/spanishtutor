@@ -1405,3 +1405,189 @@ async def test_continue_new_skill_closes_session_on_end_lesson_early(make_user, 
     assert result["session_ended"] is True
     await sync_to_async(session.refresh_from_db)()
     assert session.ended_at is not None
+
+
+class TestDegenerateContrastRows:
+    """A CONTRAST row whose known side equals its target side teaches nothing and
+    is always wrong. This is the `Yo fui → Yo fui` failure that shipped to the
+    student on 2026-08-19 (skill b1_preterite_vs_imperfect)."""
+
+    def test_detects_the_row_that_shipped(self):
+        from engine.teach_drill import find_degenerate_contrast_rows
+
+        paradigm = (
+            "Yo fui → Yo fui (I go → I went)\n"
+            "Tú vas → Tú fuiste\n"
+            "Él va → Él fue\n"
+            "Nosotros vamos → Nosotros fuimos\n"
+            "Ellos van → Ellos fueron"
+        )
+        assert find_degenerate_contrast_rows(paradigm) == ["Yo fui → Yo fui (I go → I went)"]
+
+    def test_correct_paradigm_is_clean(self):
+        from engine.teach_drill import find_degenerate_contrast_rows
+
+        paradigm = (
+            "Yo voy → Yo fui (I go → I went)\n"
+            "Tú vas → Tú fuiste\n"
+            "Él va → Él fue"
+        )
+        assert find_degenerate_contrast_rows(paradigm) == []
+
+    def test_gloss_arrow_alone_does_not_trigger(self):
+        """The English gloss carries its own arrow. Only the Spanish sides count."""
+        from engine.teach_drill import find_degenerate_contrast_rows
+
+        assert find_degenerate_contrast_rows("Yo como → Yo comía (I eat → I eat)") == []
+
+    def test_prose_with_an_arrow_is_not_a_paradigm_row(self):
+        """Only rows opening with a person pronoun are CONTRAST rows."""
+        from engine.teach_drill import find_degenerate_contrast_rows
+
+        assert find_degenerate_contrast_rows("presente → pretérito") == []
+
+    def test_ignores_case_and_surrounding_whitespace(self):
+        from engine.teach_drill import find_degenerate_contrast_rows
+
+        assert find_degenerate_contrast_rows("  Yo Fui  →  yo fui  ") != []
+
+
+class TestDegenerateParadigmRegeneration:
+    """A degenerate paradigm must never reach the student. Four prompt-level fixes
+    failed to prevent it, so the turn regenerates deterministically instead."""
+
+    BAD = ("Aquí va:\n"
+           "Yo fui → Yo fui (I go → I went)\n"
+           "Tú vas → Tú fuiste\n"
+           "Él va → Él fue\n"
+           "¿Cómo dices 'I went'?")
+    GOOD = ("Aquí va:\n"
+            "Yo voy → Yo fui (I go → I went)\n"
+            "Tú vas → Tú fuiste\n"
+            "Él va → Él fue\n"
+            "¿Cómo dices 'I went'?")
+
+    async def _run(self, make_user, make_skill, responses, uid):
+        from engine.teach_drill import handle_teach_drill_turn
+        from learner.models import Session
+
+        user = await sync_to_async(make_user)(discord_id=uid, cefr_level='B1')
+        skill = await sync_to_async(make_skill)(skill_id='sk_' + uid)
+        session = await sync_to_async(Session.objects.create)(
+            user=user, session_type='new_skill', target_skill=skill,
+            current_phase='teach_drill',
+            quiz_state={"teach_drill": {
+                "units": [{"id": "ir", "label": "ir", "note": "fui/fuiste/fue"}],
+                "taught": [], "drills": {}, "turn_count": 0, "lesson_complete": False,
+            }},
+        )
+        mock = AsyncMock(side_effect=responses)
+        with patch('engine.teach_drill.call_llm', new=mock):
+            result = await handle_teach_drill_turn(user, session, text="listo")
+        return result, mock
+
+    @pytest.mark.asyncio
+    @pytest.mark.django_db(transaction=True)
+    async def test_degenerate_paradigm_is_regenerated(self, make_user, make_skill):
+        result, mock = await self._run(make_user, make_skill, [self.BAD, self.GOOD], 'td_deg1')
+
+        assert "Yo fui → Yo fui" not in result["text"]
+        assert "Yo voy → Yo fui" in result["text"]
+        assert mock.await_count == 2
+
+    @pytest.mark.asyncio
+    @pytest.mark.django_db(transaction=True)
+    async def test_clean_paradigm_is_not_regenerated(self, make_user, make_skill):
+        """No wasted API call when the first response is already correct."""
+        result, mock = await self._run(make_user, make_skill, [self.GOOD, self.BAD], 'td_deg2')
+
+        assert result["text"] == self.GOOD
+        assert mock.await_count == 1
+
+    @pytest.mark.asyncio
+    @pytest.mark.django_db(transaction=True)
+    async def test_regeneration_is_attempted_only_once(self, make_user, make_skill):
+        """Two bad responses must not loop; the turn still returns something."""
+        result, mock = await self._run(make_user, make_skill, [self.BAD, self.BAD], 'td_deg3')
+
+        assert mock.await_count == 2
+        assert result["text"].strip()
+
+
+class TestParadigmDemandMatchesUnit:
+    """The root cause of the `Yo fui → Yo fui` bug: the instruction ordered a full
+    paradigm from a unit that contained no verb, so the model invented both the
+    verb and the known side."""
+
+    def test_usage_unit_is_not_asked_for_a_paradigm(self):
+        from engine.teach_drill import build_teach_instruction
+        unit = {"id": "completed", "label": "Preterite — completed events",
+                "note": "trigger words: ayer, una vez", "kind": "usage"}
+
+        instr = build_teach_instruction(unit, person_new="yo", is_final=False)
+
+        assert "full paradigm" not in instr.lower()
+        assert "Preterite — completed events" in instr
+
+    def test_paradigm_unit_is_given_the_known_side_explicitly(self):
+        """A mandatory-CONTRAST unit must carry its known forms so the model
+        never has to derive them."""
+        from engine.teach_drill import build_teach_instruction
+        unit = {"id": "ir", "label": "ir", "note": "fui/fuiste/fue", "kind": "paradigm",
+                "verb": "ir", "known_tense": "presente",
+                "known_forms": {"yo": "voy", "tú": "vas", "él": "va"}}
+
+        instr = build_teach_instruction(unit, person_new="yo", is_final=False)
+
+        assert "presente" in instr
+        assert "voy" in instr
+
+    def test_legacy_unit_without_kind_still_gets_a_paradigm(self):
+        """Sessions already in flight have units with no 'kind' key. They must keep
+        the old behaviour rather than silently losing their paradigm."""
+        from engine.teach_drill import build_teach_instruction
+        unit = {"id": "tener", "label": "tener", "note": "stem tuv-"}
+
+        instr = build_teach_instruction(unit, person_new="yo", is_final=False)
+
+        assert "full paradigm" in instr.lower()
+
+
+class TestUnitExtractionCarriesTheKnownSide:
+    def test_extraction_prompt_requires_a_kind_field(self):
+        from engine.teach_drill import UNIT_EXTRACTION_PROMPT
+        assert '"kind"' in UNIT_EXTRACTION_PROMPT
+
+    def test_extraction_prompt_requires_known_forms_for_contrast_skills(self):
+        """The unit must carry the known side so the model never derives it."""
+        from engine.teach_drill import UNIT_EXTRACTION_PROMPT
+        assert '"known_forms"' in UNIT_EXTRACTION_PROMPT
+        assert '"known_tense"' in UNIT_EXTRACTION_PROMPT
+
+    @pytest.mark.asyncio
+    async def test_extract_units_preserves_the_new_fields(self):
+        from engine.teach_drill import extract_units
+        fake = json.dumps([{
+            "id": "ir", "label": "ir", "note": "", "kind": "paradigm",
+            "verb": "ir", "known_tense": "presente",
+            "known_forms": {"yo": "voy", "tú": "vas"},
+        }])
+        with patch('engine.teach_drill.call_llm', new=AsyncMock(return_value=fake)):
+            units = await extract_units("Preterite", "ir", "B1")
+
+        assert units[0]["kind"] == "paradigm"
+        assert units[0]["known_forms"]["yo"] == "voy"
+
+
+class TestContrastSpecCoversTwoPastTenseSkills:
+    def test_spec_says_what_known_means_when_both_sides_are_past(self):
+        """`preterite vs imperfect` contrasts two PAST tenses, so 'the tense the
+        student already knows' was undefined — the gap the model filled by
+        collapsing the yo row."""
+        from engine.teach_drill import TEACH_DRILL_CONTINUATION_SUFFIX
+        spec = TEACH_DRILL_CONTINUATION_SUFFIX.lower()
+        assert "preterite vs" in spec or "preterite-vs" in spec
+
+    def test_spec_forbids_an_identical_known_and_target_side(self):
+        from engine.teach_drill import TEACH_DRILL_CONTINUATION_SUFFIX
+        assert "identical" in TEACH_DRILL_CONTINUATION_SUFFIX.lower()

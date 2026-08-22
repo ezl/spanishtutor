@@ -99,9 +99,17 @@ Each unit is a JSON object with these fields:
 - "id": a short slug, unique within this skill (e.g. "ser_ir", "tener", "estar")
 - "label": human-readable label for prompts (e.g. "ser / ir", "tener")
 - "note": one line of teacher-facing metadata — the stem, a spelling quirk, a meaning shift, or empty string if nothing special. NOT taught verbatim to the student, but shapes what you teach.
+- "kind": "paradigm" if this unit is a verb that gets conjugated, "usage" if it is a rule or usage context with no verb of its own. A "usage" unit is never rendered as a conjugation table.
+
+For "paradigm" units ONLY, also include:
+- "verb": the infinitive being conjugated (e.g. "ir")
+- "known_tense": the Spanish name of the tense the student ALREADY knows, which forms the left side of each contrast row (e.g. "presente")
+- "known_forms": an object mapping person to the known-tense form, for yo/tú/él/nosotros/ellos (e.g. {{"yo":"voy","tú":"vas","él":"va","nosotros":"vamos","ellos":"van"}})
+
+"known_forms" must be the OTHER tense, never the tense being taught. If the known and target form for a person would be identical, you have picked the wrong known tense.
 
 Return ONLY the JSON array. No prose, no markdown fences, no explanation. Example valid response:
-[{{"id":"ser_ir","label":"ser / ir","note":"share fui/fuiste/fue conjugation"}},{{"id":"estar","label":"estar","note":"stem estuv-"}}]"""
+[{{"id":"ser_ir","label":"ser / ir","note":"share fui/fuiste/fue conjugation","kind":"paradigm","verb":"ir","known_tense":"presente","known_forms":{{"yo":"voy","tú":"vas","él":"va","nosotros":"vamos","ellos":"van"}}}},{{"id":"trigger_words","label":"Trigger words","note":"ayer, una vez","kind":"usage"}}]"""
 
 
 async def extract_units(skill_name: str, skill_description: str, cefr_level: str) -> list[dict]:
@@ -129,12 +137,29 @@ def _parse_units_json(raw: str) -> list[dict]:
         return []
     if not isinstance(units, list):
         return []
-    # Coerce shape — drop entries missing required keys.
-    return [
-        {"id": str(u.get("id", "")), "label": str(u.get("label", "")), "note": str(u.get("note", ""))}
-        for u in units
-        if isinstance(u, dict) and u.get("id") and u.get("label")
-    ]
+    # Coerce shape — drop entries missing required keys. Optional paradigm fields
+    # are carried through when present: dropping them would strip the known side
+    # back off the unit and reintroduce the derivation the model gets wrong.
+    coerced = []
+    for u in units:
+        if not (isinstance(u, dict) and u.get("id") and u.get("label")):
+            continue
+        unit = {
+            "id": str(u.get("id", "")),
+            "label": str(u.get("label", "")),
+            "note": str(u.get("note", "")),
+        }
+        if u.get("kind") in ("usage", "paradigm"):
+            unit["kind"] = u["kind"]
+        if u.get("verb"):
+            unit["verb"] = str(u["verb"])
+        if u.get("known_tense"):
+            unit["known_tense"] = str(u["known_tense"])
+        known_forms = u.get("known_forms")
+        if isinstance(known_forms, dict) and known_forms:
+            unit["known_forms"] = {str(k): str(v) for k, v in known_forms.items()}
+        coerced.append(unit)
+    return coerced
 
 
 # ── Rotation / spacing (pure logic, no I/O) ───────────────────────────────────
@@ -329,6 +354,10 @@ Imperfect example (yo vivir):
     Nosotros vivimos → Nosotros vivíamos
     Ellos viven → Ellos vivían
 
+Preterite vs. imperfect (and any skill contrasting two PAST tenses with each other): the contrast is about USAGE, not conjugation. Neither past tense is the "known" side of the other. Teach when each one applies with example sentences. If you do show a paradigm for such a skill, the known side is the PRESENT tense — never the other past tense.
+
+The known and target sides of a row must NEVER be identical. A row like `Yo fui → Yo fui` shows the student no transformation and is a hard error; if you cannot produce a different known form, the unit is a usage unit and needs no paradigm at all.
+
 The `known` side is what the student already has automated; the `target` side is what they're learning. The bridge IS the point — surfaces the transformation, links new to known, and trains the retrieval switch. WITHOUT the bridge, the student is memorizing forms in isolation, which is exactly what teach_drill exists to prevent.
 
 FORBIDDEN for the skill types above (any of these is a pattern violation):
@@ -480,6 +509,51 @@ def build_retrieval_only_instruction(retrieval: dict, person_retrieve: str) -> s
     )
 
 
+PARADIGM_CORRECTION_INSTRUCTION = """Your previous message contained an invalid CONTRAST paradigm row:
+
+{rows}
+
+In a CONTRAST row the LEFT side is the form the student ALREADY KNOWS and the RIGHT side is the TARGET form being taught. The two sides must be DIFFERENT forms — a row with an identical left and right side shows no transformation and teaches the student nothing.
+
+Resend your entire message, corrected. Keep everything else identical: same unit, same example sentence, same drill question, same format, same end markers. Fix only the broken row(s)."""
+
+
+# Person pronouns that open a CONTRAST paradigm row. Used to tell a paradigm
+# row apart from ordinary prose that happens to contain an arrow.
+CONTRAST_ROW_PERSONS = frozenset({
+    "yo", "tú", "tu", "él", "el", "ella", "usted",
+    "nosotros", "nosotras", "ellos", "ellas", "ustedes",
+})
+
+_TRAILING_GLOSS = re.compile(r'\([^)]*\)\s*$')
+
+
+def find_degenerate_contrast_rows(text: str) -> list[str]:
+    """Return CONTRAST rows whose known side is identical to its target side.
+
+    A row like `Yo fui -> Yo fui` shows the student no transformation at all, so
+    it is always wrong regardless of which verb or tense is being taught. This is
+    a pure structural check: it needs no conjugation table, and it cannot flag a
+    correct row. Four prompt-level fixes failed to stop this class of error
+    (08-15 x2, 08-16 x2, recurred 08-19) -- hence a deterministic guard.
+    """
+    bad = []
+    for line in text.splitlines():
+        row = line.strip()
+        if not row:
+            continue
+        if row.split()[0].strip('*_:.').casefold() not in CONTRAST_ROW_PERSONS:
+            continue
+        # The English gloss carries its own arrow; only the Spanish sides count.
+        sides = _TRAILING_GLOSS.sub('', row).strip().split('\u2192')
+        if len(sides) != 2:
+            continue
+        known, target = sides[0].strip(), sides[1].strip()
+        if known and known.casefold() == target.casefold():
+            bad.append(row)
+    return bad
+
+
 def build_teach_instruction(unit: dict, person_new: str, is_final: bool) -> str:
     """Instruction for a teach turn: teach one unit + ONE production question about it.
     No retrieval on teach turns — retrieval happens on its own alternating turn."""
@@ -491,12 +565,38 @@ def build_teach_instruction(unit: dict, person_new: str, is_final: bool) -> str:
 
     label = unit["label"]
     note = unit["note"] or "no special notes"
-    parts.append(
-        f"1) Teach exactly this unit: **{label}** (metadata: {note}).\n"
-        f"   - Show the full paradigm one line per person (Yo/Tú/Él/Nosotros/Ellos).\n"
-        f"   - Give ONE natural example sentence using an item from this paradigm.\n"
-        f"   - Keep it under 100 words for this step."
-    )
+    # A usage unit contains no verb, so demanding a paradigm from it forces the
+    # model to invent one -- the root cause of the `Yo fui -> Yo fui` row that
+    # shipped on 2026-08-19. Units with no "kind" key predate this field and keep
+    # the original paradigm behaviour so lessons already in flight don't change.
+    if unit.get("kind") == "usage":
+        parts.append(
+            f"1) Teach exactly this unit: **{label}** (metadata: {note}).\n"
+            f"   - This is a USAGE unit, NOT a verb paradigm. Do NOT render a conjugation "
+            f"table and do NOT pick a verb to conjugate.\n"
+            f"   - Explain when this usage applies, then give TWO short contrasting example "
+            f"sentences that show it against the alternative.\n"
+            f"   - Keep it under 100 words for this step."
+        )
+    else:
+        paradigm_lines = (
+            f"   - Show the full paradigm one line per person (Yo/Tú/Él/Nosotros/Ellos).\n"
+        )
+        known_forms = unit.get("known_forms") or {}
+        if known_forms:
+            forms = ", ".join(f"{person} {form}" for person, form in known_forms.items())
+            known_tense = unit.get("known_tense") or "the tense the student already knows"
+            paradigm_lines += (
+                f"   - The KNOWN side of each CONTRAST row is the {known_tense}: {forms}. "
+                f"Use these exact forms on the left of each `→`. Do NOT derive your own "
+                f"known side and never repeat the target form there.\n"
+            )
+        parts.append(
+            f"1) Teach exactly this unit: **{label}** (metadata: {note}).\n"
+            f"{paradigm_lines}"
+            f"   - Give ONE natural example sentence using an item from this paradigm.\n"
+            f"   - Keep it under 100 words for this step."
+        )
 
     parts.append(
         f"2) Ask EXACTLY ONE production question testing **{label}** in the "
@@ -649,6 +749,22 @@ async def handle_teach_drill_turn(user, session, text: str) -> dict:
     cefr_level = user.estimated_cefr_level or 'A2'
     suffix = TEACH_DRILL_CONTINUATION_SUFFIX.format(skill_name=skill_name, cefr_level=cefr_level)
     response = await call_llm(history, user=user, system_suffix=suffix)
+
+    # Deterministic guard: a CONTRAST row whose known side equals its target side
+    # teaches no transformation and is always wrong. Regenerate once with an
+    # explicit correction rather than ship a bad form to the student. Runs before
+    # marker stripping so the retry sees the message exactly as the model wrote it.
+    degenerate_rows = find_degenerate_contrast_rows(response)
+    if degenerate_rows:
+        retry_history = history + [
+            {"role": "assistant", "content": response},
+            {"role": "user", "content": PARADIGM_CORRECTION_INSTRUCTION.format(
+                rows="\n".join(degenerate_rows))},
+        ]
+        # One retry only. If the model fails twice the turn still goes out --
+        # a lesson that stalls is worse than one bad row, and the drill question
+        # and markers still need to reach the student.
+        response = await call_llm(retry_history, user=user, system_suffix=suffix)
 
     # Strip markers.
     response, marker_seen = _strip_lesson_complete_marker(response)
