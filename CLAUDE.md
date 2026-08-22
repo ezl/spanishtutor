@@ -45,7 +45,7 @@ Three layers. Each one only knows about the layer directly below it.
 - **User resolution** — `resolve_user(platform, external_id, display_name)`. `PLATFORM_ID_FIELD` maps a platform name to the `User` column holding its identity (`discord_id`, `messenger_psid`). Adding a platform means adding one entry here, not a new lookup path.
 - **First-message flow** — a brand-new user gets `FIRST_MESSAGE` before the engine ever sees the text.
 - **The non-text guard** — voice clips, photos and stickers reach dispatch as empty `text` and get `NON_TEXT_NOTICE_TEXT`. It sits above command and engine routing (an attachment must never be scored as a blank answer) and below the first-message check (a new user sending a sticker gets onboarded, not corrected). Transports pass empty text through; none of them knows what an attachment is.
-- **Commands** — the `COMMANDS` table (`!reset`, `!retest`, `!english`, `!spanish`, `!menu`, `!translate`). Commands live here, never in a transport, so every command works on every platform for free.
+- **Commands** — the `COMMANDS` table (`!reset`, `!retest`, `!english`, `!spanish`, `!menu`, `!translate`) and `ARG_COMMANDS` for commands taking an argument (`!learn <topic>`), matched on the first word. Commands live here, never in a transport, so every command works on every platform for free.
 - **Error wrapping** — any exception below dispatch becomes a friendly `Reply`, so no transport needs its own engine-error handling.
 - **Welcome flow** — `handle_welcome(platform, external_id, display_name)` for a platform's explicit "start" affordance (Messenger's Get Started button), where there's no user text to route.
 - **Normalizing the engine's response dict** into an ordered `list[Reply]`.
@@ -76,6 +76,7 @@ engine/                # DISPATCH + ENGINE
   quiz_evaluator.py    # answer evaluation
   scoring.py           # skill x mode scoring
   curriculum.py        # skill selection / next-skill logic
+  skill_request.py     # student asks for a specific lesson (detect / resolve / start)
   onboarding.py        # FIRST_MESSAGE + onboarding flow
   translate.py         # !translate mode handler
   interests.py         # interest extraction
@@ -90,6 +91,7 @@ curriculum/            # skills.yaml, config.yaml (runtime reload)
 - **Text-only on chat platforms**: `IncomingEvent` has no attachments field on purpose. Voice gets built on the web app first, where we have full control; if a chat platform ever gets voice, it becomes an interface to the web version. This is a deliberate scope decision (2026-08-17), not an oversight.
 - **Stateless per request**: no in-memory user state. Everything read from DB on each message.
 - **Multi-tenant from day one**: every DB query scoped to `user_id`.
+- **The model never reasons about the curriculum**: what skills exist, what they require, and which one a request maps to are decided in code (`curriculum.py`, `skill_request.py`). The model classifies intent and relays the student's words; it is never asked to judge the skill graph. Letting it do so produced a confidently false claim to a student that subjunctive required solid preterite.
 - **Config over code**: skill taxonomy, SRS weights, Luz Angela's system prompt — all in config files. Changes to these don't require a redeploy, just a restart.
 
 ## Workflow

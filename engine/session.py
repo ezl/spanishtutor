@@ -411,6 +411,24 @@ Sin listas. Sin encabezados. 4 oraciones en tono conversacional."""
 
 # ── Phase helpers ──────────────────────────────────────────────────────────────
 
+def _opening_history(prompt: str, student_text: str, greeting: str = None) -> list[dict]:
+    """Build the conversation for an opening turn.
+
+    The student's message used to be dropped here: the check-in greeting is a
+    canned f-string, and the opening prompt was sent to the model on its own, so
+    anything the student said in reply never reached it. Roles must alternate --
+    call_llm hands `messages` to the API with no normalisation.
+    """
+    history = []
+    if greeting:
+        history.append({"role": "assistant", "content": greeting})
+    said = (student_text or '').strip()
+    if said:
+        prompt = f'The student just said: "{said}"\n\n{prompt}'
+    history.append({"role": "user", "content": prompt})
+    return history
+
+
 def _skill_type(skill) -> str:
     return 'vocab' if skill and 'vocab' in skill.skill_id else 'grammar'
 
@@ -692,6 +710,19 @@ async def handle_session(user, text: str, attachments: list = None) -> dict:
     if not session:
         return await _open_session(user, text)
 
+    # Skill requests are handled above phase routing, so a request made at the
+    # check-in greeting is caught as readily as one made mid-drill. The original
+    # failure lost two of its three turns because the only classifier lived
+    # inside teach_drill. Resolution of a pending clarifying question comes
+    # first, so a one-word answer ("formation") isn't re-read as a new request.
+    from .skill_request import (
+        handle_skill_request, looks_like_skill_request, resolve_pending_request,
+    )
+    if session.current_phase == 'skill_request':
+        return await resolve_pending_request(user, session, text)
+    if looks_like_skill_request(text):
+        return await handle_skill_request(user, session, text)
+
     if session.current_phase == 'check_in':
         return await _handle_check_in(user, session, text)
 
@@ -713,10 +744,16 @@ async def handle_session(user, text: str, attachments: list = None) -> dict:
     return await _continue_session(user, session, text, attachments)
 
 
-async def _open_session(user, text: str) -> dict:
+async def _open_session(user, text: str, forced_skill: dict = None) -> dict:
     from learner.models import Session, SessionEvent, SessionSkill, Skill
 
-    session_type, context, frontier_skills = await _select_session(user)
+    if forced_skill is not None:
+        # The student asked for this skill by name. A direct request outranks
+        # normal selection entirely -- any active skill may be requested and
+        # there is no prerequisite gate (decision 2026-08-22).
+        session_type, context, frontier_skills = 'new_skill', {'skill': forced_skill}, []
+    else:
+        session_type, context, frontier_skills = await _select_session(user)
 
     # Walk back to the most recent session with an actual summary. Sessions
     # that auto-closed after minimal activity (idle-close with <N events) can
@@ -898,7 +935,8 @@ async def _open_session(user, text: str) -> dict:
                         skill_name=target_skill_obj.name,
                         cefr_level=level, interests=interests,
                     )
-                    opening = await call_llm([{"role": "user", "content": prompt}], user=user)
+                    opening = await call_llm(
+                        _opening_history(prompt, text), user=user)
                 else:
                     # Fallback: LLM failed to enumerate units. Use the legacy dense lesson.
                     import logging
@@ -1064,7 +1102,10 @@ async def _handle_check_in(user, session, text: str) -> dict:
                         skill_name=skill.name,
                         cefr_level=level, interests=interests,
                     )
-                    opening = await call_llm([{"role": "user", "content": prompt}], user=user)
+                    opening = await call_llm(
+                        _opening_history(prompt, text,
+                                         greeting=pending.content if pending else None),
+                        user=user)
                 else:
                     import logging
                     logging.getLogger(__name__).warning(

@@ -5,6 +5,7 @@ Covers: _srs_position, _srs_build_schedule, phase flow helpers,
 and _select_session decision tree.
 """
 import pytest
+from unittest.mock import patch, AsyncMock
 from datetime import timedelta
 from asgiref.sync import sync_to_async
 from django.utils import timezone
@@ -653,3 +654,152 @@ async def test_open_session_skips_empty_summary_sessions(make_user, make_skill):
     )()
     assert 'preterite irregulars' in check_in_event.content, \
         f"Check-in should quote real summary but was: {check_in_event.content!r}"
+
+
+class TestCheckInReplyReachesTheModel:
+    """The student's reply to the greeting was written to the DB and then dropped
+    before the LLM saw it — 'I want to learn subjunctive' was structurally
+    discarded in sessions 46 and 47 (2026-08-19)."""
+
+    async def _open(self, make_user, make_skill, text, uid):
+        from engine.session import _handle_check_in
+        from learner.models import Session, SessionEvent
+
+        user = await sync_to_async(make_user)(discord_id=uid, cefr_level='B1')
+        skill = await sync_to_async(make_skill)(skill_id=uid + '_gram', name='Preterite')
+        session = await sync_to_async(Session.objects.create)(
+            user=user, session_type='new_skill', target_skill=skill,
+            current_phase='check_in',
+        )
+        await sync_to_async(SessionEvent.objects.create)(
+            session=session, event_type='system',
+            content='Today I want to push forward with something new. Ready?',
+            user_response='',
+        )
+        units = AsyncMock(return_value='[{"id":"u1","label":"u1","note":""}]')
+        opening = AsyncMock(return_value='OPENING TURN')
+        with patch('engine.teach_drill.call_llm', new=units), \
+             patch('engine.session.call_llm', new=opening):
+            await _handle_check_in(user, session, text=text)
+        return opening
+
+    @pytest.mark.asyncio
+    @pytest.mark.django_db(transaction=True)
+    async def test_student_reply_is_in_the_history(self, make_user, make_skill):
+        opening = await self._open(
+            make_user, make_skill, "I want to learn the subjunctive", 'ci_reach')
+
+        sent = opening.await_args.args[0]
+        assert "I want to learn the subjunctive" in " ".join(m["content"] for m in sent)
+
+    @pytest.mark.asyncio
+    @pytest.mark.django_db(transaction=True)
+    async def test_history_roles_alternate(self, make_user, make_skill):
+        """call_llm passes messages straight to the API with no normalisation."""
+        opening = await self._open(make_user, make_skill, "listo", 'ci_alt')
+
+        roles = [m["role"] for m in opening.await_args.args[0]]
+        assert all(a != b for a, b in zip(roles, roles[1:])), roles
+
+    @pytest.mark.asyncio
+    @pytest.mark.django_db(transaction=True)
+    async def test_empty_reply_still_works(self, make_user, make_skill):
+        opening = await self._open(make_user, make_skill, "", 'ci_empty')
+        assert opening.await_count == 1
+
+
+class TestForcedSkill:
+    """A skill request must be able to override normal session selection."""
+
+    @pytest.mark.asyncio
+    @pytest.mark.django_db(transaction=True)
+    async def test_forced_skill_overrides_selection(self, make_user, make_skill):
+        from engine.session import _open_session
+        from learner.models import Session
+
+        user = await sync_to_async(make_user)(discord_id='forced_1', cefr_level='B1')
+        await sync_to_async(make_skill)(skill_id='a1_default', name='Default pick')
+        wanted = await sync_to_async(make_skill)(
+            skill_id='b1_subjunctive_formation', name='Subjunctive — formation',
+            cefr_level='B1')
+
+        units = AsyncMock(return_value='[{"id":"u1","label":"u1","note":""}]')
+        with patch('engine.teach_drill.call_llm', new=units), \
+             patch('engine.session.call_llm', new=AsyncMock(return_value='OPENING')):
+            await _open_session(user, text="quiero el subjuntivo", forced_skill={
+                'id': wanted.skill_id, 'name': wanted.name,
+                'cefr_level': 'B1', 'description': '', 'order': 1})
+
+        session = await sync_to_async(
+            lambda: Session.objects.filter(user=user).order_by('-id').select_related('target_skill').first()
+        )()
+        assert session.session_type == 'new_skill'
+        assert session.target_skill.skill_id == 'b1_subjunctive_formation'
+
+
+@pytest.mark.django_db(transaction=True)
+class TestSkillRequestRouting:
+    """Detection must be phase-independent: the original bug lost two of three
+    turns because the only classifier lived inside teach_drill, and the student
+    asked at the check-in greeting."""
+
+    async def _grid(self, make_skill):
+        return [
+            await sync_to_async(make_skill)(
+                skill_id='b1_subjunctive_formation',
+                name='Subjunctive — present formation', cefr_level='B1',
+                description='Forming the present subjunctive'),
+            await sync_to_async(make_skill)(
+                skill_id='b1_subjunctive_triggers_doubt_emotion',
+                name='Subjunctive — doubt and emotion triggers', cefr_level='B1',
+                description='Dudo que'),
+        ]
+
+    async def _session(self, make_user, make_skill, uid, phase):
+        from learner.models import Session
+        grid = await self._grid(make_skill)
+        user = await sync_to_async(make_user)(discord_id=uid, cefr_level='B1')
+        session = await sync_to_async(Session.objects.create)(
+            user=user, session_type='new_skill', target_skill=grid[0],
+            current_phase=phase,
+            quiz_state={"teach_drill": {"units": [{"id": "u", "label": "u", "note": ""}],
+                                        "taught": [], "drills": {}, "turn_count": 0,
+                                        "lesson_complete": False}},
+        )
+        return user, session
+
+    @pytest.mark.asyncio
+    async def test_request_at_the_greeting_is_caught(self, make_user, make_skill):
+        from engine.session import handle_session
+        from learner.models import Session
+
+        user, session = await self._session(make_user, make_skill, 'rt_ci', 'check_in')
+        result = await handle_session(user, "I want to learn subjunctive")
+
+        assert "formation" in result["text"].lower()
+        reloaded = await sync_to_async(Session.objects.get)(pk=session.pk)
+        assert reloaded.current_phase == 'skill_request'
+
+    @pytest.mark.asyncio
+    async def test_request_mid_lesson_is_caught(self, make_user, make_skill):
+        from engine.session import handle_session
+        from learner.models import Session
+
+        user, session = await self._session(make_user, make_skill, 'rt_td', 'teach_drill')
+        result = await handle_session(user, "can we learn subjunctive instead")
+
+        assert "formation" in result["text"].lower()
+        reloaded = await sync_to_async(Session.objects.get)(pk=session.pk)
+        assert reloaded.current_phase == 'skill_request'
+
+    @pytest.mark.asyncio
+    async def test_a_drill_answer_is_never_intercepted(self, make_user, make_skill):
+        from engine.session import handle_session
+        from learner.models import Session
+
+        user, session = await self._session(make_user, make_skill, 'rt_ans', 'teach_drill')
+        with patch('engine.teach_drill.call_llm', new=AsyncMock(return_value='EVALUATION')):
+            await handle_session(user, "Yo tuve un buen día")
+
+        reloaded = await sync_to_async(Session.objects.get)(pk=session.pk)
+        assert reloaded.current_phase != 'skill_request'

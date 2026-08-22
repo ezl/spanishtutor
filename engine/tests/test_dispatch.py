@@ -440,3 +440,67 @@ class TestNonTextGuard:
         replies = await handle(event)
 
         assert replies[0].text == FIRST_MESSAGE
+
+
+@pytest.mark.django_db(transaction=True)
+class TestLearnCommand:
+    """Deterministic counterpart to natural-language skill requests. Lives in
+    dispatch, so it works on every platform and in every phase for free."""
+
+    async def _setup(self, uid, make_skill):
+        from learner.models import User
+        await sync_to_async(make_skill)(
+            skill_id='b1_subjunctive_formation',
+            name='Subjunctive — present formation', cefr_level='B1',
+            description='Forming the present subjunctive')
+        await sync_to_async(make_skill)(
+            skill_id='b1_subjunctive_triggers_doubt_emotion',
+            name='Subjunctive — doubt and emotion triggers', cefr_level='B1',
+            description='Dudo que')
+        return await sync_to_async(User.objects.create)(
+            discord_id=uid, display_name='L', instruction_language='auto',
+            estimated_cefr_level='B1',
+        )
+
+    async def _run(self, uid, text, make_skill):
+        from engine.dispatch import IncomingEvent, handle
+        await self._setup(uid, make_skill)
+        return await handle(IncomingEvent(
+            platform='discord', external_id=uid, display_name='L', text=text))
+
+    @pytest.mark.asyncio
+    async def test_unique_request_starts_the_skill(self, make_skill):
+        from unittest.mock import patch, AsyncMock
+        from learner.models import Session
+
+        with patch('engine.teach_drill.call_llm',
+                   new=AsyncMock(return_value='[{"id":"u","label":"u","note":""}]')), \
+             patch('engine.session.call_llm', new=AsyncMock(return_value='OPENING')):
+            await self._run('d_learn1', '!learn subjunctive formation', make_skill)
+
+        session = await sync_to_async(
+            lambda: Session.objects.select_related('target_skill').order_by('-id').first())()
+        assert session.target_skill.skill_id == 'b1_subjunctive_formation'
+
+    @pytest.mark.asyncio
+    async def test_ambiguous_request_lists_the_options(self, make_skill):
+        from learner.models import Session
+
+        replies = await self._run('d_learn2', '!learn subjunctive', make_skill)
+
+        assert 'formation' in replies[0].text.lower()
+        assert 'doubt' in replies[0].text.lower()
+        count = await sync_to_async(Session.objects.count)()
+        assert count == 0, "must not guess a skill when the request is ambiguous"
+
+    @pytest.mark.asyncio
+    async def test_bare_command_explains_itself(self, make_skill):
+        replies = await self._run('d_learn3', '!learn', make_skill)
+        assert '!learn' in replies[0].text
+
+    @pytest.mark.asyncio
+    async def test_engine_is_not_called_for_the_command(self, make_skill):
+        from unittest.mock import patch, AsyncMock
+        with patch('engine.core.handle_message', new=AsyncMock()) as engine:
+            await self._run('d_learn4', '!learn subjunctive', make_skill)
+        engine.assert_not_called()

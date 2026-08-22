@@ -175,6 +175,32 @@ async def _cmd_translate(user, event: IncomingEvent) -> list:
     ))]
 
 
+async def _cmd_learn(user, event: IncomingEvent, arg: str) -> list:
+    """`!learn <topic>` — request a specific lesson by name.
+
+    The deterministic counterpart to a natural-language request. Both funnel
+    into engine.skill_request so the resolution rules exist in one place.
+    """
+    from engine.skill_request import handle_skill_request
+    from learner.models import Session
+
+    if not arg:
+        return [Reply(text=(
+            "Tell me what you want to work on: `!learn <topic>` — "
+            "for example `!learn subjunctive` or `!learn preterite`. "
+            "`!menu` shows what's available."
+        ))]
+
+    session = await sync_to_async(
+        lambda: Session.objects.filter(user=user, ended_at__isnull=True)
+                               .exclude(session_type='onboarding')
+                               .select_related('target_skill').first()
+    )()
+    result = await handle_skill_request(user, session, arg)
+    return [Reply(text=result.get('text', ''),
+                  session_ended=result.get('session_ended', False))]
+
+
 COMMANDS = {
     '!reset': _cmd_reset,
     '!retest': _cmd_retest,
@@ -182,6 +208,12 @@ COMMANDS = {
     '!spanish': _cmd_spanish,
     '!menu': _cmd_menu,
     '!translate': _cmd_translate,
+}
+
+# Commands that take an argument. Matched on the FIRST word of the message
+# rather than the whole text, so they need their own table.
+ARG_COMMANDS = {
+    '!learn': _cmd_learn,
 }
 
 
@@ -241,6 +273,11 @@ async def handle(event: IncomingEvent) -> list:
         cmd_key = event.text.strip().lower()
         if cmd_key in COMMANDS:
             return await COMMANDS[cmd_key](user, event)
+
+        # Argument-taking commands match on the first word; the rest is the arg.
+        head, _, arg = event.text.strip().partition(' ')
+        if head.lower() in ARG_COMMANDS:
+            return await ARG_COMMANDS[head.lower()](user, event, arg.strip())
 
         result = await handle_message(user, event.text, [])
 
