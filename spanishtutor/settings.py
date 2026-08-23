@@ -33,15 +33,19 @@ SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 # HSTS. Env-driven so it can be dialled down without a code change, which
 # matters because removing the setting is NOT the undo: browsers keep an
 # expired-at-max-age policy of their own. The undo is serving max-age=0 over
-# HTTPS until stragglers pick it up, so this starts short and is raised once
-# the header is confirmed live.
+# HTTPS until stragglers pick it up.
+#
+# Shipped at 300 first and confirmed live on all three hostnames before being
+# raised to a year. includeSubDomains is safe today because www is the only
+# subdomain that resolves and it has its own certificate; it does constrain any
+# future subdomain to having HTTPS from the moment it exists.
 #
 # The real cost of HSTS is that a certificate error stops being click-through
 # and becomes a hard failure. That is the security property, but it makes
 # renewal load-bearing.
-SECURE_HSTS_SECONDS = int(os.environ.get('SECURE_HSTS_SECONDS', '300'))
-SECURE_HSTS_INCLUDE_SUBDOMAINS = os.environ.get('SECURE_HSTS_INCLUDE_SUBDOMAINS', 'false').lower() == 'true'
-SECURE_HSTS_PRELOAD = os.environ.get('SECURE_HSTS_PRELOAD', 'false').lower() == 'true'
+SECURE_HSTS_SECONDS = int(os.environ.get('SECURE_HSTS_SECONDS', '31536000'))
+SECURE_HSTS_INCLUDE_SUBDOMAINS = os.environ.get('SECURE_HSTS_INCLUDE_SUBDOMAINS', 'true').lower() == 'true'
+SECURE_HSTS_PRELOAD = os.environ.get('SECURE_HSTS_PRELOAD', 'true').lower() == 'true'
 
 INSTALLED_APPS = [
     'django.contrib.admin',
