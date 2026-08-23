@@ -110,13 +110,26 @@ a:hover { color: var(--ms-coral-dark); }
 
 /* ── Layout ───────────────────────────────────────────────────────────── */
 
-.ms-page {
-  max-width: var(--ms-page);
-  margin: 0 auto;
+.ms-page { width: 100%; }
+
+/* Full-bleed grounds, centred content. Each block spans the viewport so its
+   background reaches the window edge; the side padding keeps the text inside
+   the 880 column. Below that width the max() falls back to the gutter. */
+.ms-hero,
+.ms-section,
+.ms-split,
+.ms-band,
+.ms-close,
+.ms-footer {
+  padding-left: max(var(--ms-gutter), calc(50% - var(--ms-page) / 2));
+  padding-right: max(var(--ms-gutter), calc(50% - var(--ms-page) / 2));
 }
 
+.ms-hero { padding-top: 76px; padding-bottom: 56px; }
+
 .ms-section {
-  padding: 52px var(--ms-gutter);
+  padding-top: 52px;
+  padding-bottom: 52px;
   display: flex;
   flex-direction: column;
   gap: 20px;
@@ -128,7 +141,8 @@ a:hover { color: var(--ms-coral-dark); }
 .ms-split--warm { background: var(--ms-paper-warm); }
 
 .ms-split {
-  padding: 52px var(--ms-gutter);
+  padding-top: 52px;
+  padding-bottom: 52px;
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 44px;
@@ -161,7 +175,8 @@ a:hover { color: var(--ms-coral-dark); }
   /* Coral, not the section tint: with alternating grounds a warm band merged
      into whichever warm section it touched. Coral now means action outright. */
   background: var(--ms-coral);
-  padding: 46px var(--ms-gutter);
+  padding-top: 46px;
+  padding-bottom: 46px;
   display: flex;
   justify-content: center;
 }
@@ -256,7 +271,8 @@ a:hover { color: var(--ms-coral-dark); }
 
 .ms-close {
   background: var(--ms-paper-warm);
-  padding: 64px var(--ms-gutter);
+  padding-top: 64px;
+  padding-bottom: 64px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -267,7 +283,8 @@ a:hover { color: var(--ms-coral-dark); }
 /* ── Footer ───────────────────────────────────────────────────────────── */
 
 .ms-footer {
-  padding: 44px var(--ms-gutter) 32px;
+  padding-top: 44px;
+  padding-bottom: 32px;
   display: flex;
   flex-direction: column;
   gap: 26px;
@@ -358,14 +375,15 @@ a:hover { color: var(--ms-coral-dark); }
 @media (max-width: 640px) {
   :root { --ms-gutter: 24px; }
 
-  .ms-section { padding: 40px var(--ms-gutter); gap: 16px; }
+  .ms-section { padding-top: 40px; padding-bottom: 40px; gap: 16px; }
   .ms-split {
-    padding: 40px var(--ms-gutter);
+    padding-top: 40px;
+    padding-bottom: 40px;
     grid-template-columns: 1fr;   /* transcript drops below its heading */
     gap: 28px;
   }
-  .ms-band { padding: 36px var(--ms-gutter); }
-  .ms-close { padding: 48px var(--ms-gutter); }
+  .ms-band { padding-top: 36px; padding-bottom: 36px; }
+  .ms-close { padding-top: 48px; padding-bottom: 48px; }
 
   /* The grid is the element most likely to break: drop the fixed mode columns
      to fractions rather than letting the skill names crush. */
