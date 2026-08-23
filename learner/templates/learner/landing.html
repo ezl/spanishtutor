@@ -58,10 +58,20 @@
     </div>
   </div>
 
-  <svg class="ms-wave" viewBox="0 0 880 20" preserveAspectRatio="none" aria-hidden="true"><path d="M0 11 C 110 3, 200 18, 320 10 S 560 2, 660 11 S 800 17, 880 8" stroke="#f5b32e" stroke-width="3" fill="none"/></svg>
+
+  {% comment %}
+    The hero's one-off ending. It only reads because the ground changes across
+    it, which is why "Learn via chat" is warm. It can happen once, so it cannot
+    be mistaken for a repeating divider.
+  {% endcomment %}
+  <div style="line-height: 0;">
+    <svg width="100%" height="40" viewBox="0 0 880 40" preserveAspectRatio="none" aria-hidden="true" style="display: block;">
+      <path d="M0 0 C 150 34, 300 4, 450 18 S 730 38, 880 8 L880 40 L0 40 Z" fill="#fff6ea"></path>
+    </svg>
+  </div>
 
   <!-- Learn via chat -->
-  <section class="ms-section">
+  <section class="ms-section ms-section--warm">
     <h2 class="ms-h2">Learn via chat</h2>
     <p class="ms-p">No app to download. No new account to remember. Luz teaches you in the messaging app you already use, the same place you text your friends.</p>
     <div class="ms-chips" style="margin-top: 6px;">
@@ -89,10 +99,9 @@
     </div>
   </section>
 
-  <svg class="ms-wave" viewBox="0 0 880 20" preserveAspectRatio="none" aria-hidden="true"><path d="M0 9 C 120 17, 210 2, 330 10 S 570 18, 670 9 S 810 3, 880 12" stroke="#34b8a8" stroke-width="3" fill="none"/></svg>
 
   <!-- Live correction -->
-  <section class="ms-split">
+  <section class="ms-split ms-split--warm">
     <div>
       <h2 class="ms-h2">Live correction,<br>instant feedback</h2>
       <p class="ms-p" style="margin-top: 20px;">Say something wrong and you find out right then. Not at the end of the lesson, not on a score screen a week later. You get the correction, the reason it's wrong, and another go at it.</p>
@@ -133,7 +142,7 @@
   </section>
 
   <!-- Spaced repetition -->
-  <section class="ms-section">
+  <section class="ms-section ms-section--warm">
     <h2 class="ms-h2">Brings back what's slipping</h2>
     <p class="ms-p">Everything you learn starts fading the moment you stop using it. Luz uses <strong class="ms-strong">spaced repetition</strong>, one of the most consistently replicated findings in memory research, to bring a skill back into a lesson at the point you were about to lose it. Not on a fixed schedule, and not because you picked it off a list.</p>
     <p class="ms-p"><a href="https://en.wikipedia.org/wiki/Spaced_repetition" target="_blank" rel="noopener">How spaced repetition works &rsaquo;</a></p>
@@ -141,7 +150,6 @@
 
   <div class="ms-band"><button type="button" class="ms-btn" data-open-picker data-ref="web_srs">Start Learning</button></div>
 
-  <svg class="ms-wave" viewBox="0 0 880 20" preserveAspectRatio="none" aria-hidden="true"><path d="M0 12 C 130 4, 230 17, 350 9 S 590 3, 690 12 S 820 16, 880 9" stroke="#f4623a" stroke-width="3" fill="none"/></svg>
 
   <!-- Your life -->
   <section class="ms-section">
@@ -150,7 +158,7 @@
   </section>
 
   <!-- It decides -->
-  <section class="ms-section">
+  <section class="ms-section ms-section--warm">
     <h2 class="ms-h2">Picks what to study for you</h2>
     <p class="ms-p">You never get a menu. Show up and Luz already knows what's next, the one skill most likely to move you forward today. Deciding what to learn is work, and it's work you shouldn't have to do.</p>
     <p class="ms-p">You can still take the wheel. Say <em>"let's work on subjunctive"</em> or <em>"teach me vocabulary for Japan"</em> and she'll follow. But you never have to.</p>
@@ -178,7 +186,7 @@
     <div class="ms-footer__top">
       <div style="display: flex; flex-direction: column; gap: 9px; max-width: 250px;">
         <div class="ms-display" style="font-size: 1.375rem;">MiniSpanish</div>
-        <div style="font-size: 0.8125rem; line-height: 1.6; color: var(--ms-ink-muted);">Mini Spanish lessons, in the app you already use.</div>
+        <div class="ms-footer__tag">Mini Spanish lessons, in the app you already use.</div>
       </div>
       <div class="ms-footer__cols">
         <div class="ms-footer__col">
