@@ -30,6 +30,19 @@ CSRF_TRUSTED_ORIGINS = ['https://*.up.railway.app'] + [
 ]
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
+# HSTS. Env-driven so it can be dialled down without a code change, which
+# matters because removing the setting is NOT the undo: browsers keep an
+# expired-at-max-age policy of their own. The undo is serving max-age=0 over
+# HTTPS until stragglers pick it up, so this starts short and is raised once
+# the header is confirmed live.
+#
+# The real cost of HSTS is that a certificate error stops being click-through
+# and becomes a hard failure. That is the security property, but it makes
+# renewal load-bearing.
+SECURE_HSTS_SECONDS = int(os.environ.get('SECURE_HSTS_SECONDS', '300'))
+SECURE_HSTS_INCLUDE_SUBDOMAINS = os.environ.get('SECURE_HSTS_INCLUDE_SUBDOMAINS', 'false').lower() == 'true'
+SECURE_HSTS_PRELOAD = os.environ.get('SECURE_HSTS_PRELOAD', 'false').lower() == 'true'
+
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
