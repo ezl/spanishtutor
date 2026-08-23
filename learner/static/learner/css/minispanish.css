@@ -116,6 +116,11 @@ a:hover { color: var(--ms-coral-dark); }
   gap: 20px;
 }
 
+/* Alternating ground. Warms whole regions rather than eight words of heading,
+   and gives the eye somewhere to rest on a long scroll. Uses the tint already
+   under the CTA bands and the closing panel, so no new colour enters. */
+.ms-section--warm { background: var(--ms-paper-warm); }
+
 .ms-split {
   padding: 52px var(--ms-gutter);
   display: grid;
@@ -147,7 +152,10 @@ a:hover { color: var(--ms-coral-dark); }
 .ms-btn:focus-visible { outline: 3px solid var(--ms-teal); outline-offset: 3px; }
 
 .ms-band {
-  background: var(--ms-paper-warm);
+  /* Coral tint, not the section warm: with alternating grounds the bands would
+     otherwise merge into whichever warm section they touch. Two warms, each
+     meaning one thing -- amber for a content region, coral under the button. */
+  background: var(--ms-tint-coral);
   padding: 46px var(--ms-gutter);
   display: flex;
   justify-content: center;
