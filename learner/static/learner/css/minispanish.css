@@ -100,6 +100,23 @@ a:hover { color: var(--ms-coral-dark); }
 }
 
 .ms-em { font-style: italic; color: var(--ms-coral); }
+
+/* A short coral wave under each section heading. Coral appears in every section
+   without carrying any weight, so the CTA keeps the colour to itself. Reuses the
+   hand-drawn rule already used as a section divider rather than adding a device.
+   Scoped to content sections: the closing panel is centred, and the hero has its
+   own teal wave. */
+.ms-section > .ms-h2::after,
+.ms-split .ms-h2::after {
+  content: '';
+  display: block;
+  width: 132px;
+  height: 12px;
+  margin-top: 12px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 132 12'%3E%3Cpath d='M3 8 C 28 3, 48 11, 72 6 S 112 3, 129 7' stroke='%23f4623a' stroke-width='3' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+}
+
 .ms-strong { font-weight: 500; }
 
 /* ── Layout ───────────────────────────────────────────────────────────── */
