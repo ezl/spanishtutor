@@ -173,6 +173,27 @@ async def _redirect_to_dm(message: discord.Message) -> None:
         logger.warning('Could not point %s at DMs: %s', message.author, e)
 
 
+def _fallback_channel(guild):
+    """Somewhere the bot can speak when a member's DMs are shut.
+
+    The system channel is the right answer when one is set, but a guild need not
+    have one -- this one did not, and the old code returned silently in exactly
+    the case the fallback existed for. Any channel the bot can post in beats
+    saying nothing.
+    """
+    channel = getattr(guild, 'system_channel', None)
+    if channel is not None:
+        return channel
+    me = getattr(guild, 'me', None)
+    for candidate in getattr(guild, 'text_channels', None) or []:
+        try:
+            if candidate.permissions_for(me).send_messages:
+                return candidate
+        except Exception:
+            continue
+    return None
+
+
 @client.event
 async def on_member_join(member: discord.Member) -> None:
     """Accepting the invite IS the start affordance, so the conversation opens
@@ -200,8 +221,13 @@ async def on_member_join(member: discord.Member) -> None:
     except discord.Forbidden:
         # Closed DMs. Say it in the one place they can still hear us.
         logger.info('DMs closed for %s; falling back to the server', member)
-        channel = getattr(member.guild, 'system_channel', None)
+        channel = _fallback_channel(member.guild)
         if channel is None:
+            # Nothing to be done, but not nothing to say: a member is now sitting
+            # in the server with no greeting and no way to know why.
+            logger.warning(
+                'No channel to post the closed-DM notice for %s: nowhere the bot '
+                'can speak in %s', member, member.guild)
             return
         try:
             await channel.send(CLOSED_DM_TEXT.format(

@@ -203,3 +203,67 @@ class TestDmsStillWork:
         assert handle.await_args[0][0].text == 'anoche fui al gimnasio'
         assert handle.await_args[0][0].platform == 'discord'
         send.assert_awaited()
+
+
+class TestClosedDmFallbackWithoutASystemChannel:
+    """A guild need not have a system channel, and this one did not: production
+    had system_channel_id=None while the test below it passed, because the mock
+    made member.guild.system_channel truthy. The fallback returned silently and
+    the member sat in the server with no idea why nothing happened."""
+
+    def _member(self, system_channel, text_channels):
+        member = MagicMock()
+        member.id = 555
+        member.display_name = 'Eric'
+        member.mention = '<@555>'
+        member.bot = False
+        member.send = AsyncMock(
+            side_effect=discord.Forbidden(MagicMock(status=403), 'cannot send'))
+        member.guild.system_channel = system_channel
+        member.guild.text_channels = text_channels
+        return member
+
+    def _channel(self, can_send=True):
+        ch = MagicMock()
+        ch.send = AsyncMock()
+        perms = MagicMock()
+        perms.send_messages = can_send
+        ch.permissions_for = MagicMock(return_value=perms)
+        return ch
+
+    @pytest.mark.asyncio
+    async def test_falls_back_to_a_postable_channel(self):
+        from bot.client import on_member_join
+
+        first, second = self._channel(can_send=False), self._channel(can_send=True)
+        member = self._member(system_channel=None, text_channels=[first, second])
+
+        with patch('bot.client.dispatch_welcome', new_callable=AsyncMock) as welcome, \
+             patch('bot.client.client') as fake_client:
+            fake_client.user = MagicMock(id=999)
+            welcome.return_value = [Reply(text='¡Hola!')]
+            await on_member_join(member)
+
+        first.send.assert_not_awaited()
+        second.send.assert_awaited_once()
+        assert '<@555>' in second.send.await_args[0][0]
+
+    @pytest.mark.asyncio
+    async def test_nowhere_to_post_is_logged_not_swallowed(self, engine_caplog):
+        """If there is genuinely nowhere to speak, that is worth knowing about
+        rather than a silent return."""
+        import logging
+        from bot.client import on_member_join
+
+        member = self._member(system_channel=None, text_channels=[self._channel(can_send=False)])
+
+        with patch('bot.client.dispatch_welcome', new_callable=AsyncMock) as welcome, \
+             patch('bot.client.client') as fake_client, \
+             engine_caplog.at_level(logging.WARNING, logger='bot'):
+            fake_client.user = MagicMock(id=999)
+            welcome.return_value = [Reply(text='¡Hola!')]
+            await on_member_join(member)
+
+        assert any('nowhere' in r.getMessage().lower() or 'no channel' in r.getMessage().lower()
+                   for r in engine_caplog.records), \
+            [r.getMessage() for r in engine_caplog.records]

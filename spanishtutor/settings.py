@@ -129,7 +129,9 @@ BASE_URL = os.environ.get('BASE_URL', 'https://spanish.up.railway.app')
 # Public entry points. The landing page renders these rather than hardcoding
 # them, so a page move or a new invite is an env change, not a deploy.
 MESSENGER_LINK = os.environ.get('MESSENGER_LINK', 'https://m.me/61590505591195')
-DISCORD_INVITE = os.environ.get('DISCORD_INVITE', 'https://discord.gg/7MB73HYd')
+# Permanent: max_age=0, max_uses=0. The previous link was a default invite,
+# which expires after seven days, and had been dead on the live page.
+DISCORD_INVITE = os.environ.get('DISCORD_INVITE', 'https://discord.gg/C3bTR8xqQp')
 CONTACT_EMAIL = os.environ.get('CONTACT_EMAIL', 'ericzliu@gmail.com')
 DEV_MODE = os.environ.get('DEV_MODE', 'true').lower() == 'true'
 

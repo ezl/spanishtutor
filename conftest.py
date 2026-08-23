@@ -47,8 +47,11 @@ def engine_caplog(caplog):
     """
     import logging
     logger = logging.getLogger('engine')
+    bot_logger = logging.getLogger('bot')
     logger.addHandler(caplog.handler)
+    bot_logger.addHandler(caplog.handler)
     try:
         yield caplog
     finally:
         logger.removeHandler(caplog.handler)
+        bot_logger.removeHandler(caplog.handler)
