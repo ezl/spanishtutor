@@ -65,16 +65,24 @@ def landing(request):
         'contact_email': settings.CONTACT_EMAIL,
         # Social scrapers do not resolve relative URLs.
         'site_url': settings.BASE_URL.rstrip('/'),
+        'operator_legal_name': settings.OPERATOR_LEGAL_NAME,
         'year': timezone.now().year,
     })
 
 
+def _legal_context():
+    # Meta's business verification requires the operator's legal name to be
+    # present on the website before it will associate the domain with the
+    # business. Kept in one place so the three pages can't drift.
+    return {'operator_legal_name': settings.OPERATOR_LEGAL_NAME}
+
+
 def privacy(request):
-    return render(request, 'learner/privacy.html')
+    return render(request, 'learner/privacy.html', _legal_context())
 
 
 def terms(request):
-    return render(request, 'learner/terms.html')
+    return render(request, 'learner/terms.html', _legal_context())
 
 
 def auth_link(request, token):

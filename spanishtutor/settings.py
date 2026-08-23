@@ -19,6 +19,11 @@ ALLOWED_HOSTS = [h.strip() for h in _allowed.split(',') if h.strip()] + ['.up.ra
 # redirect entirely, so local dev and any other deployment are unaffected.
 CANONICAL_HOST = os.environ.get('CANONICAL_HOST', '')
 
+# Legal name of the entity operating the service. Meta's business
+# verification requires the legal business name to appear on the website
+# before it will associate the domain with the business.
+OPERATOR_LEGAL_NAME = os.environ.get('OPERATOR_LEGAL_NAME', 'Eric Liu')
+
 CSRF_TRUSTED_ORIGINS = ['https://*.up.railway.app'] + [
     f'https://{h.lstrip(".")}' for h in ALLOWED_HOSTS
     if h not in ('localhost', '127.0.0.1') and not h.endswith('up.railway.app')
