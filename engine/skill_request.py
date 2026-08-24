@@ -122,12 +122,29 @@ async def _model_candidates(phrase: str) -> list[dict]:
 
 
 async def _start(user, session, skill: dict) -> dict:
-    """End the current lesson and open a new one on the requested skill."""
+    """Grade the current lesson, end it, and open a new one on the requested skill.
+
+    The grade is the point. Every other path that ends a session calls
+    score_session first; this one did not, so asking for a different skill threw
+    away whatever the student had just demonstrated. One real case: seventeen
+    correct exchanges of ir + a + infinitivo, then a question about pronouns, and
+    the skill was offered again days later because the grid had never heard of it.
+
+    Best-effort: a student who asked for a different skill must not be blocked
+    because grading raised.
+    """
+    import logging
     from django.utils import timezone
     from learner.models import Session
+    from .scoring import score_session
     from .session import _open_session
 
     if session is not None:
+        try:
+            await score_session(session, user)
+        except Exception as exc:
+            logging.getLogger(__name__).error(
+                'score_session failed for session %s on skill switch: %s', session.pk, exc)
         await sync_to_async(
             lambda: Session.objects.filter(pk=session.pk, ended_at__isnull=True)
                                    .update(ended_at=timezone.now())

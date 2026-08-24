@@ -170,3 +170,65 @@ class TestPickCandidate:
     def test_ambiguous_reply_is_unresolved(self):
         from engine.skill_request import pick_candidate
         assert pick_candidate(self.CANDS, "subjunctive") is None
+
+
+class TestTheAbandonedLessonIsGraded:
+    """Switching skills mid-lesson used to throw away the evidence. Session 55
+    held seventeen correct exchanges of ir + a + infinitivo; the user asked about
+    pronouns, _start stamped ended_at with a bare queryset update, and no score
+    was ever written. next_new_skill then offered the same skill again days
+    later, because as far as the grid was concerned it had never been taught."""
+
+    @pytest.mark.asyncio
+    @pytest.mark.django_db(transaction=True)
+    async def test_the_outgoing_session_is_scored_before_it_ends(self, make_user, grid):
+        from engine import skill_request
+        from learner.models import Session
+
+        user = await sync_to_async(make_user)(cefr_level='B1')
+        outgoing = await sync_to_async(Session.objects.create)(
+            user=user, session_type='new_skill', current_phase='teach_drill')
+
+        with patch('engine.scoring.score_session', new_callable=AsyncMock) as scored, \
+             patch('engine.session._open_session', new_callable=AsyncMock) as opened:
+            opened.return_value = {'text': 'nueva lección', 'session_ended': False}
+            await skill_request._start(user, outgoing, {'id': 'b1_future_regular'})
+
+        scored.assert_awaited_once()
+        assert scored.await_args[0][0].pk == outgoing.pk
+
+    @pytest.mark.asyncio
+    @pytest.mark.django_db(transaction=True)
+    async def test_a_failed_grade_still_lets_the_new_lesson_start(self, make_user, grid):
+        """Grading is best-effort: a student who asked for a different skill
+        should not be stuck because scoring raised."""
+        from engine import skill_request
+        from learner.models import Session
+
+        user = await sync_to_async(make_user)(cefr_level='B1')
+        outgoing = await sync_to_async(Session.objects.create)(
+            user=user, session_type='new_skill', current_phase='teach_drill')
+
+        with patch('engine.scoring.score_session', new_callable=AsyncMock) as scored, \
+             patch('engine.session._open_session', new_callable=AsyncMock) as opened:
+            scored.side_effect = RuntimeError('grader exploded')
+            opened.return_value = {'text': 'nueva lección', 'session_ended': False}
+            result = await skill_request._start(user, outgoing, {'id': 'b1_future_regular'})
+
+        opened.assert_awaited_once()
+        assert result['text'] == 'nueva lección'
+
+    @pytest.mark.asyncio
+    @pytest.mark.django_db(transaction=True)
+    async def test_no_outgoing_session_is_not_an_error(self, make_user, grid):
+        from engine import skill_request
+
+        user = await sync_to_async(make_user)(cefr_level='B1')
+
+        with patch('engine.scoring.score_session', new_callable=AsyncMock) as scored, \
+             patch('engine.session._open_session', new_callable=AsyncMock) as opened:
+            opened.return_value = {'text': 'nueva lección', 'session_ended': False}
+            await skill_request._start(user, None, {'id': 'b1_future_regular'})
+
+        scored.assert_not_awaited()
+        opened.assert_awaited_once()
