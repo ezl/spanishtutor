@@ -854,3 +854,81 @@ class TestAnotherPassCopy:
         assert _is_pass_check_phase('another_pass_check') is True
         assert _is_pass_check_phase('second_pass_check') is True
         assert _is_pass_check_phase('review') is False
+
+
+class TestQuestionFloor:
+    """A mastered skill got ONE question, which cannot separate knowing it from
+    guessing — that is how a review of three skills came to be 3 questions."""
+
+    def test_no_skill_gets_fewer_than_two(self):
+        from engine.session import SCORE_TO_QUESTIONS
+        assert min(SCORE_TO_QUESTIONS.values()) >= 2
+
+    def test_untested_is_not_sampled_less_than_known_weak(self):
+        """Score 0 means zero information; it was getting fewer questions than
+        score 1, which is backwards."""
+        from engine.session import SCORE_TO_QUESTIONS
+        assert SCORE_TO_QUESTIONS[0] >= SCORE_TO_QUESTIONS[1]
+
+    def test_strong_skills_stay_tapered(self):
+        """Not flat — as more skills are mastered more come due at once."""
+        from engine.session import SCORE_TO_QUESTIONS
+        assert SCORE_TO_QUESTIONS[4] < SCORE_TO_QUESTIONS[0]
+
+
+class TestReviewTopUp:
+    """A review shorter than the minimum pulls forward the next-due skills rather
+    than drilling mastered ones harder."""
+
+    def test_no_top_up_when_already_long_enough(self):
+        from engine.session import _topped_up_skill_ids
+        scheduled = [('a', 0), ('b', 0)]          # 3 + 3 = 6 questions
+        assert _topped_up_skill_ids(scheduled, [('c', 0)]) == []
+
+    def test_pulls_forward_until_the_minimum_is_met(self):
+        from engine.session import _topped_up_skill_ids
+        scheduled = [('a', 4)]                     # 2 questions — under the floor
+        extra = _topped_up_skill_ids(scheduled, [('b', 4), ('c', 4)])
+        assert extra == ['b']                      # 2 + 2 = 4, stop
+
+    def test_never_duplicates_a_scheduled_skill(self):
+        from engine.session import _topped_up_skill_ids
+        extra = _topped_up_skill_ids([('a', 4)], [('a', 4), ('b', 4)])
+        assert 'a' not in extra
+
+    def test_degrades_gracefully_with_no_candidates(self):
+        from engine.session import _topped_up_skill_ids
+        assert _topped_up_skill_ids([('a', 4)], []) == []
+
+
+@pytest.mark.django_db(transaction=True)
+class TestPassRestartAsksTheFirstQuestion:
+    """Every pass after the first was one question short: the restart set the
+    counter to 0, claiming Q0 was outstanding, but nothing had asked it."""
+
+    @pytest.mark.asyncio
+    async def test_restart_starts_at_question_zero(self, make_user, make_skill):
+        from engine.session import _continue_srs_review, PASS_CHECK_PHASE
+        from learner.models import Session, SessionSkill
+
+        user = await sync_to_async(make_user)(discord_id='pass_0', cefr_level='B1')
+        first = await sync_to_async(make_skill)(
+            skill_id='sk_first', name='Preterite irregulars', order=1)
+        second = await sync_to_async(make_skill)(
+            skill_id='sk_second', name='Imperfect AR verbs', order=2)
+        session = await sync_to_async(Session.objects.create)(
+            user=user, session_type='srs_review', current_phase=PASS_CHECK_PHASE,
+            phase_turns_completed=0)
+        for sk in (first, second):
+            await sync_to_async(SessionSkill.objects.create)(session=session, skill=sk)
+
+        mock = AsyncMock(return_value='Next question')
+        with patch('engine.session.call_llm', new=mock):
+            await _continue_srs_review(user, session, text='si')
+
+        suffix = mock.await_args.kwargs.get('system_suffix', '')
+        assert 'Preterite irregulars' in suffix, f"wrong skill: {suffix[:200]}"
+        # The telling detail: a restart must ask question 1, not question 2.
+        # The bug consumed Q0 without ever asking it.
+        assert 'question 1 of' in suffix, (
+            f"restart skipped the first question; got: {suffix[:200]}")

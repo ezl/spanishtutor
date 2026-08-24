@@ -238,7 +238,38 @@ Rules:
 
 # ── Other session prompt templates ────────────────────────────────────────────
 
-SCORE_TO_QUESTIONS = {0: 2, 1: 3, 2: 2, 3: 1, 4: 1}
+# Questions asked per skill in a review, by its current score. Nothing drops
+# below 2: one question cannot separate knowing a form from guessing it, and a
+# mastered skill used to get exactly one. Untested (0) is sampled like a known-
+# weak skill because zero information is the case most in need of evidence.
+# Strong skills stay tapered rather than flat -- as more skills are mastered,
+# more of them come due at once.
+SCORE_TO_QUESTIONS = {0: 3, 1: 3, 2: 3, 3: 2, 4: 2}
+
+# A three-question review does not read as worth showing up for.
+MIN_REVIEW_QUESTIONS = 4
+
+
+def _topped_up_skill_ids(scheduled, candidates, minimum: int = MIN_REVIEW_QUESTIONS) -> list:
+    """Extra skill ids needed to reach `minimum` questions.
+
+    Both arguments are [(skill_id, score)]. Tops up by pulling the NEXT-DUE
+    skills forward rather than drilling the scheduled ones harder: reviewing a
+    skill slightly early is pedagogically cheap, whereas extra reps on material
+    already mastered are the least valuable minutes in the session.
+    """
+    have = {sid for sid, _ in scheduled}
+    total = sum(SCORE_TO_QUESTIONS.get(score, 2) for _, score in scheduled)
+    extra = []
+    for sid, score in candidates:
+        if total >= minimum:
+            break
+        if sid in have:
+            continue
+        extra.append(sid)
+        have.add(sid)
+        total += SCORE_TO_QUESTIONS.get(score, 2)
+    return extra
 
 SRS_REVIEW_PROMPT = """The student is starting a spaced repetition review session.
 
@@ -829,6 +860,29 @@ async def _open_session(user, text: str, forced_skill: dict = None) -> dict:
         for sid in due_ids:
             if sid in due_map:
                 await sync_to_async(SessionSkill.objects.get_or_create)(session=session, skill=due_map[sid])
+
+        def _extra_ids():
+            from learner.models import SkillScore
+            rows = list(SkillScore.objects.filter(user=user, mode='writing')
+                                          .select_related('skill'))
+            scores = {r.skill.skill_id: r.score for r in rows if r.skill}
+            scheduled = [(sid, scores.get(sid, 0)) for sid in due_ids]
+            candidates = [
+                (r.skill.skill_id, r.score)
+                for r in sorted(rows, key=lambda r: (r.next_review_at is None, r.next_review_at))
+                if r.skill and r.skill.skill_id not in due_ids
+            ]
+            return _topped_up_skill_ids(scheduled, candidates)
+
+        extra_ids = await sync_to_async(_extra_ids)()
+        if extra_ids:
+            extra_map = await sync_to_async(
+                lambda: {sk.skill_id: sk for sk in Skill.objects.filter(skill_id__in=extra_ids)}
+            )()
+            for sid in extra_ids:
+                if sid in extra_map:
+                    await sync_to_async(SessionSkill.objects.get_or_create)(
+                        session=session, skill=extra_map[sid])
     elif frontier_skills:
         for skill in frontier_skills:
             await sync_to_async(SessionSkill.objects.get_or_create)(session=session, skill=skill)
@@ -1444,7 +1498,14 @@ async def _continue_srs_review(user, session, text: str) -> dict:
         if text.strip().lower() in ANOTHER_PASS_PHRASES:
             await _set_phase(session, PASS_PHASE, 0)
             phase = PASS_PHASE
-            turns = 0
+            # phase_turns_completed means "index of the question currently
+            # outstanding", and on the first pass the opening turn generated at
+            # session open consumes index 0. A restart has no opening turn, so
+            # the local counter starts one behind -- otherwise the `turns + 1`
+            # below skips question 0 and every pass after the first is a
+            # question short. Only the local value is negative; what gets
+            # persisted after the question is asked is 0, as before.
+            turns = -1
         else:
             return await _close_session(user, explicit=False)
 
