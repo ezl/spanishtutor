@@ -307,7 +307,7 @@ def mark_complete(state: dict) -> dict:
 
 # ── Prompt templates ──────────────────────────────────────────────────────────
 
-TEACH_DRILL_OPENING_PROMPT = """You are Luz Angela, opening a bite-sized chunked lesson on {skill_name} for a Spanish student.
+TEACH_DRILL_OPENING_PROMPT = """You are Luz Ángela, opening a bite-sized chunked lesson on {skill_name} for a Spanish student.
 
 Student level: {cefr_level}
 Student interests: {interests}
@@ -482,7 +482,9 @@ Common traps to AVOID:
 
 CLASSIFY_FIRST_CHECK = """FIRST DECISION (do this BEFORE anything else): classify the student's most recent message. Read what they wrote and pick ONE category:
 
-  (a) LESSON ANSWER — a Spanish attempt at the drill question you just asked. The message reads as an answer, even if partial or wrong. Examples: "Yo tuve", "fuiste al gimnasio", any Spanish text that looks like an attempt at the target form.
+  (a) LESSON ANSWER — a response to the drill question you just asked. Two kinds, both belong here:
+      - An attempt at the form, even if partial or wrong. Examples: "Yo tuve", "fuiste al gimnasio", any Spanish text that looks like an attempt at the target form.
+      - Declining to answer: "I don't know", "no sé", "ni idea", "no idea", "pass", "skip this one", a shrug. Saying they don't know IS a response to the question — it is not filler and it is not a wrong answer.
       → Go to CORRECTNESS EVALUATION below.
 
   (b) CONTENT QUESTION — asking about Spanish itself (grammar, meaning, usage, comparisons). Examples: "wait, is estar always for locations?", "why is it hizo not hico?", "does poder always mean 'managed to' in preterite?"
@@ -515,9 +517,18 @@ Classification bar:
 - Uncertain between LESSON ANSWER and CONTENT QUESTION → prefer CONTENT QUESTION (safer to defer than falsely mark ✗).
 - Uncertain between CONTENT QUESTION and AMBIENT ACK → use AMBIENT ACK for one-to-three-word fillers with no linguistic substance; CONTENT QUESTION for anything that's actually asking something.
 - Uncertain between CONTENT QUESTION and META-FEEDBACK → prefer CONTENT QUESTION (avoids false-positive log entries).
-- Uncertain between LESSON ANSWER and AMBIENT ACK → if it's in the target language and looks like it could be attempting the form, treat as LESSON ANSWER.
+- Uncertain between LESSON ANSWER and AMBIENT ACK → if it's in the target language and looks like it could be attempting the form, treat as LESSON ANSWER. "no sé" and every other way of saying "I don't know" is LESSON ANSWER via the NO ATTEMPT branch — never AMBIENT ACK, and never scored as a wrong answer.
 
-CORRECTNESS EVALUATION (only if you classified as LESSON ANSWER): did the Spanish attempt contain ANY error?
+CORRECTNESS EVALUATION (only if you classified as LESSON ANSWER): first, did they actually attempt the form?
+
+  - NO ATTEMPT — they said they don't know, or asked to skip or pass, instead of producing Spanish. This is NOT an error: give no ✗, no correction framing, and do not treat it as a failed attempt. Your ENTIRE response this turn is:
+    * ONE short reassuring line — "Tranquilo/a, es normal" (Spanish for B1+) or "No worries, that one's tricky" (English for A1/A2). No praise theatre, no lecture.
+    * Give the answer outright: the target form on its own line, glossed.
+    * Re-ask it: "Te la vuelvo a preguntar: [restate the SAME question]" (Spanish for B1+) or "Let me ask you that same one again: [restate]" (English for A1/A2).
+    * Literal marker on its own line at the very end: <<REDO_PENDING>>
+    STOP THERE. Do NOT teach a new unit, do NOT show a new paradigm, do NOT ask a different question. The student asked to be shown this one — show it and come straight back to it.
+
+  If they DID attempt the form: did the Spanish contain ANY error?
 
   Any preposition mistake, gender/agreement error, tense error, wrong verb form, wrong verb choice, spelling error, or missing accent counts as an error. Do NOT soften with "Close, but..." or partial-credit — an answer is either fully correct (✓) or has an error (✗).
 

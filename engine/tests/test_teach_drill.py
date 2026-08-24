@@ -1746,3 +1746,54 @@ class TestDenseFallbackObeysTheSameRules:
             if '→' not in row:
                 bare.append(row)
         assert bare == [], f"dense prompt still demonstrates bare rows: {bare}"
+
+
+def _no_attempt_branch(prompt: str) -> str:
+    """The NO ATTEMPT branch only — up to where the attempt path resumes."""
+    start = prompt.find("NO ATTEMPT")
+    end = prompt.find("If they DID attempt", start)
+    assert start != -1 and end != -1, "NO ATTEMPT branch not found"
+    return prompt[start:end]
+
+
+class TestNoAttemptHandling:
+    """Feedback #9 (2026-08-22): saying "I don't know" made Luz move on to a
+    DIFFERENT question. A capitulation is a response to the drill, so it belongs
+    in LESSON ANSWER as a third evaluation outcome — not a sixth category."""
+
+    def test_declining_to_answer_is_a_lesson_answer(self):
+        from engine.teach_drill import CLASSIFY_FIRST_CHECK
+        lowered = CLASSIFY_FIRST_CHECK.lower()
+        assert "no sé" in lowered or "no se" in lowered
+        assert "don't know" in lowered
+
+    def test_there_is_a_no_attempt_branch(self):
+        from engine.teach_drill import CLASSIFY_FIRST_CHECK
+        assert "NO ATTEMPT" in CLASSIFY_FIRST_CHECK
+
+    def test_no_attempt_is_not_marked_wrong(self):
+        """An honest 'I don't know' must not be scored as an error."""
+        from engine.teach_drill import CLASSIFY_FIRST_CHECK
+        branch = _no_attempt_branch(CLASSIFY_FIRST_CHECK)
+        assert "NOT an error" in branch
+        assert "no ✗" in branch.lower()
+
+    def test_no_attempt_reveals_the_answer_and_re_asks(self):
+        from engine.teach_drill import CLASSIFY_FIRST_CHECK
+        branch = _no_attempt_branch(CLASSIFY_FIRST_CHECK)
+        assert "SAME question" in branch
+        assert "<<REDO_PENDING>>" in branch
+
+    def test_no_attempt_does_not_advance_the_lesson(self):
+        from engine.teach_drill import CLASSIFY_FIRST_CHECK
+        branch = _no_attempt_branch(CLASSIFY_FIRST_CHECK)
+        assert "do not teach a new unit" in branch.lower()
+
+    def test_tiebreak_no_longer_forces_a_capitulation_to_be_scored(self):
+        """The old bar pushed anything in Spanish toward LESSON ANSWER, so 'no sé'
+        could be marked ✗ — penalising honesty."""
+        from engine.teach_drill import CLASSIFY_FIRST_CHECK
+        bar = [line for line in CLASSIFY_FIRST_CHECK.splitlines()
+               if 'AMBIENT ACK' in line and 'Uncertain' in line]
+        assert bar, "classification tiebreak line is gone"
+        assert any('no sé' in line.lower() or "don't know" in line.lower() for line in bar)
