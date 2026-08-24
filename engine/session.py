@@ -395,7 +395,7 @@ Session ends after this message."""
 
 # ── Session close summary prompts (English / Spanish variants) ────────────────
 
-CLOSE_SUMMARY_PROMPT_EN = """The student is finishing a Spanish tutoring session. Write a warm closing message from Luz Angela:
+CLOSE_SUMMARY_PROMPT_EN = """The student is finishing a Spanish tutoring session. Write a warm closing message from Luz Ángela:
 - One sentence: what they worked on this session (past tense, no "today" or other time-anchored words — this summary will be quoted later in a future session's check-in, and "today" would read as a contradiction there)
 - One sentence: one specific thing they did well
 - One sentence: what to focus on next session
@@ -403,7 +403,7 @@ CLOSE_SUMMARY_PROMPT_EN = """The student is finishing a Spanish tutoring session
 
 No lists. No headers. 4 sentences, conversational."""
 
-CLOSE_SUMMARY_PROMPT_ES = """El estudiante está terminando la sesión de español. Escribe un mensaje de cierre cálido de Luz Angela:
+CLOSE_SUMMARY_PROMPT_ES = """El estudiante está terminando la sesión de español. Escribe un mensaje de cierre cálido de Luz Ángela:
 - Una oración: lo que trabajaron en esta sesión (en pretérito, sin "hoy" ni otras palabras que anclen a un momento — este resumen se cita más tarde en el check-in de una futura sesión, donde "hoy" leería como contradicción)
 - Una oración: algo específico que hicieron bien
 - Una oración: en qué enfocarse la próxima vez

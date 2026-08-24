@@ -2,11 +2,11 @@
 
 ## What This Is
 
-A personalized Spanish learning system delivered primarily through Discord. An AI tutor named Luz Angela teaches you Spanish through conversation, quizzes, voice messages, and adaptive content — all tied to your personal interests. The system tracks your ability across a full skill × mode grid and continuously pushes the boundary of what you know.
+A personalized Spanish learning system delivered primarily through Discord. An AI tutor named Luz Ángela teaches you Spanish through conversation, quizzes, voice messages, and adaptive content — all tied to your personal interests. The system tracks your ability across a full skill × mode grid and continuously pushes the boundary of what you know.
 
 ---
 
-## Luz Angela
+## Luz Ángela
 
 The tutor persona. Mid-30s, from Laureles, Medellín. Warm, playful, direct, lightly flirty in the way Colombian women naturally are. Speaks Medellín Spanish. Not sycophantic — she tells you when your Spanish is wrong and makes you want to try harder anyway. If asked whether she's a bot, she says yes, straightforwardly.
 
@@ -14,7 +14,7 @@ The persona guides tone, dialect, and style. There is no fictional backstory. Sh
 
 Her first message to every new user:
 
-> *¡Hola! Soy Luz Angela, tu profesora de español. 🌟*
+> *¡Hola! Soy Luz Ángela, tu profesora de español. 🌟*
 >
 > *Vamos a empezar con una evaluación rápida para entender dónde estás — no te preocupes, no es un examen formal. Solo quiero conocer tu español.*
 >
@@ -32,7 +32,7 @@ Her first message to every new user:
 
 **Voice**: User sends voice messages (Discord voice note feature). Bot downloads, transcribes via Whisper STT, processes, responds with TTS audio. No voice channels — DM voice messages only.
 
-**Language**: Spanish-first, calibrated to the user's current level. English escape hatch always available: user says "English please" and Luz Angela accommodates. Instructions in onboarding make this clear upfront.
+**Language**: Spanish-first, calibrated to the user's current level. English escape hatch always available: user says "English please" and Luz Ángela accommodates. Instructions in onboarding make this clear upfront.
 
 ---
 
@@ -41,10 +41,10 @@ Her first message to every new user:
 ```
 Discord DM  ──┐
               ├──▶  Conversation Engine (Django)  ──▶  Postgres
-Web UI      ──┘         (Luz Angela lives here)
+Web UI      ──┘         (Luz Ángela lives here)
 ```
 
-The conversation engine is interface-agnostic. `engine.handle_message(user_id, text, attachments)` returns a response regardless of surface. Discord bot and web API both call this function. Luz Angela never knows which surface she's on.
+The conversation engine is interface-agnostic. `engine.handle_message(user_id, text, attachments)` returns a response regardless of surface. Discord bot and web API both call this function. Luz Ángela never knows which surface she's on.
 
 **Stack:**
 | Layer | Choice |
@@ -84,7 +84,7 @@ Skills are CEFR-derived grammar and vocabulary components. Examples: present ten
 - SRS decay curve
 
 **4-point scoring:**
-| Score | Grid display | Luz Angela says |
+| Score | Grid display | Luz Ángela says |
 |---|---|---|
 | 0 | ⬜ untested | — |
 | 1 | 🟥 beginner | *Apenas empezando* |
@@ -105,7 +105,7 @@ The grid is populated progressively — not in a single evaluation session.
 4. Initial grid populated with estimates. Untested cells remain ⬜.
 
 **Subsequent sessions:**
-Each session adds one additional evaluation phase until the full grid is covered. Phases: listening (TTS audio + comprehension), speaking (voice message response), reading comprehension, translation (EN→ES and ES→EN), written production. Luz Angela is transparent: she's still calibrating.
+Each session adds one additional evaluation phase until the full grid is covered. Phases: listening (TTS audio + comprehension), speaking (voice message response), reading comprehension, translation (EN→ES and ES→EN), written production. Luz Ángela is transparent: she's still calibrating.
 
 **Binary search principle:** if a user aces B2, jump to C1. If they fail C1, probe B2 in depth. Converges without exhaustive questioning.
 
@@ -119,7 +119,7 @@ Each session adds one additional evaluation phase until the full grid is covered
 Recommendation is calculated from: skill × mode scores, last tested timestamps, predicted SRS decay, current edge of ability. Not a guess.
 
 **During session:**
-- Bot-driven. Luz Angela decides what to work on. User can override ("drill me on subjunctive", "let's do a story").
+- Bot-driven. Luz Ángela decides what to work on. User can override ("drill me on subjunctive", "let's do a story").
 - Content tied to user's interests (~75% of content wrapped in personal context).
 - All 5 language modes covered across sessions. No mode repeats more than twice per session.
 - Error correction: significant errors get inline correction ("You said ___. More natural: ___. Type it back once."), then move on. Minor errors silently logged.
@@ -127,7 +127,7 @@ Recommendation is calculated from: skill × mode scores, last tested timestamps,
 
 **Closing:**
 - Explicit: user says "bye" (or similar) → immediate summary in Spanish.
-- Inactivity: after timeout, Luz Angela sends the summary unprompted.
+- Inactivity: after timeout, Luz Ángela sends the summary unprompted.
 
 Summary format (in Spanish, calibrated to user's level):
 > *¡Buena sesión, Eric! Hoy trabajamos en ____ y ____. Repasamos ____ y ____. Has aprendido ____ habilidades nuevas. Para la próxima sesión, te recomiendo ____. ¡Que tengas un buen día!*
@@ -156,7 +156,7 @@ All content LLM-generated. Inputs to every generation call:
 2. User interest profile (captured in onboarding, refined over time)
 3. User's current CEFR level
 4. Session type (review vs. push forward)
-5. Luz Angela's persona system prompt (Medellín dialect, tone, style)
+5. Luz Ángela's persona system prompt (Medellín dialect, tone, style)
 
 Content types:
 - **Quiz**: multiple choice, fill-in-the-blank, targeted at specific skill × mode cells
@@ -170,7 +170,7 @@ Content types:
 
 ## Progress View
 
-User requests progress in `#progress` (or equivalent in web UI). Luz Angela responds with:
+User requests progress in `#progress` (or equivalent in web UI). Luz Ángela responds with:
 - Current skill grid snapshot (colored squares)
 - Grid at any past timestamp for comparison
 - Top 3 strengths, top 3 weaknesses
@@ -231,7 +231,7 @@ Implementation:
 - Add `dialect` field to the `User` model (e.g. `es-co`, `es-mx`, `es-ar`, `es-es`). Default: `es-co`.
 - The `dialect` is passed to the question generation prompt and is included in `question_framework.yaml` as a header field.
 - Vocabulary skills can be tagged with dialect-specific entries in `skills.yaml`. Grammar skills are shared.
-- The tutor persona (Luz Angela) is dialect-specific. A Mexican Spanish variant would have a different persona name, origin, and expressions — but the same underlying engine.
+- The tutor persona (Luz Ángela) is dialect-specific. A Mexican Spanish variant would have a different persona name, origin, and expressions — but the same underlying engine.
 - No changes to the quiz algorithm, DB schema (beyond the new field), or views.
 
 Effort: ~2 weeks per dialect. Mostly curriculum work (vocabulary lists, sample questions, persona tuning). No architectural changes.
@@ -328,7 +328,7 @@ Regardless of which expansion tier is implemented:
 |---|---|
 | Add/edit skills in taxonomy | Edit `curriculum/skills.yaml`, restart |
 | Adjust SRS weights | Edit config file, restart |
-| Change Luz Angela's system prompt | Edit config file, restart |
+| Change Luz Ángela's system prompt | Edit config file, restart |
 | Add a new content type | Code change → redeploy |
 | Bug fix | Code change → redeploy |
 | New Discord command | Code change → redeploy |

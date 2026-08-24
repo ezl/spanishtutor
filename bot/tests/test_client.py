@@ -25,90 +25,10 @@ def _dm_message(content='hola', author_id=555, display_name='Eric'):
     return message
 
 
-def _guild_message(content='hola', author_id=555, display_name='Eric'):
-    message = MagicMock()
-    message.author = MagicMock()
-    message.author.id = author_id
-    message.author.display_name = display_name
-    message.content = content
-    message.channel = MagicMock(spec=discord.TextChannel)
-    message.channel.send = AsyncMock()
-    return message
-
-
 def _bot_user(bot_id=999):
     user = MagicMock()
     user.id = bot_id
     return user
-
-
-class TestGuildMessagesAreRedirected:
-    """A new arrival types in the server because that is the only room they can
-    see. Before this, on_message returned early and they got silence."""
-
-    @pytest.mark.asyncio
-    async def test_guild_message_gets_a_pointer_to_dms(self):
-        from bot.client import on_message, _guild_redirected
-
-        _guild_redirected.clear()
-        message = _guild_message()
-
-        with patch('bot.client.client') as fake_client:
-            fake_client.user = _bot_user()
-            await on_message(message)
-
-        assert message.channel.send.await_count == 1
-        sent = message.channel.send.await_args[0][0]
-        assert 'Luz' in sent
-        # The bot's own profile link is the shortest path to a DM.
-        assert 'discord.com/users/999' in sent
-
-    @pytest.mark.asyncio
-    async def test_guild_message_never_reaches_the_engine(self):
-        """Server chatter must not be scored as a lesson answer."""
-        from bot.client import on_message, _guild_redirected
-
-        _guild_redirected.clear()
-        message = _guild_message()
-
-        with patch('bot.client.client') as fake_client, \
-             patch('bot.client.dispatch_handle', new_callable=AsyncMock) as handle:
-            fake_client.user = _bot_user()
-            await on_message(message)
-
-        handle.assert_not_awaited()
-
-    @pytest.mark.asyncio
-    async def test_the_same_person_is_only_redirected_once(self):
-        """The pointer is a signpost, not a greeter that shouts at every message."""
-        from bot.client import on_message, _guild_redirected
-
-        _guild_redirected.clear()
-        first = _guild_message(content='hola')
-        second = _guild_message(content='anyone here?')
-
-        with patch('bot.client.client') as fake_client:
-            fake_client.user = _bot_user()
-            await on_message(first)
-            await on_message(second)
-
-        assert first.channel.send.await_count == 1
-        assert second.channel.send.await_count == 0
-
-    @pytest.mark.asyncio
-    async def test_the_bots_own_guild_messages_are_ignored(self):
-        from bot.client import on_message, _guild_redirected
-
-        _guild_redirected.clear()
-        message = _guild_message()
-        bot_user = _bot_user()
-        message.author = bot_user
-
-        with patch('bot.client.client') as fake_client:
-            fake_client.user = bot_user
-            await on_message(message)
-
-        assert message.channel.send.await_count == 0
 
 
 class TestJoiningTheServerStartsTheConversation:
@@ -126,14 +46,14 @@ class TestJoiningTheServerStartsTheConversation:
         member.bot = False
 
         with patch('bot.client.dispatch_welcome', new_callable=AsyncMock) as welcome:
-            welcome.return_value = [Reply(text='¡Hola! Soy Luz Angela')]
+            welcome.return_value = [Reply(text='¡Hola! Soy Luz Ángela')]
             await on_member_join(member)
 
         welcome.assert_awaited_once()
         assert welcome.await_args[0][0] == 'discord'
         assert welcome.await_args[0][1] == '555'
         member.send.assert_awaited()
-        assert 'Luz Angela' in member.send.await_args[0][0]
+        assert 'Luz Ángela' in member.send.await_args[0][0]
 
     @pytest.mark.asyncio
     async def test_a_closed_dm_falls_back_to_the_server(self):
@@ -187,9 +107,8 @@ class TestIntents:
 class TestDmsStillWork:
     @pytest.mark.asyncio
     async def test_dm_is_routed_to_the_engine(self):
-        from bot.client import on_message, _guild_redirected
+        from bot.client import on_message
 
-        _guild_redirected.clear()
         message = _dm_message(content='anoche fui al gimnasio')
 
         with patch('bot.client.client') as fake_client, \

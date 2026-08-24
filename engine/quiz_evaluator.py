@@ -1,7 +1,7 @@
 """
 Focused LLM evaluator for placement quiz answers.
 
-Bypasses the Luz Angela persona via system_override. Returns an integer 1-4.
+Bypasses the Luz Ángela persona via system_override. Returns an integer 1-4.
 """
 import logging
 from learner.models import QuizQuestion

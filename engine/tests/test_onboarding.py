@@ -324,7 +324,7 @@ class TestFirstMessage:
         greeting ending in "Ready to start?" would name the user "Yes"."""
         from engine.onboarding import FIRST_MESSAGE
         t = FIRST_MESSAGE.lower()
-        assert 'luz angela' in t
+        assert 'luz ángela' in t
         assert 'assessment' in t
         assert 'name' in t or 'call you' in t, (
             'FIRST_MESSAGE must end by asking for a name; the next message is '

@@ -4,7 +4,7 @@
 
 ## V1 — Foundation (current)
 
-**Goal:** Luz Angela working end-to-end for a single user. Full evaluation, skill grid populated progressively, daily reminders, progress view — delivered over chat, **text only**.
+**Goal:** Luz Ángela working end-to-end for a single user. Full evaluation, skill grid populated progressively, daily reminders, progress view — delivered over chat, **text only**.
 
 ### This phase is text-only, on a transport-agnostic engine
 
@@ -191,14 +191,14 @@ Discord bot running on Railway, connected to Postgres. Responds to DMs. Foundati
 
 ---
 
-## APP-2: Luz Angela Persona + Conversation Engine
+## APP-2: Luz Ángela Persona + Conversation Engine
 
 **Description:**
-Interface-agnostic conversation engine. All message handling goes through `engine.handle_message(user_id, text, attachments)`. Luz Angela's persona lives here as a system prompt.
+Interface-agnostic conversation engine. All message handling goes through `engine.handle_message(user_id, text, attachments)`. Luz Ángela's persona lives here as a system prompt.
 
 **Acceptance criteria:**
 - `engine.handle_message()` callable from Discord bot and future web API
-- Luz Angela system prompt defined (Medellín dialect, warm/direct/playful, Spanish-first, honest about being a bot)
+- Luz Ángela system prompt defined (Medellín dialect, warm/direct/playful, Spanish-first, honest about being a bot)
 - "English please" triggers English mode for that response, then returns to Spanish
 - Response always calibrated to user's current estimated CEFR level
 
@@ -207,11 +207,11 @@ Interface-agnostic conversation engine. All message handling goes through `engin
 ## APP-3: Onboarding + Initial Evaluation
 
 **Description:**
-New user DMs the bot → Luz Angela runs onboarding + session 1 evaluation → initial skill grid populated.
+New user DMs the bot → Luz Ángela runs onboarding + session 1 evaluation → initial skill grid populated.
 
 **Acceptance criteria:**
 - First DM from new user triggers onboarding
-- Luz Angela asks: native language, interests, why learning / where they want to use it
+- Luz Ángela asks: native language, interests, why learning / where they want to use it
 - Adaptive quiz bisects A1→C2 skill axis. User's self-report is starting difficulty only. Correct → harder, wrong → easier. Terminates when level estimated with confidence (~5–7 questions).
 - Freeform written response collected and evaluated
 - Initial CEFR estimate saved, skill grid seeded with estimates, untested cells marked ⬜
@@ -223,13 +223,13 @@ New user DMs the bot → Luz Angela runs onboarding + session 1 evaluation → i
 ## APP-4: Voice Message Support (STT + TTS)
 
 **Description:**
-User sends voice messages → transcribed via Whisper → evaluated. Luz Angela responds with TTS audio for listening exercises.
+User sends voice messages → transcribed via Whisper → evaluated. Luz Ángela responds with TTS audio for listening exercises.
 
 **Acceptance criteria:**
 - Bot detects voice message attachments in DMs
 - Downloads audio, sends to Whisper STT, receives transcript
 - Transcript processed by conversation engine identically to text input
-- For listening exercises: Luz Angela generates TTS audio (OpenAI TTS or ElevenLabs), uploads as voice message
+- For listening exercises: Luz Ángela generates TTS audio (OpenAI TTS or ElevenLabs), uploads as voice message
 - Error handling if audio is inaudible or transcription fails
 
 ---
@@ -274,10 +274,10 @@ Add listening and speaking session types to cover the two modes the current syst
 Every post-onboarding session has a defined open, content loop, and close.
 
 **Acceptance criteria:**
-- **Open**: Luz Angela recaps last session + recommends review vs. push forward based on SRS decay and current skill edge. One-question check-in: "¿Revisamos o seguimos?"
+- **Open**: Luz Ángela recaps last session + recommends review vs. push forward based on SRS decay and current skill edge. One-question check-in: "¿Revisamos o seguimos?"
 - **Content**: bot-driven, SRS selects skill × mode targets, content generated per APP-7. No mode repeats more than twice per session.
 - **Close (explicit)**: user says "bye" or equivalent → immediate summary in Spanish
-- **Close (inactivity)**: after configurable timeout → Luz Angela sends summary unprompted
+- **Close (inactivity)**: after configurable timeout → Luz Ángela sends summary unprompted
 - Summary format: worked on ___, reviewed ___, N skills improved, recommendation for next session
 - Session start/end timestamps recorded
 
@@ -332,7 +332,7 @@ Cron job sends personalized daily reminders via DM based on user preferences.
 ## APP-10: Progress View
 
 **Description:**
-User requests progress summary → Luz Angela responds with skill grid snapshot and history.
+User requests progress summary → Luz Ángela responds with skill grid snapshot and history.
 
 **Acceptance criteria:**
 - Triggered by user request in DM ("show my progress", "cómo voy", etc.)

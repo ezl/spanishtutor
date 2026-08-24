@@ -88,7 +88,7 @@ async def test_handle_translate_returns_llm_text(make_user):
 
 @pytest.mark.django_db(transaction=True)
 async def test_handle_translate_uses_system_override(make_user):
-    """handle_translate calls call_llm with system_override (not Luz Angela persona)."""
+    """handle_translate calls call_llm with system_override (not Luz Ángela persona)."""
     from engine.translate import handle_translate
     from asgiref.sync import sync_to_async
 
@@ -104,4 +104,4 @@ async def test_handle_translate_uses_system_override(make_user):
         await handle_translate(user, 'I want to go to the store')
 
     assert captured.get('system_override') is not None
-    assert 'Luz Angela' not in captured['system_override']
+    assert 'Luz Ángela' not in captured['system_override']

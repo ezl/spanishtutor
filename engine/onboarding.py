@@ -31,8 +31,8 @@ def _fix_blanks(text: str) -> str:
 # It MUST end by asking for a name: _step_collect_name stores the very next
 # message verbatim as display_name. A greeting ending "Ready to start?" would
 # name the user "Yes".
-FIRST_MESSAGE = """👋 ¡Hola! Soy Luz Angela, tu profesora de español.
-(Hi! I'm Luz Angela, your personalized Spanish teacher.)
+FIRST_MESSAGE = """👋 ¡Hola! Soy Luz Ángela, tu profesora de español.
+(Hi! I'm Luz Ángela, your personalized Spanish teacher.)
 
 We'll start with a quick assessment so I know where to begin — it takes about 3 minutes.
 

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What This Project Is
 
-A personalized Spanish learning system. An AI tutor named Luz Angela teaches Spanish through chat DMs (Discord and Facebook Messenger today) — conversation, quizzes, and adaptive content tied to the user's personal interests. The system tracks ability across a skill × mode grid (A1→C2 skills × 5 CEFR language modes) and continuously pushes the boundary of what the user knows.
+A personalized Spanish learning system. An AI tutor named Luz Ángela teaches Spanish through chat DMs (Discord and Facebook Messenger today) — conversation, quizzes, and adaptive content tied to the user's personal interests. The system tracks ability across a skill × mode grid (A1→C2 skills × 5 CEFR language modes) and continuously pushes the boundary of what the user knows.
 
 See `PLAN.md` for full product decisions and `ROADMAP.md` for V1 tickets.
 
@@ -82,7 +82,7 @@ engine/                # DISPATCH + ENGINE
   onboarding.py        # FIRST_MESSAGE + onboarding flow
   translate.py         # !translate mode handler
   interests.py         # interest extraction
-  persona.py           # Luz Angela system prompt
+  persona.py           # Luz Ángela system prompt
 learner/               # models (User, Session, SkillScore...), auth, web views
 curriculum/            # skills.yaml, config.yaml (runtime reload)
 ```
@@ -95,7 +95,7 @@ curriculum/            # skills.yaml, config.yaml (runtime reload)
 - **Multi-tenant from day one**: every DB query scoped to `user_id`.
 - **One channel, one user — no account linking** (decided 2026-08-22): a person who uses both Messenger and Discord has two `User` rows, two skill grids, and two placement quizzes, and they never merge. The common case is a single channel, and merging two independently-measured skill grids has no correct answer — you would be discarding someone's history or reconciling scores taken under different conditions. Do not build a linking or merge flow without revisiting this. **Before Stripe ships**, note that billing attaches to a `User`: either Discord stops being a public entry point, or billing has to attach to something that outlives a channel — otherwise a paying Messenger customer hits the paywall again on Discord.
 - **The model never reasons about the curriculum**: what skills exist, what they require, and which one a request maps to are decided in code (`curriculum.py`, `skill_request.py`). The model classifies intent and relays the student's words; it is never asked to judge the skill graph. Letting it do so produced a confidently false claim to a student that subjunctive required solid preterite.
-- **Config over code**: skill taxonomy, SRS weights, Luz Angela's system prompt — all in config files. Changes to these don't require a redeploy, just a restart.
+- **Config over code**: skill taxonomy, SRS weights, Luz Ángela's system prompt — all in config files. Changes to these don't require a redeploy, just a restart.
 
 ## Workflow
 
@@ -112,7 +112,7 @@ python manage.py createsuperuser  # Create Django admin user
 python manage.py shell            # Django shell
 ```
 
-## Luz Angela
+## Luz Ángela
 
 The tutor persona. Mid-30s, from Laureles, Medellín. Warm, playful, direct. Speaks Colombian Spanish (Medellín dialect). Not sycophantic. Honest about being a bot if asked. Spanish-first, calibrated to user's CEFR level. English escape hatch: user says "English please."
 

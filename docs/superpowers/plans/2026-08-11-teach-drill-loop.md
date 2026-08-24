@@ -630,7 +630,7 @@ Append to `engine/teach_drill.py`:
 ```python
 # ── Prompt templates ──────────────────────────────────────────────────────────
 
-TEACH_DRILL_OPENING_PROMPT = """You are Luz Angela, opening a bite-sized chunked lesson on {skill_name} for a Spanish student.
+TEACH_DRILL_OPENING_PROMPT = """You are Luz Ángela, opening a bite-sized chunked lesson on {skill_name} for a Spanish student.
 
 Student level: {cefr_level}
 Student interests: {interests}
@@ -1633,7 +1633,7 @@ EOF
 
 - [ ] **Step 5: Manual smoke test on Discord**
 
-DM Luz Angela with any message. Expected behavior:
+DM Luz Ángela with any message. Expected behavior:
 1. Bot sends a scripted check-in ("¿Listo/a?" for B1+).
 2. Student replies affirmatively.
 3. Bot sends the teach_drill opening (outcome framing + "Ready to start?").

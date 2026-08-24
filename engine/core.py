@@ -58,7 +58,7 @@ async def handle_message(user, text: str, attachments: list = None) -> dict:
     Interface-agnostic message handler. Called by Discord bot and future web API.
 
     Returns: {
-        "text": str,           # Luz Angela's response text
+        "text": str,           # Luz Ángela's response text
         "audio_url": str|None, # TTS audio URL if applicable
         "session_ended": bool,
     }

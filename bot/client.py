@@ -21,22 +21,6 @@ USER_ERROR_MESSAGE = FALLBACK_ERROR_TEXT
 
 _user_locks: dict[str, asyncio.Lock] = {}
 
-# Everyone who has already been pointed at DMs, so the signpost does not shout
-# at every message they send. In-memory on purpose: a redeploy costing someone
-# a second pointer is cheaper than a table for it.
-_guild_redirected: set[str] = set()
-
-# Discord will not let a stranger DM a bot until they share a server, so the
-# landing page's Discord CTA is an invite -- it lands people in a room, not in a
-# conversation. These two strings are the whole bridge from that room to a DM.
-GUILD_REDIRECT_TEXT = (
-    "\N{WAVING HAND SIGN} \u00a1Hola! Soy Luz Angela. I teach in a **private chat**, "
-    "not here in the server.\n\n"
-    "**Click here to message Luz Angela: {dm_url}**\n"
-    "Then hit **Message** and say hi \u2014 anything at all.\n\n"
-    "(On your phone: tap my picture, then **Message**.)"
-)
-
 # Shown in the server when a new member's DMs are closed to us. Same
 # instruction, minus the part we cannot do for them.
 CLOSED_DM_TEXT = (
@@ -108,7 +92,7 @@ client = discord.Client(intents=intents)
 
 @client.event
 async def on_ready():
-    print(f'Luz Angela online as {client.user} (id: {client.user.id})')
+    print(f'Luz Ángela online as {client.user} (id: {client.user.id})')
 
 
 @client.event
@@ -116,7 +100,6 @@ async def on_message(message: discord.Message):
     if message.author == client.user:
         return
     if not isinstance(message.channel, discord.DMChannel):
-        await _redirect_to_dm(message)
         return
 
     text = message.content.strip()
@@ -154,23 +137,6 @@ async def on_message(message: discord.Message):
 async def run():
     token = django.conf.settings.DISCORD_BOT_TOKEN
     await client.start(token)
-
-
-async def _redirect_to_dm(message: discord.Message) -> None:
-    """Answer a server message with the way out of the server.
-
-    The engine is never called: a message here is someone looking for the door,
-    not a lesson answer, and scoring it as one would be worse than silence.
-    """
-    uid = str(message.author.id)
-    if uid in _guild_redirected:
-        return
-    _guild_redirected.add(uid)
-    try:
-        await message.channel.send(GUILD_REDIRECT_TEXT.format(dm_url=_dm_url()))
-    except Exception as e:
-        _guild_redirected.discard(uid)
-        logger.warning('Could not point %s at DMs: %s', message.author, e)
 
 
 def _fallback_channel(guild):

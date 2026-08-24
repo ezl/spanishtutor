@@ -189,7 +189,7 @@ async def test_handle_translate_returns_llm_text(make_user):
 
 @pytest.mark.django_db(transaction=True)
 async def test_handle_translate_uses_system_override(make_user):
-    """handle_translate calls call_llm with system_override (not Luz Angela persona)."""
+    """handle_translate calls call_llm with system_override (not Luz Ángela persona)."""
     from engine.translate import handle_translate
     from asgiref.sync import sync_to_async
 
@@ -205,7 +205,7 @@ async def test_handle_translate_uses_system_override(make_user):
         await handle_translate(user, 'I want to go to the store')
 
     assert captured.get('system_override') is not None
-    assert 'Luz Angela' not in captured['system_override']
+    assert 'Luz Ángela' not in captured['system_override']
 ```
 
 - [ ] **Step 2: Run tests to verify they fail**
@@ -372,7 +372,7 @@ async def handle_message(user, text: str, attachments: list = None) -> dict:
     Interface-agnostic message handler. Called by Discord bot and future web API.
 
     Returns: {
-        "text": str,           # Luz Angela's response text
+        "text": str,           # Luz Ángela's response text
         "audio_url": str|None, # TTS audio URL if applicable
         "session_ended": bool,
     }

@@ -22,7 +22,7 @@ Nine sections, each carrying exactly one attribute, in this order:
 6. Brings back what's slipping
 7. Lessons built from your life
 8. Picks what to study for you
-9. Meet Luz Angela, then the close
+9. Meet Luz Ángela, then the close
 
 **"How it works" was cut.** The old page had a 1-2-3 summary. Once every
 attribute stands in its own section, that list only restates the page.
