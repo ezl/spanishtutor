@@ -712,6 +712,21 @@ async def handle_session(user, text: str, attachments: list = None) -> dict:
     if not session:
         return await _open_session(user, text)
 
+    # Deterministic feedback capture, above handler routing so it works in EVERY
+    # session type. Capture used to live only inside the teach_drill classifier,
+    # so feedback typed during an SRS review or a conversation had nowhere to go.
+    # Logging only -- the turn continues normally, because feedback is orthogonal
+    # to whatever the student was doing.
+    from .feedback import looks_like_explicit_feedback, record_feedback
+    if looks_like_explicit_feedback(text):
+        anchor = await sync_to_async(
+            lambda: session.events.order_by('-timestamp').first()
+        )()
+        await record_feedback(
+            session, anchor, text,
+            "Student explicitly labelled this feedback; captured verbatim for review.",
+        )
+
     # Skill requests are handled above phase routing, so a request made at the
     # check-in greeting is caught as readily as one made mid-drill. The original
     # failure lost two of its three turns because the only classifier lived
@@ -1745,6 +1760,18 @@ async def _close_session_record(session, user):
     except Exception:
         pass
 
+    # The feedback sweep runs here instead of on a cron: session close batches
+    # naturally, scales with usage, needs no scheduler, and costs nothing when
+    # nobody is using the bot. It sweeps the recent WINDOW rather than only this
+    # session, so a session that is abandoned and never closes still gets picked
+    # up whenever some other session closes. Wrapped like its neighbours -- a
+    # detection failure must never stop a session from closing.
+    try:
+        from .feedback import sweep
+        await sweep()
+    except Exception:
+        pass
+
 
 async def _close_session(user, explicit: bool = True) -> dict:
     import django.conf
@@ -1779,6 +1806,14 @@ async def _close_session(user, explicit: bool = True) -> dict:
         except Exception as exc:
             import logging
             logging.getLogger(__name__).error("score_session failed: %s", exc)
+
+        # Same feedback sweep as the silent close path -- see _close_session_record.
+        try:
+            from .feedback import sweep
+            await sweep()
+        except Exception as exc:
+            import logging
+            logging.getLogger(__name__).error("feedback sweep failed: %s", exc)
 
         if django.conf.settings.DEV_MODE:
             parts = []

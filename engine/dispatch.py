@@ -189,6 +189,40 @@ async def _cmd_translate(user, event: IncomingEvent) -> list:
     ))]
 
 
+async def _cmd_feedback(user, event: IncomingEvent, arg: str) -> list:
+    """`!feedback <text>` — the advertised way to report a problem.
+
+    Lives in dispatch so it works on every platform and in every session type,
+    including none. Real users will never know the internal "Feedback:" marker
+    convention, and until now there was no door at all.
+    """
+    from engine.feedback import record_feedback
+    from learner.models import Session
+
+    if not arg:
+        return [Reply(text=(
+            "Tell me what's not working: `!feedback <your message>` — "
+            "for example `!feedback the lessons move too fast`. "
+            "Anything you send goes straight to the developer."
+        ))]
+
+    session = await sync_to_async(
+        lambda: Session.objects.filter(user=user).order_by('-id').first()
+    )()
+    if session is None:
+        return [Reply(text=(
+            "Start a lesson first and then send that again — I need a session "
+            "to attach it to."
+        ))]
+
+    anchor = await sync_to_async(
+        lambda: session.events.order_by('-timestamp').first()
+    )()
+    await record_feedback(session, anchor, arg,
+                          "Submitted via the !feedback command.")
+    return [Reply(text="Got it — that's logged and a human will read it. ¡Gracias! 🙏")]
+
+
 async def _cmd_learn(user, event: IncomingEvent, arg: str) -> list:
     """`!learn <topic>` — request a specific lesson by name.
 
@@ -228,6 +262,7 @@ COMMANDS = {
 # rather than the whole text, so they need their own table.
 ARG_COMMANDS = {
     '!learn': _cmd_learn,
+    '!feedback': _cmd_feedback,
 }
 
 

@@ -1797,3 +1797,29 @@ class TestNoAttemptHandling:
                if 'AMBIENT ACK' in line and 'Uncertain' in line]
         assert bar, "classification tiebreak line is gone"
         assert any('no sé' in line.lower() or "don't know" in line.lower() for line in bar)
+
+
+class TestInlineClassifierCapturesSystemFeedback:
+    """Two messages on 08-22 were missed by the inline classifier: one was about
+    interest capture and one was phrased as a question."""
+
+    def test_meta_feedback_covers_system_behaviour(self):
+        """It was scoped to 'YOU, the pedagogy, the pacing, the cues, the style',
+        which excludes scheduling, interests and session structure."""
+        from engine.teach_drill import CLASSIFY_FIRST_CHECK
+        idx = CLASSIFY_FIRST_CHECK.find('(c) META-FEEDBACK')
+        branch = CLASSIFY_FIRST_CHECK[idx:CLASSIFY_FIRST_CHECK.find('(d) AMBIENT', idx)]
+        low = branch.lower()
+        assert 'system' in low
+        assert any(w in low for w in ('scheduling', 'review', 'interests'))
+
+    def test_tiebreak_no_longer_prefers_dropping_feedback(self):
+        """'prefer CONTENT QUESTION (avoids false-positive log entries)' tuned
+        against the costly error: a miss loses the signal permanently."""
+        from engine.teach_drill import CLASSIFY_FIRST_CHECK
+        assert 'avoids false-positive log entries' not in CLASSIFY_FIRST_CHECK
+
+    def test_a_question_shaped_complaint_is_still_feedback(self):
+        from engine.teach_drill import CLASSIFY_FIRST_CHECK
+        low = CLASSIFY_FIRST_CHECK.lower()
+        assert 'phrased as a question' in low

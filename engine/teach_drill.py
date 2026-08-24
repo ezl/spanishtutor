@@ -494,7 +494,8 @@ CLASSIFY_FIRST_CHECK = """FIRST DECISION (do this BEFORE anything else): classif
         3. Literal marker on its own line at the very end: <<QUESTION_ANSWERED>>
       Do NOT teach a new unit, do NOT introduce a new drill. The teach/drill steps below this check are DEFERRED to the next turn.
 
-  (c) META-FEEDBACK — commenting on YOU, the pedagogy, the pacing, the cues, or the style. Examples: "that cue was ambiguous", "you keep asking me the same person", "this is going too fast", "shouldn't 'I was at the wedding' be estar?" (meta because the student is questioning YOUR choice).
+  (c) META-FEEDBACK — commenting on the SYSTEM rather than doing the lesson. That covers you and your teaching (the pedagogy, the pacing, the cues, the style) AND how the system behaves around it: review scheduling and how often something comes back, how many questions a review asks, what it remembers about them, which interests it draws on, session structure and length. Examples: "that cue was ambiguous", "you keep asking me the same person", "this is going too fast", "shouldn't 'I was at the wedding' be estar?" (meta because the student is questioning YOUR choice), "the last time it said 2nd pass, this would be 3rd", "2 questions isn't enough for a review", "we keep coming back to the same few topics".
+      A complaint, a frustration, a suggestion and a bug report are all META-FEEDBACK. So is one phrased as a question ("why does it keep asking me this?", "how did that get incorporated already?") — the question form does NOT make it a CONTENT QUESTION, because it is not asking about Spanish.
       → Emit <<FEEDBACK>>[one-sentence paraphrase]<<END_FEEDBACK>> block, then CONTINUE with the teach/drill steps below this check. FEEDBACK is orthogonal — proceed normally with the lesson.
       Do NOT write any acknowledgment yourself — code prepends a canonical acknowledgment automatically after the marker is stripped. Any acknowledgment you write will duplicate it.
       Do NOT promise to change your behavior in future turns (e.g., "I'll drop the hybrid phrasing going forward"). You cannot actually change your prompt — feedback is logged for the developer to review offline. A promise you can't keep is worse than no promise.
@@ -516,7 +517,7 @@ CLASSIFY_FIRST_CHECK = """FIRST DECISION (do this BEFORE anything else): classif
 Classification bar:
 - Uncertain between LESSON ANSWER and CONTENT QUESTION → prefer CONTENT QUESTION (safer to defer than falsely mark ✗).
 - Uncertain between CONTENT QUESTION and AMBIENT ACK → use AMBIENT ACK for one-to-three-word fillers with no linguistic substance; CONTENT QUESTION for anything that's actually asking something.
-- Uncertain between CONTENT QUESTION and META-FEEDBACK → prefer CONTENT QUESTION (avoids false-positive log entries).
+- Uncertain between CONTENT QUESTION and META-FEEDBACK → is it about SPANISH, or about the lesson/system? About Spanish is a CONTENT QUESTION; about the lesson or the system is META-FEEDBACK, even when phrased as a question. If still genuinely torn, log it as META-FEEDBACK: a stray log row costs a scroll, a missed complaint is gone for good.
 - Uncertain between LESSON ANSWER and AMBIENT ACK → if it's in the target language and looks like it could be attempting the form, treat as LESSON ANSWER. "no sé" and every other way of saying "I don't know" is LESSON ANSWER via the NO ATTEMPT branch — never AMBIENT ACK, and never scored as a wrong answer.
 
 CORRECTNESS EVALUATION (only if you classified as LESSON ANSWER): first, did they actually attempt the form?

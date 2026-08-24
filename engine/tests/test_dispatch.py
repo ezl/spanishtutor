@@ -594,3 +594,51 @@ class TestWelcomeIsLevelAware:
         replies = await handle_welcome('discord', 'd_named_new', 'Alice')
 
         assert replies[0].text == FIRST_MESSAGE
+
+
+@pytest.mark.django_db(transaction=True)
+class TestFeedbackCommand:
+    """Real users will never know the internal convention. `!feedback` is the
+    advertised door, and it works on every platform because it lives in dispatch."""
+
+    async def _user_with_session(self, uid, make_skill):
+        from learner.models import User, Session
+        user = await sync_to_async(User.objects.create)(
+            discord_id=uid, display_name='L', instruction_language='auto',
+            estimated_cefr_level='B1')
+        skill = await sync_to_async(make_skill)(skill_id=uid + '_sk')
+        await sync_to_async(Session.objects.create)(
+            user=user, session_type='new_skill', target_skill=skill)
+        return user
+
+    async def _run(self, uid, text, make_skill):
+        from engine.dispatch import IncomingEvent, handle
+        await self._user_with_session(uid, make_skill)
+        return await handle(IncomingEvent(
+            platform='discord', external_id=uid, display_name='L', text=text))
+
+    @pytest.mark.asyncio
+    async def test_feedback_command_records_it(self, make_skill):
+        from learner.models import SessionFeedback
+        replies = await self._run('d_fb1', '!feedback the lessons move too fast', make_skill)
+
+        rows = await sync_to_async(lambda: list(SessionFeedback.objects.all()))()
+        assert len(rows) == 1
+        assert 'move too fast' in rows[0].user_message
+        assert replies[0].text
+
+    @pytest.mark.asyncio
+    async def test_bare_command_explains_itself(self, make_skill):
+        from learner.models import SessionFeedback
+        replies = await self._run('d_fb2', '!feedback', make_skill)
+
+        assert '!feedback' in replies[0].text
+        count = await sync_to_async(SessionFeedback.objects.count)()
+        assert count == 0
+
+    @pytest.mark.asyncio
+    async def test_engine_is_not_called(self, make_skill):
+        from unittest.mock import patch, AsyncMock
+        with patch('engine.core.handle_message', new=AsyncMock()) as engine:
+            await self._run('d_fb3', '!feedback too hard', make_skill)
+        engine.assert_not_called()
