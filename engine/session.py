@@ -52,10 +52,41 @@ MORE_PRACTICE_PHRASES = {
     'keep going', 'continue', 'not yet', 'more practice please', 'no',
 }
 
-SECOND_PASS_CHECK_STRING = (
-    'That covers everything. Want to do a quick second pass to lock it in?'
+# The review loop already repeats indefinitely: after a pass is exhausted it
+# offers again. Only the wording claimed a count, so the third pass announced
+# itself as the second. No counter -- the copy simply stops asserting a number.
+ANOTHER_PASS_CHECK_STRING = (
+    'That covers everything. Want another pass for more practice?'
 )
-SECOND_PASS_PHRASES = {
+
+PASS_CHECK_PHASE = 'another_pass_check'
+PASS_PHASE = 'another_pass'
+# 'second_pass_check' is the pre-rename value. Accepted so a session already
+# sitting in that phase when this deploys is not stranded.
+_PASS_CHECK_PHASES = frozenset({PASS_CHECK_PHASE, 'second_pass_check'})
+
+
+def _trim_summary(raw: str, limit: int = 80) -> str:
+    """Shorten a summary without cutting a word in half.
+
+    A hard slice turned "la boda de Chris" into "la boda de Chri…", which reads
+    to the student as the system getting their friend's name wrong.
+    """
+    raw = raw or ''
+    if len(raw) <= limit:
+        return raw
+    cut = raw[:limit]
+    spaced = cut.rsplit(' ', 1)[0]
+    # A single unbroken token has no boundary to fall back to; keep the slice.
+    return (spaced if spaced else cut).rstrip(' ,;:.') + '…'
+
+
+def _is_pass_check_phase(phase: str) -> bool:
+    """True when the session is waiting on 'want another pass?'."""
+    return phase in _PASS_CHECK_PHASES
+
+
+ANOTHER_PASS_PHRASES = {
     'yes', 'sure', 'yeah', 'yep', 'ok', 'okay', 'listo', 'sí', 'si',
     "let's go", 'dale', 'second pass', 'go again', 'again',
 }
@@ -884,7 +915,7 @@ async def _open_session(user, text: str, forced_skill: dict = None) -> dict:
 
     if last_session and not win_state and not skip_checkin:
         raw = last_session.summary or ''
-        last_snippet = (raw[:80] + '…') if len(raw) > 80 else raw
+        last_snippet = _trim_summary(raw, limit=80)
         target_name = target_skill_obj.name if target_skill_obj else None
         # Detect resumption: any prior new_skill session for this user × target_skill
         # means we're picking it back up, not introducing it as new.
@@ -1372,7 +1403,7 @@ async def _continue_new_skill(user, session, text: str) -> dict:
 async def _continue_srs_review(user, session, text: str) -> dict:
     from learner.models import SessionEvent, SessionSkill, SkillScore
 
-    phase = session.current_phase  # 'review', 'second_pass_check', 'second_pass'
+    phase = session.current_phase  # 'review', then PASS_CHECK_PHASE / PASS_PHASE
     turns = session.phase_turns_completed
 
     session_skills = await sync_to_async(
@@ -1409,10 +1440,10 @@ async def _continue_srs_review(user, session, text: str) -> dict:
     history.append({"role": "user", "content": text})
 
     # Handle second pass check response
-    if phase == 'second_pass_check':
-        if text.strip().lower() in SECOND_PASS_PHRASES:
-            await _set_phase(session, 'second_pass', 0)
-            phase = 'second_pass'
+    if _is_pass_check_phase(phase):
+        if text.strip().lower() in ANOTHER_PASS_PHRASES:
+            await _set_phase(session, PASS_PHASE, 0)
+            phase = PASS_PHASE
             turns = 0
         else:
             return await _close_session(user, explicit=False)
@@ -1423,8 +1454,8 @@ async def _continue_srs_review(user, session, text: str) -> dict:
     if next_pos is None:
         # All questions answered — wrap up and offer second pass
         response_text = await call_llm(history, user=user, system_suffix=SRS_REVIEW_COMPLETE_SUFFIX)
-        response_text = response_text + "\n\n" + SECOND_PASS_CHECK_STRING
-        await _set_phase(session, 'second_pass_check', 0)
+        response_text = response_text + "\n\n" + ANOTHER_PASS_CHECK_STRING
+        await _set_phase(session, PASS_CHECK_PHASE, 0)
     else:
         next_skill, next_q_num, next_q_total = next_pos
         current_pos = _srs_position(turns, schedule)

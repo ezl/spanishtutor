@@ -803,3 +803,54 @@ class TestSkillRequestRouting:
 
         reloaded = await sync_to_async(Session.objects.get)(pk=session.pk)
         assert reloaded.current_phase != 'skill_request'
+
+
+class TestSummaryTrim:
+    """Feedback #12a: "It's Chris's birthday. This says Chri. That's wrong."
+    A hard character slice cut the name in half."""
+
+    def test_does_not_cut_a_word_in_half(self):
+        from engine.session import _trim_summary
+        raw = ("Practiced preterite and imperfect, talked about the gym and "
+               "about la boda de Chris and coffee with Melodie")
+        out = _trim_summary(raw, limit=80)
+        assert 'Chri…' not in out
+        assert not out.rstrip('…').rstrip().endswith('Chri')
+
+    def test_short_summaries_pass_through_untouched(self):
+        from engine.session import _trim_summary
+        assert _trim_summary('Short one', limit=80) == 'Short one'
+
+    def test_long_summary_is_still_shortened(self):
+        from engine.session import _trim_summary
+        raw = 'palabra ' * 40
+        out = _trim_summary(raw, limit=80)
+        assert len(out) <= 81
+        assert out.endswith('…')
+
+    def test_a_single_unbroken_token_still_truncates(self):
+        from engine.session import _trim_summary
+        out = _trim_summary('x' * 200, limit=80)
+        assert len(out) <= 81
+        assert out.endswith('…')
+
+    def test_empty_is_safe(self):
+        from engine.session import _trim_summary
+        assert _trim_summary('', limit=80) == ''
+
+
+class TestAnotherPassCopy:
+    """Feedback #15a: the review always offered a "second pass", including on the
+    third. The loop was already correct — only the wording claimed a count."""
+
+    def test_copy_does_not_claim_a_number(self):
+        from engine.session import ANOTHER_PASS_CHECK_STRING
+        assert 'second pass' not in ANOTHER_PASS_CHECK_STRING.lower()
+        assert 'another pass' in ANOTHER_PASS_CHECK_STRING.lower()
+
+    def test_sessions_mid_flight_on_the_old_phase_still_work(self):
+        """Renaming the phase must not strand a session already sitting in it."""
+        from engine.session import _is_pass_check_phase
+        assert _is_pass_check_phase('another_pass_check') is True
+        assert _is_pass_check_phase('second_pass_check') is True
+        assert _is_pass_check_phase('review') is False
