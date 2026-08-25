@@ -1,0 +1,291 @@
+# elicitation.yaml
+#
+# Questions Luz asks to learn about the student, so lessons can be built from
+# their actual life rather than from the same four facts.
+#
+# WHY THIS EXISTS
+#   Interest extraction was passive: it mined whatever the conversation happened
+#   to contain, and the conversation was generated FROM the interests. The pool
+#   fed itself and never grew (2026-08-25 review: 141 rows for ~15 real facts,
+#   two thirds of them gym / Chris / Melodie restated).
+#
+# DESIGN RULES (see also engine/elicitation.py)
+#   1. Universal — everyone eats, sleeps, has a past, has next week. Nothing may
+#      presuppose kids, a partner, a car, a passport, or money.
+#   2. The fact lives in the FOLLOW-UP. "Do you cook or eat out?" yields "eat
+#      out", which is worthless. "Which place, and what did you order?" yields a
+#      name and a dish. Every entry is a pair for that reason.
+#   3. Grammar-aligned. The question is the practice, so elicitation costs no
+#      lesson time: a preterite lesson asks what you did, a subjunctive lesson
+#      asks what you hope for.
+#   4. Low stakes. Money, health problems, and relationship status are never
+#      openers.
+#
+# DIALECT: Colombian Spanish (Medellín). No vosotros, ever. Use ustedes for
+# second-person plural. carro / apartamento / celular / tinto, not coche / piso /
+# móvil / café solo.
+
+# Controlled vocabulary. Interest extraction must map every fact to one of these,
+# so that "which category is thin?" has an answer. Previously categories were
+# free text and the model invented a new label per session ("hobbies",
+# "fitness/hobbies", "hobbies/interests", "fitness/exercise interest"...).
+categories:
+  - work_study
+  - family
+  - friends
+  - food
+  - home_place
+  - travel
+  - exercise_sport
+  - music_media
+  - hobbies
+  - pets
+  - daily_routine
+  - celebrations
+  - past_childhood
+  - goals_dreams
+  - health
+
+questions:
+  # ── present / daily routine ────────────────────────────────────────────────
+  - id: food_home_or_out
+    category: food
+    grammar: [present, gustar]
+    opener_es: "¿Cocinas en casa o sales a comer más seguido?"
+    opener_en: "Do you cook at home or eat out more often?"
+    follow_up_es: "¿Cuál fue el último lugar? ¿Qué pediste?"
+    follow_up_en: "Where was the last place, and what did you order?"
+
+  - id: routine_saturday
+    category: daily_routine
+    grammar: [present]
+    opener_es: "¿Qué haces normalmente un sábado?"
+    opener_en: "What do you usually do on a Saturday?"
+    follow_up_es: "¿Y con quién? ¿Siempre es igual o cambia?"
+    follow_up_en: "Who with? Is it always the same or does it change?"
+
+  - id: work_what_you_do
+    category: work_study
+    grammar: [present]
+    opener_es: "¿A qué te dedicas? ¿Trabajas o estudias?"
+    opener_en: "What do you do — do you work or study?"
+    follow_up_es: "¿Y qué es lo que más haces en un día normal?"
+    follow_up_en: "What takes up most of a normal day?"
+
+  - id: home_who_with
+    category: home_place
+    grammar: [present]
+    opener_es: "¿En qué ciudad vives? ¿Vives solo o con alguien?"
+    opener_en: "What city do you live in, and do you live alone or with someone?"
+    follow_up_es: "¿Qué es lo que más te gusta de ese lugar?"
+    follow_up_en: "What do you like most about it there?"
+
+  - id: pets_have
+    category: pets
+    grammar: [present, tener]
+    opener_es: "¿Tienes mascotas? ¿O has tenido alguna?"
+    opener_en: "Do you have any pets? Or have you had one before?"
+    follow_up_es: "¿Cómo se llama? ¿Cómo es?"
+    follow_up_en: "What's its name? What's it like?"
+
+  # ── gustar / preferences ───────────────────────────────────────────────────
+  - id: music_taste
+    category: music_media
+    grammar: [gustar, present]
+    opener_es: "¿Qué música te gusta escuchar?"
+    opener_en: "What music do you like?"
+    follow_up_es: "¿Qué grupo o artista? ¿Los has visto en vivo?"
+    follow_up_en: "Which band or artist? Have you seen them live?"
+
+  - id: media_watching
+    category: music_media
+    grammar: [present, present_perfect]
+    opener_es: "¿Qué estás viendo o leyendo estos días?"
+    opener_en: "What are you watching or reading these days?"
+    follow_up_es: "¿De qué se trata? ¿Lo recomiendas?"
+    follow_up_en: "What's it about? Would you recommend it?"
+
+  - id: hobbies_free_time
+    category: hobbies
+    grammar: [gustar, present]
+    opener_es: "Cuando tienes tiempo libre, ¿qué te gusta hacer?"
+    opener_en: "When you have free time, what do you like to do?"
+    follow_up_es: "¿Hace cuánto que lo haces? ¿Cómo empezaste?"
+    follow_up_en: "How long have you been doing that? How did you start?"
+
+  # ── preterite — completed events ───────────────────────────────────────────
+  - id: preterite_weekend
+    category: daily_routine
+    grammar: [preterite]
+    opener_es: "¿Qué hiciste el fin de semana pasado?"
+    opener_en: "What did you do last weekend?"
+    follow_up_es: "¿Con quién fuiste? ¿Cómo estuvo?"
+    follow_up_en: "Who did you go with? How was it?"
+
+  - id: preterite_who_you_saw
+    category: friends
+    grammar: [preterite]
+    opener_es: "¿A quién viste o con quién pasaste más tiempo esta semana?"
+    opener_en: "Who did you see or spend the most time with this week?"
+    follow_up_es: "¿Qué hicieron? ¿Hace cuánto la conoces?"
+    follow_up_en: "What did you do? How long have you known them?"
+
+  - id: preterite_last_trip
+    category: travel
+    grammar: [preterite]
+    opener_es: "¿Cuál fue el último viaje que hiciste, aunque haya sido cortico?"
+    opener_en: "What was the last trip you took, even a short one?"
+    follow_up_es: "¿A dónde? ¿Qué fue lo mejor de allá?"
+    follow_up_en: "Where to? What was the best part?"
+
+  - id: preterite_celebration
+    category: celebrations
+    grammar: [preterite]
+    opener_es: "¿Cuál fue la última celebración a la que fuiste?"
+    opener_en: "What was the last celebration you went to?"
+    follow_up_es: "¿De quién era? ¿Qué se hizo?"
+    follow_up_en: "Whose was it? What happened?"
+
+  # ── imperfect — habitual past / childhood ──────────────────────────────────
+  - id: imperfect_childhood_liked
+    category: past_childhood
+    grammar: [imperfect]
+    opener_es: "¿Qué te gustaba hacer cuando eras niño?"
+    opener_en: "What did you like doing when you were a kid?"
+    follow_up_es: "¿Con quién lo hacías? ¿Todavía lo haces?"
+    follow_up_en: "Who did you do it with? Do you still?"
+
+  - id: imperfect_sports_young
+    category: exercise_sport
+    grammar: [imperfect]
+    opener_es: "¿Hacías algún deporte cuando eras más joven?"
+    opener_en: "Did you play any sports when you were younger?"
+    follow_up_es: "¿Cuál? ¿Y ahora haces algo para moverte?"
+    follow_up_en: "Which one? And do you do anything to stay active now?"
+
+  - id: imperfect_where_lived
+    category: home_place
+    grammar: [imperfect]
+    opener_es: "¿Dónde vivías antes de vivir donde vives ahora?"
+    opener_en: "Where did you live before where you live now?"
+    follow_up_es: "¿Cómo era la vida allá? ¿Qué extrañas?"
+    follow_up_en: "What was life like there? What do you miss?"
+
+  - id: imperfect_family_growing_up
+    category: family
+    grammar: [imperfect]
+    opener_es: "¿Cómo era tu casa cuando eras pequeño? ¿Quién vivía contigo?"
+    opener_en: "What was your home like growing up? Who lived with you?"
+    follow_up_es: "¿Alguna tradición o costumbre que se hacía siempre?"
+    follow_up_en: "Any tradition or custom you always did?"
+
+  # ── preterite vs imperfect — narration ─────────────────────────────────────
+  - id: narrative_something_happened
+    category: daily_routine
+    grammar: [preterite_vs_imperfect]
+    opener_es: "Cuéntame algo que te pasó hace poco — algo bueno o algo raro."
+    opener_en: "Tell me about something that happened to you recently — good or strange."
+    follow_up_es: "¿Y qué estabas haciendo cuando pasó?"
+    follow_up_en: "What were you doing when it happened?"
+
+  # ── present perfect ────────────────────────────────────────────────────────
+  - id: perfect_new_restaurant
+    category: food
+    grammar: [present_perfect]
+    opener_es: "¿Has probado algún restaurante nuevo últimamente?"
+    opener_en: "Have you tried any new restaurants lately?"
+    follow_up_es: "¿Cómo se llama? ¿Qué pediste?"
+    follow_up_en: "What's it called? What did you order?"
+
+  - id: perfect_travelled
+    category: travel
+    grammar: [present_perfect]
+    opener_es: "¿Has viajado a algún lugar que te haya gustado mucho?"
+    opener_en: "Have you been anywhere you really loved?"
+    follow_up_es: "¿Qué tenía de especial? ¿Volverías?"
+    follow_up_en: "What made it special? Would you go back?"
+
+  - id: perfect_tried_new
+    category: hobbies
+    grammar: [present_perfect]
+    opener_es: "¿Has empezado algo nuevo este año? Algo que no hacías antes."
+    opener_en: "Have you started anything new this year — something you didn't do before?"
+    follow_up_es: "¿Cómo te ha ido con eso?"
+    follow_up_en: "How has it been going?"
+
+  # ── future ─────────────────────────────────────────────────────────────────
+  - id: future_next_week
+    category: goals_dreams
+    grammar: [future_periphrastic, future]
+    opener_es: "¿Qué vas a hacer la próxima semana?"
+    opener_en: "What are you going to do next week?"
+    follow_up_es: "¿Qué es lo que más ganas tienes de hacer?"
+    follow_up_en: "What are you most looking forward to?"
+
+  - id: future_this_year
+    category: goals_dreams
+    grammar: [future_periphrastic, future]
+    opener_es: "¿Tienes algún plan grande para este año?"
+    opener_en: "Do you have any big plans this year?"
+    follow_up_es: "¿Qué necesitas para que salga bien?"
+    follow_up_en: "What needs to happen to make it work?"
+
+  - id: future_weekend_plans
+    category: friends
+    grammar: [future_periphrastic]
+    opener_es: "¿Vas a ver a alguien este fin de semana?"
+    opener_en: "Are you seeing anyone this weekend?"
+    follow_up_es: "¿Qué van a hacer?"
+    follow_up_en: "What are you going to do?"
+
+  # ── conditional ────────────────────────────────────────────────────────────
+  - id: conditional_free_month
+    category: goals_dreams
+    grammar: [conditional]
+    opener_es: "Si tuvieras un mes libre, ¿qué harías?"
+    opener_en: "If you had a free month, what would you do?"
+    follow_up_es: "¿Y con quién lo harías?"
+    follow_up_en: "Who would you do it with?"
+
+  - id: conditional_anywhere
+    category: travel
+    grammar: [conditional]
+    opener_es: "Si pudieras ir a cualquier lugar mañana, ¿a dónde irías?"
+    opener_en: "If you could go anywhere tomorrow, where would you go?"
+    follow_up_es: "¿Por qué ese lugar?"
+    follow_up_en: "Why there?"
+
+  # ── subjunctive — hopes, wishes, doubt ─────────────────────────────────────
+  - id: subjunctive_hopes_year
+    category: goals_dreams
+    grammar: [subjunctive, subjunctive_triggers]
+    opener_es: "¿Qué esperas que pase este año?"
+    opener_en: "What do you hope happens this year?"
+    follow_up_es: "¿Y qué te gustaría que fuera diferente?"
+    follow_up_en: "What would you like to be different?"
+
+  - id: subjunctive_advice
+    category: friends
+    grammar: [subjunctive, subjunctive_triggers]
+    opener_es: "¿Hay alguien a quien le recomiendes que aprenda español?"
+    opener_en: "Is there anyone you'd recommend learn Spanish?"
+    follow_up_es: "¿Por qué esa persona?"
+    follow_up_en: "Why them?"
+
+  # ── comparatives / preferences ─────────────────────────────────────────────
+  - id: comparative_prefer
+    category: hobbies
+    grammar: [comparatives, present]
+    opener_es: "¿Prefieres un plan tranquilo en casa o salir con gente?"
+    opener_en: "Do you prefer a quiet plan at home or going out with people?"
+    follow_up_es: "¿Cuándo fue la última vez que hiciste eso?"
+    follow_up_en: "When was the last time you did that?"
+
+  # ── health (kept light, never an opener about problems) ────────────────────
+  - id: health_energy
+    category: health
+    grammar: [present, gustar]
+    opener_es: "¿Duermes bien normalmente? ¿Eres más de mañana o de noche?"
+    opener_en: "Do you usually sleep well? Are you more of a morning or night person?"
+    follow_up_es: "¿Y qué haces para descansar de verdad?"
+    follow_up_en: "What do you do to actually rest?"

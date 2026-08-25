@@ -1,78 +1,199 @@
 import anthropic
 import django.conf
 import logging
+import re
 from asgiref.sync import sync_to_async
 
 logger = logging.getLogger('engine')
 
-EXTRACTION_PROMPT = """Here is a conversation between a Spanish tutor and a student.
+EXTRACTION_PROMPT = """Here is a conversation between a Spanish tutor (Luz) and a student.
 
 <conversation>
 {transcript}
 </conversation>
 
-Did this conversation reveal anything about the student's life, interests, hobbies, career, relationships, or personal context?
+We already know these facts about the student:
+<known>
+{known}
+</known>
 
-If yes, output one line per fact in exactly this format:
-TOPIC | CATEGORY | CONFIDENCE
+What did the STUDENT reveal about their life that we do not already know?
 
-Only include things the student actually revealed or that are obvious inferences (e.g. if they mention Dragon Ball Z, infer shonen anime fan). If nothing personal came up, output exactly: NOTHING
+EVIDENCE RULES -- these matter more than finding something:
+- Only the STUDENT lines are evidence. TUTOR lines are context for interpreting
+  them and are NEVER a source of facts. Luz generates her sentences FROM the
+  known list, so treating her words as evidence makes the system invent facts
+  by reading its own output back.
+- Never attach a name the student did not say. If they said "our friend" without
+  naming her, the fact is "has a friend", not a friend with a name borrowed from
+  the known list.
+- A drill answer is a sentence built to a grammatical spec, not a biographical
+  claim. "Mi hijo me lo contó" answering a pronoun exercise does not mean their
+  son said anything, and it certainly does not name their son after whoever the
+  tutor mentioned.
+- If the conversation revealed nothing new, output exactly: NOTHING
 
-Examples of valid output:
-Chicago Cubs | sports | 0.9
-has a dog | pets | 0.8
-works in tech | career | 0.7
-shonen anime fan | anime | 0.5"""
+CATEGORY must be exactly one of:
+{categories}
+
+Output one line per fact, in one of these two forms:
+
+NEW | topic | category | confidence
+SUPERSEDES <exact existing topic> | topic | category | confidence
+
+Use SUPERSEDES when the new fact refines, corrects, or contradicts something in
+the known list -- "has a wife named Melodie" supersedes "has a friend named
+Melodie". Use it rather than adding a second row, so the two beliefs cannot both
+survive. Do not restate a known fact in different words: if we already have
+"Goes to the gym", "Lifts weights" is not new.
+
+Output ONLY these lines. No reasoning, no preamble, no explanation, no blank
+commentary -- just the lines, or the single word NOTHING. Working through it in
+prose risks the real output being cut off before it is written.
+
+Examples:
+NEW | plays guitar | hobbies | 0.9
+NEW | has a dog named Rufo | pets | 0.8
+SUPERSEDES has a friend named Melodie | has a wife named Melodie | family | 1.0"""
+
+
+# Words too common to identify a topic when checking who introduced it.
+_ECHO_STOPWORDS = frozenset({
+    'the', 'and', 'for', 'has', 'have', 'with', 'from', 'that', 'this', 'they',
+    'their', 'his', 'her', 'someone', 'named', 'name', 'likes', 'like', 'enjoys',
+    'goes', 'does', 'about', 'into', 'been', 'was', 'are', 'user', 'student',
+})
+
+
+def allowed_categories() -> list:
+    """Controlled vocabulary, shared with the elicitation bank so that gaps in
+    one are answerable by the other."""
+    from .elicitation import load_bank
+    return load_bank()['categories']
+
+
+def _significant_tokens(topic: str) -> set:
+    return {w for w in re.findall(r"[a-záéíóúñü]+", (topic or '').lower())
+            if len(w) >= 3 and w not in _ECHO_STOPWORDS}
+
+
+def _looks_echoed(topic: str, tutor_text: str, student_text: str) -> bool:
+    """True when this topic is not independent evidence from the student.
+
+    Either the tutor introduced it -- Luz writes sentences from the known list,
+    so the student repeating a name back is the system reading its own output --
+    or nobody actually said it and it was inferred from context.
+    """
+    tokens = _significant_tokens(topic)
+    if not tokens:
+        return True
+    tutor = (tutor_text or '').lower()
+    student = (student_text or '').lower()
+    if any(t in tutor for t in tokens):
+        return True
+    return not any(t in student for t in tokens)
 
 
 def _build_transcript(events) -> str:
+    """Label both sides explicitly. The prompt treats only STUDENT lines as
+    evidence, so the labelling is load-bearing rather than cosmetic."""
     lines = []
     for e in events:
-        if e.user_response:
-            lines.append(f"Student: {e.user_response}")
         if e.content:
-            lines.append(f"Luz: {e.content}")
+            lines.append(f"TUTOR: {e.content}")
+        if e.user_response:
+            lines.append(f"STUDENT: {e.user_response}")
     return "\n".join(lines)
 
 
+def _split_sides(events) -> tuple:
+    tutor = " ".join(e.content or '' for e in events)
+    student = " ".join(e.user_response or '' for e in events)
+    return tutor, student
+
+
 def _parse_extraction(raw: str) -> list[dict]:
-    raw = raw.strip()
+    """Parse NEW / SUPERSEDES lines. Anything outside the category vocabulary is
+    dropped: a free-text category is what made "which category is thin?"
+    unanswerable in the first place."""
+    raw = (raw or '').strip()
     if raw == 'NOTHING':
         return []
+    allowed = set(allowed_categories())
     results = []
     for line in raw.splitlines():
         parts = [p.strip() for p in line.split('|')]
-        if len(parts) != 3:
+        if len(parts) != 4:
             continue
-        topic, category, confidence_str = parts
+        head, topic, category, confidence_str = parts
         try:
             confidence = float(confidence_str)
         except ValueError:
             continue
-        if topic and category:
-            results.append({'topic': topic, 'category': category, 'confidence': confidence})
+        if not topic or category not in allowed:
+            continue
+        upper = head.upper()
+        if upper == 'NEW':
+            action, supersedes = 'new', None
+        elif upper.startswith('SUPERSEDES'):
+            action, supersedes = 'supersede', head[len('SUPERSEDES'):].strip()
+            if not supersedes:
+                continue
+        else:
+            continue
+        results.append({'action': action, 'supersedes': supersedes, 'topic': topic,
+                        'category': category, 'confidence': confidence})
     return results
 
 
-async def _call_extraction_llm(transcript: str) -> str:
+async def _call_extraction_llm(transcript: str, known: str = "(nothing yet)") -> str:
     client = anthropic.Anthropic(api_key=django.conf.settings.ANTHROPIC_API_KEY)
-    prompt = EXTRACTION_PROMPT.format(transcript=transcript)
+    prompt = EXTRACTION_PROMPT.format(
+        transcript=transcript,
+        known=known,
+        categories="\n".join(f"  {c}" for c in allowed_categories()),
+    )
     response = await sync_to_async(client.messages.create)(
         model="claude-sonnet-4-6",
-        max_tokens=512,
+        # Headroom: the prompt now carries the known list and asks for a
+        # supersede decision, and a truncated response parses to silence.
+        max_tokens=2048,
         messages=[{"role": "user", "content": prompt}],
     )
     return response.content[0].text
 
 
+# At most this many facts per category may reach the prompt. Duplicates each
+# carried their own mention_count, so one cluster (gym said four ways) crowded
+# out every other topic in the field lessons are generated from.
+MAX_PER_CATEGORY = 3
+MAX_INTEREST_FACTS = 20
+
+
+def _diverse_selection(rows, per_category=MAX_PER_CATEGORY, limit=MAX_INTEREST_FACTS):
+    """Best facts per category, spread across categories rather than ranked
+    globally, so the loudest topic cannot dominate."""
+    by_category = {}
+    for row in sorted(rows, key=lambda r: (-r.mention_count, -r.confidence, r.topic)):
+        by_category.setdefault(row.category, []).append(row)
+    kept, round_index = [], 0
+    while len(kept) < limit and round_index < per_category:
+        added = False
+        for category in sorted(by_category):
+            bucket = by_category[category]
+            if round_index < len(bucket) and len(kept) < limit:
+                kept.append(bucket[round_index])
+                added = True
+        if not added:
+            break
+        round_index += 1
+    return kept
+
+
 async def _regenerate_interests_prose(user) -> None:
     from learner.models import UserInterest
-    interests = await sync_to_async(
-        lambda: list(
-            UserInterest.objects.filter(user=user)
-                               .order_by('-mention_count', '-confidence')[:20]
-        )
-    )()
+    rows = await sync_to_async(lambda: list(UserInterest.objects.filter(user=user)))()
+    interests = _diverse_selection(rows)
     if not interests:
         return
     high = [i for i in interests if i.confidence >= 0.7]
@@ -144,32 +265,65 @@ async def extract_and_store_interests(session, user) -> list[dict]:
     if not transcript:
         return []
 
+    known_rows = await sync_to_async(
+        lambda: list(UserInterest.objects.filter(user=user).order_by('-mention_count'))
+    )()
+    known = "\n".join(f"- {r.topic} ({r.category})" for r in known_rows) or "(nothing yet)"
+
     try:
-        raw = await _call_extraction_llm(transcript)
+        raw = await _call_extraction_llm(transcript, known)
     except Exception as e:
         logger.error(f"Interest extraction failed: {e}")
         return []
 
     facts = _parse_extraction(raw)
+    tutor_text, student_text = _split_sides(events)
 
     for fact in facts:
+        topic = fact['topic']
+
+        if fact['action'] == 'supersede':
+            superseded = await sync_to_async(
+                lambda t=fact['supersedes']: UserInterest.objects.filter(
+                    user=user, topic__iexact=t).first()
+            )()
+            if superseded:
+                # Replace in place so the old belief cannot survive alongside the
+                # correction -- "friend named Melodie" and "wife named Melodie"
+                # were both sitting in the pool and either could reach a lesson.
+                await sync_to_async(
+                    lambda pk=superseded.pk: UserInterest.objects.filter(pk=pk).update(
+                        topic=topic, category=fact['category'],
+                        confidence=max(superseded.confidence, fact['confidence']),
+                    )
+                )()
+                fact['new'] = False
+                continue
+
         existing = await sync_to_async(
-            lambda: UserInterest.objects.filter(
-                user=user, topic__iexact=fact['topic']
-            ).first()
+            lambda t=topic: UserInterest.objects.filter(user=user, topic__iexact=t).first()
         )()
         if existing:
+            # Reinforce only what the student actually volunteered. Counting an
+            # echo measures the system's own output: Luz writes sentences from
+            # the known list, the student repeats a name back, and the topic
+            # climbs the ranking on no new evidence.
+            if _looks_echoed(topic, tutor_text, student_text):
+                fact['new'] = False
+                fact['echoed'] = True
+                continue
             await sync_to_async(
-                lambda: UserInterest.objects.filter(pk=existing.pk).update(
-                    mention_count=existing.mention_count + 1,
-                    confidence=max(existing.confidence, fact['confidence']),
-                )
+                lambda pk=existing.pk, c=existing.mention_count, conf=existing.confidence:
+                    UserInterest.objects.filter(pk=pk).update(
+                        mention_count=c + 1,
+                        confidence=max(conf, fact['confidence']),
+                    )
             )()
             fact['new'] = False
         else:
             await sync_to_async(UserInterest.objects.create)(
                 user=user,
-                topic=fact['topic'],
+                topic=topic,
                 category=fact['category'],
                 confidence=fact['confidence'],
             )

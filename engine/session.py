@@ -66,6 +66,24 @@ PASS_PHASE = 'another_pass'
 _PASS_CHECK_PHASES = frozenset({PASS_CHECK_PHASE, 'second_pass_check'})
 
 
+async def _elicitation_block(user, skill_id: str = None) -> str:
+    """One question about the student, aimed at whatever the pool is thinnest on.
+
+    Extraction used to be purely passive: it mined whatever the conversation
+    contained, and the conversation was generated FROM the interests, so the
+    pool fed itself and never grew. This is the other half of that loop.
+    Failing to pick a question must never block a lesson, hence the broad except.
+    """
+    try:
+        from .elicitation import build_elicitation_block, pick_for_session
+        question = await pick_for_session(user, skill_id=skill_id)
+        return build_elicitation_block(question, user.estimated_cefr_level or 'A1')
+    except Exception:
+        import logging
+        logging.getLogger(__name__).exception("elicitation selection failed")
+        return ''
+
+
 def _trim_summary(raw: str, limit: int = 80) -> str:
     """Shorten a summary without cutting a word in half.
 
@@ -320,8 +338,10 @@ Student level: {cefr_level}
 Student interests: {interests}
 Last session: {last_summary}
 
-Open with a genuine question about their life. Draw from their interests or last session.
-Let the conversation flow naturally.
+Open with a genuine question about their life. Go somewhere we do NOT already
+know about -- the interests above are what we have already, and asking about
+them again is how the same few topics kept coming back. Prefer new ground.
+Let the conversation flow naturally.{elicitation}
 Correct significant errors inline using the standard correction format.
 Minor errors (accents, small typos): ignore, never interrupt flow.
 
@@ -1006,6 +1026,7 @@ async def _open_session(user, text: str, forced_skill: dict = None) -> dict:
         skill_dict = context.get('skill')
         if not skill_dict or not target_skill_obj:
             prompt = CONVERSATION_PROMPT.format(
+                elicitation=await _elicitation_block(user),
                 cefr_level=level, interests=interests, last_summary=last_summary
             )
             opening = await call_llm([{"role": "user", "content": prompt}], user=user)
@@ -1034,6 +1055,7 @@ async def _open_session(user, text: str, forced_skill: dict = None) -> dict:
                     # happens on the student's next reply.
                     from .teach_drill import TEACH_DRILL_OPENING_PROMPT
                     prompt = TEACH_DRILL_OPENING_PROMPT.format(
+                        elicitation=await _elicitation_block(user, target_skill_obj.skill_id),
                         skill_name=target_skill_obj.name,
                         cefr_level=level, interests=interests,
                     )
@@ -1091,6 +1113,7 @@ async def _open_session(user, text: str, forced_skill: dict = None) -> dict:
 
     elif session_type == 'conversation':
         prompt = CONVERSATION_PROMPT.format(
+            elicitation=await _elicitation_block(user),
             cefr_level=level, interests=interests, last_summary=last_summary
         )
         opening = await call_llm([{"role": "user", "content": prompt}], user=user)
@@ -1130,6 +1153,7 @@ async def _open_session(user, text: str, forced_skill: dict = None) -> dict:
 
     else:
         prompt = CONVERSATION_PROMPT.format(
+            elicitation=await _elicitation_block(user),
             cefr_level=level, interests=interests, last_summary=last_summary
         )
         opening = await call_llm([{"role": "user", "content": prompt}], user=user)
@@ -1201,6 +1225,7 @@ async def _handle_check_in(user, session, text: str) -> dict:
                     initial_phase = 'teach_drill'
                     from .teach_drill import TEACH_DRILL_OPENING_PROMPT
                     prompt = TEACH_DRILL_OPENING_PROMPT.format(
+                        elicitation=await _elicitation_block(user, skill.skill_id),
                         skill_name=skill.name,
                         cefr_level=level, interests=interests,
                     )
@@ -1237,6 +1262,7 @@ async def _handle_check_in(user, session, text: str) -> dict:
                 initial_phase = 'guided_practice'
         else:
             prompt = CONVERSATION_PROMPT.format(
+                elicitation=await _elicitation_block(user),
                 cefr_level=level, interests=interests, last_summary=last_summary
             )
             opening = await call_llm([{"role": "user", "content": prompt}], user=user)
@@ -1267,6 +1293,7 @@ async def _handle_check_in(user, session, text: str) -> dict:
 
     elif session_type == 'conversation':
         prompt = CONVERSATION_PROMPT.format(
+            elicitation=await _elicitation_block(user),
             cefr_level=level, interests=interests, last_summary=last_summary
         )
         opening = await call_llm([{"role": "user", "content": prompt}], user=user)
@@ -1304,6 +1331,7 @@ async def _handle_check_in(user, session, text: str) -> dict:
 
     else:
         prompt = CONVERSATION_PROMPT.format(
+            elicitation=await _elicitation_block(user),
             cefr_level=level, interests=interests, last_summary=last_summary
         )
         opening = await call_llm([{"role": "user", "content": prompt}], user=user)

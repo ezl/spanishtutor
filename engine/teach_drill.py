@@ -340,7 +340,7 @@ Structure (2-4 short sentences total):
    - B1+: "¿Listo/a para empezar?"
 
 Chat style. No headers, no bullet points, no textbook tone.
-Do not preview specific verbs or forms — the actual teaching starts next turn."""
+Do not preview specific verbs or forms — the actual teaching starts next turn.{elicitation}"""
 
 
 TEACH_DRILL_CONTINUATION_SUFFIX = """CURRENT PHASE: Teach-drill loop for {skill_name}
