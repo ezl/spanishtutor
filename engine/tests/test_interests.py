@@ -472,3 +472,35 @@ class TestCleanupParseFailuresAreLoud:
         from engine.interests import _parse_cleanup_plan
         raw = '```json\n{"clusters":[],"contradictions":[],"drop":[1]}\n```'
         assert _parse_cleanup_plan(raw, valid_ids={1})['drop'] == [1]
+
+
+class TestFirstJsonObject:
+    """A greedy {.*} span ran from the first brace to the last, so any content
+    after the plan turned a valid plan into a decode error."""
+
+    def test_takes_the_first_object_and_ignores_trailing_content(self):
+        from engine.interests import _first_json_object
+        assert _first_json_object('{"a": 1}\n\nSome notes.\n{"b": 2}') == '{"a": 1}'
+
+    def test_handles_nested_braces(self):
+        from engine.interests import _first_json_object
+        src = '{"clusters": [{"members": [1, 2]}], "drop": []}'
+        assert _first_json_object('prose ' + src + ' more') == src
+
+    def test_ignores_braces_inside_strings(self):
+        from engine.interests import _first_json_object
+        src = '{"reason": "a } brace in text", "drop": []}'
+        assert _first_json_object(src) == src
+
+    def test_returns_none_when_unbalanced(self):
+        from engine.interests import _first_json_object
+        assert _first_json_object('{"a": 1') is None
+
+    def test_returns_none_when_there_is_no_object(self):
+        from engine.interests import _first_json_object
+        assert _first_json_object('no json here') is None
+
+    def test_plan_parsing_survives_trailing_content(self):
+        from engine.interests import _parse_cleanup_plan
+        raw = '```json\n{"clusters":[],"contradictions":[],"drop":[1]}\n```\n\nLet me know if...'
+        assert _parse_cleanup_plan(raw, valid_ids={1})['drop'] == [1]

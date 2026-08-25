@@ -380,6 +380,41 @@ Return ONLY JSON, no prose:
 - Every row id must appear exactly once, in exactly one of the three lists."""
 
 
+def _first_json_object(text: str) -> str | None:
+    """The first balanced {...} in the text, or None.
+
+    A greedy regex ran from the first brace to the last, so anything the model
+    wrote after the plan -- a second object, a closing remark -- was swallowed
+    into the slice and turned a perfectly good plan into a decode error.
+    String-aware, so a brace inside a "reason" cannot unbalance the scan.
+    """
+    start = text.find('{')
+    if start == -1:
+        return None
+    depth = 0
+    in_string = False
+    escaped = False
+    for i in range(start, len(text)):
+        ch = text[i]
+        if in_string:
+            if escaped:
+                escaped = False
+            elif ch == '\\':
+                escaped = True
+            elif ch == '"':
+                in_string = False
+            continue
+        if ch == '"':
+            in_string = True
+        elif ch == '{':
+            depth += 1
+        elif ch == '}':
+            depth -= 1
+            if depth == 0:
+                return text[start:i + 1]
+    return None
+
+
 class CleanupParseError(Exception):
     """The model produced a plan we could not read.
 
@@ -400,12 +435,12 @@ def _parse_cleanup_plan(raw: str, valid_ids: set) -> dict:
     empty = {'clusters': [], 'contradictions': [], 'drop': []}
     text = re.sub(r'^\s*```(?:json)?|```\s*$', '', (raw or '').strip(),
                   flags=re.MULTILINE).strip()
-    match = re.search(r'\{.*\}', text, flags=re.DOTALL)
-    if not match:
+    blob = _first_json_object(text)
+    if blob is None:
         # No plan at all -- the model declined, which is a real answer.
         return empty
     try:
-        data = _json.loads(match.group(0))
+        data = _json.loads(blob)
     except (ValueError, TypeError) as exc:
         raise CleanupParseError(f"plan was not valid JSON: {exc}") from exc
     if not isinstance(data, dict):
