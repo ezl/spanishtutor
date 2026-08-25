@@ -332,3 +332,223 @@ async def extract_and_store_interests(session, user) -> list[dict]:
     await _regenerate_interests_prose(user)
     logger.info(f"Interests extracted for {user}: {[f['topic'] for f in facts]}")
     return facts
+
+
+CLEANUP_PROMPT = """You are consolidating a Spanish tutoring app's memory of one student.
+
+Each row is a fact it believes. The list has accumulated for weeks with only
+exact-string deduplication, so the same fact appears several times in different
+words, some categories are free text that no longer exists, and a few rows
+contradict each other.
+
+<rows>
+{rows}
+</rows>
+
+CATEGORY must be exactly one of:
+{categories}
+
+Return ONLY JSON, no prose:
+
+{{
+  "clusters": [
+    {{"canonical": "one clear phrasing", "category": "<category>", "members": [<row ids>]}}
+  ],
+  "contradictions": [
+    {{"reason": "why these cannot both be true", "members": [<row ids>],
+      "safe": "the weaker fact that is still true, or omit", "category": "<category>"}}
+  ],
+  "drop": [<row ids>]
+}}
+
+- clusters: rows that say the SAME thing. Give one canonical phrasing and the
+  right category. A single row that only needs its category remapped is a
+  cluster of one.
+- contradictions: rows that cannot both be true about the same person -- a
+  friend who is also a child, a habit and its opposite. Do NOT try to pick the
+  true one; we cannot know, and a wrong fact generates lessons about a person
+  who does not exist.
+  Where a weaker fact survives the disagreement, give it as "safe": "friend
+  named Chris" and "son named Chris" disagree about the relationship, but that
+  a Chris exists is not in dispute, so safe is "knows someone named Chris".
+  Omit "safe" only when nothing at all survives.
+  Facts that merely differ in specificity are NOT contradictions -- "knows
+  Melodie" and "has a wife named Melodie" are a cluster, and the more specific
+  phrasing is the canonical one.
+- drop: rows that are worthless -- generic filler true of everyone, or so vague
+  they could not shape a lesson.
+- Every row id must appear exactly once, in exactly one of the three lists."""
+
+
+class CleanupParseError(Exception):
+    """The model produced a plan we could not read.
+
+    Distinct from "no plan": returning an empty plan for undecodable JSON made a
+    failed run look exactly like a successful no-op, which is how a 120-row
+    cleanup silently reported nothing to do.
+    """
+
+
+def _parse_cleanup_plan(raw: str, valid_ids: set) -> dict:
+    """Parse the consolidation plan, keeping only ids we actually showed it.
+
+    The model can never remove a row it was not given, and a category outside
+    the controlled vocabulary invalidates its cluster -- free-text categories
+    are what made the pool unmeasurable to begin with.
+    """
+    import json as _json
+    empty = {'clusters': [], 'contradictions': [], 'drop': []}
+    text = re.sub(r'^\s*```(?:json)?|```\s*$', '', (raw or '').strip(),
+                  flags=re.MULTILINE).strip()
+    match = re.search(r'\{.*\}', text, flags=re.DOTALL)
+    if not match:
+        # No plan at all -- the model declined, which is a real answer.
+        return empty
+    try:
+        data = _json.loads(match.group(0))
+    except (ValueError, TypeError) as exc:
+        raise CleanupParseError(f"plan was not valid JSON: {exc}") from exc
+    if not isinstance(data, dict):
+        raise CleanupParseError("plan was not an object")
+
+    allowed = set(allowed_categories())
+
+    clusters = []
+    for cluster in data.get('clusters') or []:
+        if not isinstance(cluster, dict) or cluster.get('category') not in allowed:
+            continue
+        members = [m for m in (cluster.get('members') or []) if m in valid_ids]
+        canonical = str(cluster.get('canonical', '')).strip()
+        if members and canonical:
+            clusters.append({'canonical': canonical, 'category': cluster['category'],
+                             'members': members})
+
+    contradictions = []
+    for item in data.get('contradictions') or []:
+        if not isinstance(item, dict):
+            continue
+        members = [m for m in (item.get('members') or []) if m in valid_ids]
+        if not members:
+            continue
+        entry = {'reason': str(item.get('reason', '')), 'members': members}
+        safe = str(item.get('safe', '') or '').strip()
+        if safe and item.get('category') in allowed:
+            entry['safe'] = safe
+            entry['category'] = item['category']
+        contradictions.append(entry)
+
+    drop = [m for m in (data.get('drop') or []) if m in valid_ids]
+    return {'clusters': clusters, 'contradictions': contradictions, 'drop': drop}
+
+
+async def build_cleanup_plan(user) -> tuple:
+    """Ask the model how to consolidate this user's interest rows."""
+    from learner.models import UserInterest
+
+    rows = await sync_to_async(
+        lambda: list(UserInterest.objects.filter(user=user).order_by('pk'))
+    )()
+    if not rows:
+        return {'clusters': [], 'contradictions': [], 'drop': []}, []
+
+    listing = "\n".join(
+        f"{r.pk} | {r.topic} | {r.category} | seen {r.mention_count}x" for r in rows
+    )
+    prompt = CLEANUP_PROMPT.format(
+        rows=listing,
+        categories="\n".join(f"  {c}" for c in allowed_categories()),
+    )
+    client = anthropic.Anthropic(api_key=django.conf.settings.ANTHROPIC_API_KEY)
+    valid_ids = {r.pk for r in rows}
+
+    last_error = None
+    for attempt in range(2):
+        response = await sync_to_async(client.messages.create)(
+            model="claude-sonnet-4-6",
+            max_tokens=8192,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        try:
+            return _parse_cleanup_plan(response.content[0].text, valid_ids), rows
+        except CleanupParseError as exc:
+            last_error = exc
+            logger.warning("cleanup plan unreadable (attempt %d/2): %s", attempt + 1, exc)
+    raise last_error
+
+
+async def apply_cleanup_plan(user, plan: dict, dry_run: bool = False) -> dict:
+    """Collapse clusters, delete contradictions and filler. Returns a summary."""
+    from learner.models import UserInterest
+
+    summary = {'merged': 0, 'clusters': 0, 'contradictions': 0, 'dropped': 0}
+
+    for cluster in plan.get('clusters') or []:
+        members = cluster['members']
+        summary['clusters'] += 1
+        summary['merged'] += len(members)
+        if dry_run:
+            continue
+        rows = await sync_to_async(
+            lambda m=members: list(UserInterest.objects.filter(user=user, pk__in=m)
+                                                       .order_by('first_seen_at'))
+        )()
+        if not rows:
+            continue
+        keeper = rows[0]
+        # Max, not sum: the counts are echo-inflated, and summing would compound
+        # the very signal that let one cluster crowd out every other topic.
+        await sync_to_async(
+            lambda: UserInterest.objects.filter(pk=keeper.pk).update(
+                topic=cluster['canonical'],
+                category=cluster['category'],
+                mention_count=max(r.mention_count for r in rows),
+                confidence=max(r.confidence for r in rows),
+            )
+        )()
+        losers = [r.pk for r in rows[1:]]
+        if losers:
+            await sync_to_async(
+                lambda: UserInterest.objects.filter(user=user, pk__in=losers).delete()
+            )()
+
+    contradiction_ids = []
+    for item in plan.get('contradictions') or []:
+        members = item['members']
+        summary['contradictions'] += len(members)
+        if not item.get('safe'):
+            contradiction_ids.extend(members)
+            continue
+        # Keep what survives the disagreement. Deleting every row would lose
+        # that the person exists at all, when only the relationship is contested.
+        if dry_run:
+            continue
+        rows = await sync_to_async(
+            lambda m=members: list(UserInterest.objects.filter(user=user, pk__in=m)
+                                                       .order_by('first_seen_at'))
+        )()
+        if not rows:
+            continue
+        keeper = rows[0]
+        await sync_to_async(
+            lambda k=keeper, it=item: UserInterest.objects.filter(pk=k.pk).update(
+                topic=it['safe'], category=it['category'],
+                mention_count=1, confidence=0.6,
+            )
+        )()
+        losers = [r.pk for r in rows[1:]]
+        if losers:
+            await sync_to_async(
+                lambda l=losers: UserInterest.objects.filter(user=user, pk__in=l).delete()
+            )()
+    drop_ids = list(plan.get('drop') or [])
+    summary['dropped'] = len(drop_ids)
+
+    removable = contradiction_ids + drop_ids
+    if removable and not dry_run:
+        await sync_to_async(
+            lambda: UserInterest.objects.filter(user=user, pk__in=removable).delete()
+        )()
+
+    if not dry_run:
+        await _regenerate_interests_prose(user)
+    return summary

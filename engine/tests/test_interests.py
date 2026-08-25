@@ -270,3 +270,205 @@ class TestProseDiversity:
         reloaded = await sync_to_async(lambda: type(user).objects.get(pk=user.pk))()
         assert 'works in tech' in reloaded.interests
         assert reloaded.interests.count('gym fact') <= 3
+
+
+class TestCleanupPlanParsing:
+    def test_parses_a_plan(self):
+        from engine.interests import _parse_cleanup_plan
+        raw = '''{"clusters":[{"canonical":"goes to the gym","category":"exercise_sport","members":[1,2,3]}],
+                  "contradictions":[{"reason":"friend vs son","members":[7,8]}],
+                  "drop":[9]}'''
+        plan = _parse_cleanup_plan(raw, valid_ids={1, 2, 3, 7, 8, 9})
+        assert plan['clusters'][0]['members'] == [1, 2, 3]
+        assert plan['contradictions'][0]['members'] == [7, 8]
+        assert plan['drop'] == [9]
+
+    def test_tolerates_prose_around_the_json(self):
+        from engine.interests import _parse_cleanup_plan
+        raw = 'Here is the plan:\n{"clusters":[],"contradictions":[],"drop":[4]}\nDone.'
+        assert _parse_cleanup_plan(raw, valid_ids={4})['drop'] == [4]
+
+    def test_drops_clusters_with_an_invalid_category(self):
+        from engine.interests import _parse_cleanup_plan
+        raw = '{"clusters":[{"canonical":"x","category":"fitness/hobbies","members":[1]}]}'
+        assert _parse_cleanup_plan(raw, valid_ids={1})['clusters'] == []
+
+    def test_ignores_row_ids_that_do_not_exist(self):
+        """The model must never be able to delete a row it was not shown."""
+        from engine.interests import _parse_cleanup_plan
+        raw = '{"clusters":[{"canonical":"x","category":"pets","members":[1,999]}],"drop":[888]}'
+        plan = _parse_cleanup_plan(raw, valid_ids={1})
+        assert plan['clusters'][0]['members'] == [1]
+        assert plan['drop'] == []
+
+    def test_garbage_yields_an_empty_plan(self):
+        from engine.interests import _parse_cleanup_plan
+        plan = _parse_cleanup_plan('no json at all', valid_ids={1})
+        assert plan == {'clusters': [], 'contradictions': [], 'drop': []}
+
+
+@pytest.mark.django_db(transaction=True)
+class TestApplyCleanupPlan:
+
+    async def _rows(self, make_user, uid):
+        from learner.models import UserInterest
+        user = await sync_to_async(make_user)(discord_id=uid, cefr_level='B1')
+        a = await sync_to_async(UserInterest.objects.create)(
+            user=user, topic='Goes to the gym', category='fitness/hobbies',
+            confidence=1.0, mention_count=7)
+        b = await sync_to_async(UserInterest.objects.create)(
+            user=user, topic='Lifts weights', category='hobbies/fitness',
+            confidence=1.0, mention_count=2)
+        c = await sync_to_async(UserInterest.objects.create)(
+            user=user, topic='weightlifting / lifting weights', category='hobbies',
+            confidence=0.9, mention_count=1)
+        return user, a, b, c
+
+    @pytest.mark.asyncio
+    async def test_a_cluster_collapses_to_one_row(self, make_user):
+        from engine.interests import apply_cleanup_plan
+        from learner.models import UserInterest
+
+        user, a, b, c = await self._rows(make_user, 'cln_merge')
+        plan = {'clusters': [{'canonical': 'goes to the gym and lifts weights',
+                              'category': 'exercise_sport',
+                              'members': [a.pk, b.pk, c.pk]}],
+                'contradictions': [], 'drop': []}
+
+        await apply_cleanup_plan(user, plan)
+
+        rows = await sync_to_async(lambda: list(UserInterest.objects.filter(user=user)))()
+        assert len(rows) == 1
+        assert rows[0].topic == 'goes to the gym and lifts weights'
+        assert rows[0].category == 'exercise_sport'
+
+    @pytest.mark.asyncio
+    async def test_merged_count_is_the_max_not_the_sum(self, make_user):
+        """The counts are echo-inflated, so summing would compound the very
+        signal that made one cluster dominate."""
+        from engine.interests import apply_cleanup_plan
+        from learner.models import UserInterest
+
+        user, a, b, c = await self._rows(make_user, 'cln_count')
+        plan = {'clusters': [{'canonical': 'gym', 'category': 'exercise_sport',
+                              'members': [a.pk, b.pk, c.pk]}],
+                'contradictions': [], 'drop': []}
+
+        await apply_cleanup_plan(user, plan)
+
+        row = await sync_to_async(lambda: UserInterest.objects.get(user=user))()
+        assert row.mention_count == 7
+
+    @pytest.mark.asyncio
+    async def test_contradictions_are_removed_entirely(self, make_user):
+        """A wrong fact is worse than a missing one -- it generates sentences
+        about a son who does not exist. Elicitation can re-learn the truth."""
+        from engine.interests import apply_cleanup_plan
+        from learner.models import UserInterest
+
+        user, a, b, c = await self._rows(make_user, 'cln_contra')
+        plan = {'clusters': [], 'drop': [],
+                'contradictions': [{'reason': 'friend vs son', 'members': [a.pk, b.pk]}]}
+
+        await apply_cleanup_plan(user, plan)
+
+        remaining = await sync_to_async(
+            lambda: sorted(UserInterest.objects.filter(user=user).values_list('pk', flat=True)))()
+        assert remaining == [c.pk]
+
+    @pytest.mark.asyncio
+    async def test_dry_run_changes_nothing(self, make_user):
+        from engine.interests import apply_cleanup_plan
+        from learner.models import UserInterest
+
+        user, a, b, c = await self._rows(make_user, 'cln_dry')
+        plan = {'clusters': [{'canonical': 'gym', 'category': 'exercise_sport',
+                              'members': [a.pk, b.pk, c.pk]}],
+                'contradictions': [], 'drop': []}
+
+        summary = await apply_cleanup_plan(user, plan, dry_run=True)
+
+        count = await sync_to_async(lambda: UserInterest.objects.filter(user=user).count())()
+        assert count == 3
+        assert summary['merged'] == 3
+
+
+@pytest.mark.django_db(transaction=True)
+class TestContradictionKeepsWhatIsStillTrue:
+    """Deleting every row in a contradiction loses too much: "friend named
+    Chris" vs "son named Chris" disagree about the relationship, but that a
+    Chris exists is not in dispute."""
+
+    async def _pair(self, make_user, uid):
+        from learner.models import UserInterest
+        user = await sync_to_async(make_user)(discord_id=uid, cefr_level='B1')
+        a = await sync_to_async(UserInterest.objects.create)(
+            user=user, topic='Friend named Chris', category='friends', confidence=1.0)
+        b = await sync_to_async(UserInterest.objects.create)(
+            user=user, topic='Son named Chris', category='family', confidence=1.0)
+        return user, a, b
+
+    @pytest.mark.asyncio
+    async def test_collapses_to_the_safe_fact_when_given_one(self, make_user):
+        from engine.interests import apply_cleanup_plan
+        from learner.models import UserInterest
+
+        user, a, b = await self._pair(make_user, 'contra_safe')
+        plan = {'clusters': [], 'drop': [], 'contradictions': [
+            {'reason': 'friend vs son', 'members': [a.pk, b.pk],
+             'safe': 'knows someone named Chris', 'category': 'friends'}]}
+
+        await apply_cleanup_plan(user, plan)
+
+        rows = await sync_to_async(lambda: list(UserInterest.objects.filter(user=user)))()
+        assert len(rows) == 1
+        assert rows[0].topic == 'knows someone named Chris'
+
+    @pytest.mark.asyncio
+    async def test_deletes_everything_when_nothing_is_salvageable(self, make_user):
+        from engine.interests import apply_cleanup_plan
+        from learner.models import UserInterest
+
+        user, a, b = await self._pair(make_user, 'contra_nosafe')
+        plan = {'clusters': [], 'drop': [],
+                'contradictions': [{'reason': 'irreconcilable', 'members': [a.pk, b.pk]}]}
+
+        await apply_cleanup_plan(user, plan)
+
+        count = await sync_to_async(lambda: UserInterest.objects.filter(user=user).count())()
+        assert count == 0
+
+    def test_plan_parsing_keeps_the_safe_field(self):
+        from engine.interests import _parse_cleanup_plan
+        raw = ('{"contradictions":[{"reason":"r","members":[1,2],'
+               '"safe":"knows someone named Chris","category":"friends"}]}')
+        plan = _parse_cleanup_plan(raw, valid_ids={1, 2})
+        assert plan['contradictions'][0]['safe'] == 'knows someone named Chris'
+
+    def test_a_safe_fact_with_a_bad_category_is_discarded(self):
+        from engine.interests import _parse_cleanup_plan
+        raw = ('{"contradictions":[{"reason":"r","members":[1,2],'
+               '"safe":"x","category":"relationships"}]}')
+        plan = _parse_cleanup_plan(raw, valid_ids={1, 2})
+        assert not plan['contradictions'][0].get('safe')
+
+
+class TestCleanupParseFailuresAreLoud:
+    """An undecodable plan used to return {} — indistinguishable from "nothing
+    to clean", so a failed run looked like a successful no-op."""
+
+    def test_malformed_json_raises_rather_than_returning_empty(self):
+        from engine.interests import CleanupParseError, _parse_cleanup_plan
+        with pytest.raises(CleanupParseError):
+            _parse_cleanup_plan('{"clusters": [ {"canonical": }} nope', valid_ids={1})
+
+    def test_no_json_at_all_is_still_an_empty_plan(self):
+        """Distinct case: the model declined, rather than answering badly."""
+        from engine.interests import _parse_cleanup_plan
+        assert _parse_cleanup_plan('nothing to do here', valid_ids={1}) == {
+            'clusters': [], 'contradictions': [], 'drop': []}
+
+    def test_code_fences_are_tolerated(self):
+        from engine.interests import _parse_cleanup_plan
+        raw = '```json\n{"clusters":[],"contradictions":[],"drop":[1]}\n```'
+        assert _parse_cleanup_plan(raw, valid_ids={1})['drop'] == [1]
