@@ -248,3 +248,48 @@ class TestNoOrphanedGrammarTags:
     def test_matching_ids_are_not_reported(self):
         from engine.elicitation import orphaned_grammar_tags
         assert 'preterite' not in orphaned_grammar_tags(['b1_preterite_vs_imperfect'])
+
+
+class TestTagsMatchWholeTokens:
+    """Substring matching has no notion of intent: "perfect" matches
+    b1_imperfect_ar, so a compound-tense question would attach to the imperfect
+    lesson and look exactly like a correct match. orphaned_grammar_tags() cannot
+    see that — a wrong match is indistinguishable from a right one — so the
+    matcher itself has to stop producing them."""
+
+    def test_perfect_does_not_match_imperfect(self):
+        from engine.elicitation import tag_matches_skill
+        assert tag_matches_skill('perfect', 'b1_imperfect_ar') is False
+
+    def test_imperfect_matches_imperfect(self):
+        from engine.elicitation import tag_matches_skill
+        assert tag_matches_skill('imperfect', 'b1_imperfect_ar') is True
+
+    def test_multi_word_tags_match_contiguously(self):
+        from engine.elicitation import tag_matches_skill
+        assert tag_matches_skill('compound_tenses', 'c1_compound_tenses_past') is True
+        assert tag_matches_skill('tenses', 'c1_compound_tenses_past') is True
+
+    def test_a_tag_absent_from_the_id_does_not_match(self):
+        from engine.elicitation import tag_matches_skill
+        assert tag_matches_skill('present', 'b1_preterite_vs_imperfect') is False
+
+    def test_partial_word_fragments_never_match(self):
+        from engine.elicitation import tag_matches_skill
+        assert tag_matches_skill('present', 'a1_presentation_skills') is False
+        assert tag_matches_skill('ar', 'b1_imperfect_ar') is True
+
+    def test_real_skills_still_resolve(self):
+        from engine.elicitation import grammar_tags_for_skill
+        assert 'preterite' in grammar_tags_for_skill('b1_preterite_vs_imperfect')
+        assert 'subjunctive' in grammar_tags_for_skill('b1_subjunctive_formation')
+        assert 'future_periphrastic' in grammar_tags_for_skill('a2_future_periphrastic')
+
+    def test_no_tag_is_orphaned_under_the_stricter_matcher(self):
+        """The stricter rule must not silently detach questions that were
+        matching legitimately."""
+        import pathlib, yaml
+        from engine.elicitation import orphaned_grammar_tags
+        ids = [s['id'] for s in yaml.safe_load(
+            pathlib.Path('curriculum/skills.yaml').read_text())['skills']]
+        assert orphaned_grammar_tags(ids) == []

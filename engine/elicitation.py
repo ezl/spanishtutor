@@ -73,15 +73,37 @@ def select_question(held_counts: dict, grammar_tags=None, exclude_ids=(),
     return min(pool, key=lambda q: (rank.get(q['category'], len(rank)), q['id']))
 
 
+def tag_matches_skill(tag: str, skill_id: str) -> bool:
+    """Whether a grammar tag describes this skill, matching WHOLE id segments.
+
+    Skill ids are underscore-delimited, so the segments are the meaningful
+    units. Raw substring matching had no notion of that and therefore none of
+    intent: "perfect" matches b1_imperfect_ar, which would attach compound-tense
+    questions to the imperfect lesson and look exactly like a correct match.
+    orphaned_grammar_tags() cannot catch that -- a wrong match is
+    indistinguishable from a right one -- so the matcher has to not produce it.
+
+    A multi-segment tag must appear contiguously: compound_tenses matches
+    c1_compound_tenses_past, but not a skill that merely mentions both words
+    apart.
+    """
+    parts = [p for p in (skill_id or '').lower().split('_') if p]
+    needle = [p for p in (tag or '').lower().split('_') if p]
+    if not needle or len(needle) > len(parts):
+        return False
+    return any(parts[i:i + len(needle)] == needle
+               for i in range(len(parts) - len(needle) + 1))
+
+
 def grammar_tags_for_skill(skill_id: str) -> list:
     """Grammar tags from the bank that this skill's id mentions.
 
     Lets a preterite lesson ask what you did last weekend and a subjunctive
     lesson ask what you hope for, so the elicitation turn is also practice.
     """
-    sid = (skill_id or '').lower()
     tags = {tag for q in load_bank()['questions'] for tag in q['grammar']}
-    return sorted((t for t in tags if t in sid), key=len, reverse=True)
+    return sorted((t for t in tags if tag_matches_skill(t, skill_id)),
+                  key=len, reverse=True)
 
 
 async def held_category_counts(user) -> dict:
@@ -177,6 +199,6 @@ def orphaned_grammar_tags(skill_ids) -> list:
     rename can quietly detach a question from the lesson it was written for and
     nothing anywhere says so. This makes that visible.
     """
-    ids = [(sid or '').lower() for sid in skill_ids]
     tags = {tag for q in load_bank()['questions'] for tag in q['grammar']}
-    return sorted(tag for tag in tags if not any(tag in sid for sid in ids))
+    return sorted(tag for tag in tags
+                  if not any(tag_matches_skill(tag, sid) for sid in skill_ids))
