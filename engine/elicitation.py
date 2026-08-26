@@ -31,18 +31,25 @@ def load_bank() -> dict:
     return yaml.safe_load(BANK_PATH.read_text())
 
 
-def category_gaps(held_counts: dict) -> list:
+def category_gaps(held_counts: dict, ask_counts: dict = None) -> list:
     """Controlled-vocabulary categories, thinnest first.
 
     `held_counts` maps category -> how many facts we hold. Categories absent
     from it count as zero, which is the point: a category we have never once
     recorded is the most valuable thing to ask about.
+
+    `ask_counts` breaks the tie between those zeroes. Facts alone cannot tell
+    "never asked" from "asked, and this student has no pets", so a category that
+    does not apply would sit at zero and be chosen forever. Asking is the cost;
+    a category already paid for drops behind one that has not been tried.
     """
     categories = load_bank()['categories']
-    return sorted(categories, key=lambda c: (held_counts.get(c, 0), c))
+    asked = ask_counts or {}
+    return sorted(categories, key=lambda c: (held_counts.get(c, 0), asked.get(c, 0), c))
 
 
-def select_question(held_counts: dict, grammar_tags=None, exclude_ids=()) -> dict | None:
+def select_question(held_counts: dict, grammar_tags=None, exclude_ids=(),
+                    ask_counts: dict = None) -> dict | None:
     """Pick the question to ask, or None when the bank is exhausted.
 
     Grammar match first so the question doubles as practice for the skill being
@@ -56,7 +63,7 @@ def select_question(held_counts: dict, grammar_tags=None, exclude_ids=()) -> dic
     if not available:
         return None
 
-    gaps = category_gaps(held_counts)
+    gaps = category_gaps(held_counts, ask_counts)
     rank = {category: i for i, category in enumerate(gaps)}
 
     tags = set(grammar_tags or ())
@@ -91,12 +98,46 @@ async def held_category_counts(user) -> dict:
     return await sync_to_async(_counts)()
 
 
+async def asked_state(user) -> tuple:
+    """(question ids already asked, how many asks per category)."""
+    from asgiref.sync import sync_to_async
+    from learner.models import ElicitationAsk
+
+    def _state():
+        ids, per_category = set(), {}
+        for qid, category in ElicitationAsk.objects.filter(user=user).values_list(
+                'question_id', 'category'):
+            ids.add(qid)
+            per_category[category] = per_category.get(category, 0) + 1
+        return ids, per_category
+
+    return await sync_to_async(_state)()
+
+
+async def record_ask(user, question: dict) -> None:
+    """Remember that this question went out, so it is not asked again.
+
+    Recorded when the question reaches the prompt rather than when the student
+    answers: we cannot see whether Luz asked it, and repeating a question is a
+    worse failure than skipping one.
+    """
+    from asgiref.sync import sync_to_async
+    from learner.models import ElicitationAsk
+
+    await sync_to_async(ElicitationAsk.objects.get_or_create)(
+        user=user, question_id=question['id'],
+        defaults={'category': question['category']},
+    )
+
+
 async def pick_for_session(user, skill_id: str = None, exclude_ids=()) -> dict | None:
-    """The question to ask this session, or None."""
+    """The question to ask this session, or None once the bank is exhausted."""
     counts = await held_category_counts(user)
+    asked_ids, ask_counts = await asked_state(user)
     return select_question(counts,
                            grammar_tags=grammar_tags_for_skill(skill_id),
-                           exclude_ids=exclude_ids)
+                           exclude_ids=set(exclude_ids) | asked_ids,
+                           ask_counts=ask_counts)
 
 
 def build_elicitation_block(question: dict | None, cefr_level: str = 'B1') -> str:

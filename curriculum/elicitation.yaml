@@ -45,6 +45,9 @@ categories:
   - past_childhood
   - goals_dreams
   - health
+  - people_in_life
+  - preferences
+  - problems
 
 questions:
   # ── present / daily routine ────────────────────────────────────────────────
@@ -289,3 +292,52 @@ questions:
     opener_en: "Do you usually sleep well? Are you more of a morning or night person?"
     follow_up_es: "¿Y qué haces para descansar de verdad?"
     follow_up_en: "What do you do to actually rest?"
+
+  - id: people_who_recurs
+    category: people_in_life
+    grammar: [present, gustar]
+    opener_es: "¿Con quién hablas casi todos los días?"
+    opener_en: "Who do you talk to almost every day?"
+    follow_up_es: "¿Cómo se llama y de qué hablan normalmente?"
+    follow_up_en: "What is their name, and what do you usually talk about?"
+
+  - id: people_who_you_saw
+    category: people_in_life
+    grammar: [preterite, preterite_vs_imperfect]
+    opener_es: "¿A quién viste la última vez que saliste?"
+    opener_en: "Who did you see the last time you went out?"
+    follow_up_es: "¿Cómo se llama, y qué hicieron juntos?"
+    follow_up_en: "What is their name, and what did you two do?"
+
+  - id: prefer_two_things
+    category: preferences
+    grammar: [comparatives, gustar]
+    opener_es: "¿Prefieres las mañanas o las noches?"
+    opener_en: "Are you more of a morning person or a night person?"
+    follow_up_es: "¿Por qué? ¿Qué haces normalmente a esa hora?"
+    follow_up_en: "Why, and what do you usually do then?"
+
+  - id: prefer_cannot_stand
+    category: preferences
+    grammar: [gustar, subjunctive_triggers]
+    opener_es: "¿Hay algo que todo el mundo disfruta y a ti no te gusta nada?"
+    opener_en: "Is there something everyone else enjoys that you cannot stand?"
+    follow_up_es: "¿Qué es exactamente lo que no te gusta de eso?"
+    follow_up_en: "What exactly is it about it that you dislike?"
+
+  - id: problems_this_week
+    category: problems
+    grammar: [preterite, imperfect]
+    opener_es: "¿Qué fue lo más molesto de esta semana?"
+    opener_en: "What was the most annoying thing about this week?"
+    follow_up_es: "¿Qué pasó exactamente?"
+    follow_up_en: "What exactly happened?"
+
+  - id: problems_wish_changed
+    category: problems
+    grammar: [subjunctive, conditional]
+    opener_es: "Si pudieras cambiar una cosa de tu rutina, ¿qué sería?"
+    opener_en: "If you could change one thing about your routine, what would it be?"
+    follow_up_es: "¿Qué te lo impide ahora mismo?"
+    follow_up_en: "What is stopping you right now?"
+

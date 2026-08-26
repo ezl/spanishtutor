@@ -125,10 +125,7 @@ class Session(models.Model):
         ('reading', 'Reading'),
         ('writing', 'Writing'),
         # legacy
-        ('evaluation', 'Evaluation'),
         ('review', 'Review'),
-        ('push_forward', 'Push Forward'),
-        ('user_directed', 'User Directed'),
     ]
 
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='sessions')
@@ -161,6 +158,31 @@ class SessionSkill(models.Model):
 
     def __str__(self):
         return f"{self.session} | {self.skill.skill_id}"
+
+
+class ElicitationAsk(models.Model):
+    """One question, asked once, to one student.
+
+    Without this the picker had no memory: pick_for_session took an exclude_ids
+    argument that nothing ever populated, and select_question breaks ties by
+    question id, so the lowest-id question in the thinnest category was chosen
+    every single session until a fact happened to land in that category.
+
+    It also separates "never asked" from "asked, nothing came back", which raw
+    fact counts cannot. Someone with no pets would otherwise be asked about pets
+    forever, since the category stays permanently at zero.
+    """
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='elicitation_asks')
+    question_id = models.CharField(max_length=64)
+    category = models.CharField(max_length=32)
+    asked_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('user', 'question_id')
+        app_label = 'learner'
+
+    def __str__(self):
+        return f"{self.user} asked {self.question_id}"
 
 
 class UserInterest(models.Model):

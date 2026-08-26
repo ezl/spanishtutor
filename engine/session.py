@@ -81,8 +81,10 @@ async def _elicitation_block(user, skill_id: str = None) -> str:
     Failing to pick a question must never block a lesson, hence the broad except.
     """
     try:
-        from .elicitation import build_elicitation_block, pick_for_session
+        from .elicitation import build_elicitation_block, pick_for_session, record_ask
         question = await pick_for_session(user, skill_id=skill_id)
+        if question:
+            await record_ask(user, question)
         return build_elicitation_block(question, user.estimated_cefr_level or 'A1')
     except Exception:
         import logging

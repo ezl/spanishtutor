@@ -324,7 +324,6 @@ async def _explain_incorrect(items: list) -> dict:
 async def _conclude_quiz(user, session, quiz_state: dict, skills: list, uid: str) -> dict:
     from learner.models import EvaluationProgress, Session, SessionEvent, QuizQuestion
     from .quiz_flow import quiz_derive_results
-    from .interests import seed_interests
 
     results = quiz_derive_results(quiz_state, skills)
     cefr = results['cefr_level']
@@ -423,7 +422,6 @@ async def _conclude_quiz(user, session, quiz_state: dict, skills: list, uid: str
         estimated_cefr_level=cefr,
         onboarding_complete=True,
     )
-    await seed_interests(user)
     await sync_to_async(EvaluationProgress.objects.get_or_create)(user=user, phase='session1')
     await sync_to_async(
         lambda: Session.objects.filter(pk=session.pk).update(ended_at=timezone.now())

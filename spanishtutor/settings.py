@@ -104,6 +104,15 @@ else:
         }
     }
 
+# Test database name, so two agents working in this repo at once do not share
+# one. Django derives "test_<NAME>" by default, so concurrent pytest runs both
+# create, drop and connect to the same database and destroy each other's results
+# -- the symptom is a run finishing in seconds with every django_db test erroring
+# on "database is being accessed by other users".
+_test_db = os.environ.get('TEST_DB_NAME')
+if _test_db:
+    DATABASES['default'].setdefault('TEST', {})['NAME'] = _test_db
+
 LANGUAGE_CODE = 'en-us'
 TIME_ZONE = 'UTC'
 USE_I18N = True

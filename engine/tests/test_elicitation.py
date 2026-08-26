@@ -65,7 +65,14 @@ class TestSelectQuestion:
     def test_among_grammar_matches_prefers_the_thinnest_category(self):
         from engine.elicitation import select_question
         # Both are preterite questions; travel is empty, friends is well covered.
-        held = {'friends': 9, 'travel': 0, 'daily_routine': 9, 'celebrations': 9}
+        # Every other category carrying a preterite question is filled, so travel
+        # is uniquely the thinnest -- otherwise this passes or fails on the
+        # alphabetical tiebreak rather than on the ranking being tested.
+        held = {'friends': 9, 'travel': 0, 'daily_routine': 9, 'celebrations': 9,
+                'problems': 9, 'people_in_life': 9, 'past_childhood': 9,
+                'food': 9, 'health': 9, 'home_place': 9, 'work_study': 9,
+                'exercise_sport': 9, 'hobbies': 9, 'music_media': 9, 'pets': 9,
+                'family': 9, 'goals_dreams': 9, 'preferences': 9}
         q = select_question(held, grammar_tags=['preterite'])
         assert q['category'] == 'travel'
 
@@ -165,3 +172,52 @@ class TestElicitationBlock:
         q = load_bank()['questions'][0]
         block = build_elicitation_block(q, cefr_level='B1')
         assert q['follow_up_es'] in block or q['follow_up_en'] in block
+
+
+class TestTheSameQuestionIsNotAskedTwice:
+    """pick_for_session took an exclude_ids argument that nothing populated, and
+    select_question breaks ties on question id, so the lowest-id question in the
+    thinnest category went out every session until a fact happened to land in
+    that category."""
+
+    @pytest.mark.asyncio
+    @pytest.mark.django_db(transaction=True)
+    async def test_consecutive_picks_are_all_different(self, make_user):
+        from asgiref.sync import sync_to_async
+        from engine.elicitation import pick_for_session, record_ask
+
+        user = await sync_to_async(make_user)()
+        seen = []
+        for _ in range(6):
+            q = await pick_for_session(user)
+            assert q is not None
+            await record_ask(user, q)
+            seen.append(q['id'])
+
+        assert len(set(seen)) == len(seen), f'repeated a question: {seen}'
+
+    @pytest.mark.asyncio
+    @pytest.mark.django_db(transaction=True)
+    async def test_a_category_that_yields_nothing_stops_being_chosen(self, make_user):
+        """Facts alone cannot tell "never asked" from "asked, and they have no
+        pets". Without the ask count that category sits at zero and wins forever."""
+        from asgiref.sync import sync_to_async
+        from engine.elicitation import pick_for_session, record_ask
+
+        user = await sync_to_async(make_user)()
+        first = await pick_for_session(user)
+        await record_ask(user, first)
+
+        # Nothing was learned, so held counts are unchanged.
+        second = await pick_for_session(user)
+
+        assert second['category'] != first['category']
+
+    def test_ask_counts_break_the_tie_between_empty_categories(self):
+        from engine.elicitation import category_gaps
+
+        # No facts anywhere, so every category ties on the first key. pets is the
+        # only one that has cost an ask, so it goes last: a category already
+        # tried loses to every category that has not been.
+        gaps = category_gaps({}, ask_counts={'pets': 3})
+        assert gaps[-1] == 'pets'
