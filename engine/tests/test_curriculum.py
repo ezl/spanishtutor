@@ -98,3 +98,33 @@ class TestRequestPhrasingIsStripped:
                    name='Subjunctive — present formation',
                    description='Forming the present subjunctive')
         assert [m['id'] for m in find_matching_skills(phrase)] == ['b1_subjunctive_formation']
+
+
+class TestNumberCoverage:
+    """Splitting a1_numbers (1-1000) into five graded lessons silently dropped
+    the ceiling to 100 and lost arithmetic entirely. That matters for a tutor
+    teaching Medellín Spanish: Colombian prices are in thousands of pesos, so a
+    student could ask "¿cuánto cuesta?" and not understand "cuatro mil".
+    Deliberately loose — it pins coverage, not lesson names or ordering."""
+
+    def _mentions(self, word):
+        """Whole-word search. A substring check is worthless here: "mil" appears
+        inside "familia" and "similar", so `'mil' in blob` passes on a curriculum
+        that stops at 100 — the exact failure this test exists to catch."""
+        import pathlib, re, yaml
+        skills = yaml.safe_load(pathlib.Path('curriculum/skills.yaml').read_text())['skills']
+        blob = ' '.join(f"{s['id']} {s['name']} {s.get('description', '')}"
+                        for s in skills).lower()
+        return re.search(rf'\b{word}\b', blob) is not None
+
+    def test_numbers_reach_a_thousand(self):
+        assert self._mentions('mil'), "no skill covers numbers into the thousands"
+
+    def test_the_hundreds_are_covered(self):
+        assert self._mentions('cien') or self._mentions('doscientos')
+
+    def test_arithmetic_is_covered(self):
+        """Not "más" and "menos" on their own — those appear in the greeting
+        phrase "más o menos", so that check passes on a curriculum with no
+        arithmetic at all. Look for something only arithmetic says."""
+        assert self._mentions('dividido') or self._mentions('arithmetic')

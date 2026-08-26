@@ -108,6 +108,18 @@ skills:
     description: "veintiuno through veintinueve on the veinti- pattern; treinta, cuarenta, cincuenta, sesenta, setenta, ochenta, noventa, cien; then treinta y uno and the y pattern. One rule generates every number to 100."
     prerequisites: [a1_numbers_16_20]
 
+  - id: a1_numbers_100_1000
+    name: Numbers 100-1000
+    cefr_level: A1
+    description: "cien for exactly 100, ciento from 101 up (ciento uno); doscientos through novecientos with gender agreement (doscientas casas); mil. Colombian prices live here — un tinto cuesta cuatro mil."
+    prerequisites: [a1_numbers_21_100]
+
+  - id: a1_numbers_arithmetic
+    name: Talking about amounts
+    cefr_level: A1
+    description: "más, menos, por, dividido entre, son/es; ¿cuánto es?, ¿cuánto cuesta?, ¿cuántos hay?. Turns the number words into something you can transact with — asking a price and understanding the answer."
+    prerequisites: [a1_numbers_100_1000]
+
   - id: a1_dates_time
     name: Dates and telling time
     cefr_level: A1
