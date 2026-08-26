@@ -1,0 +1,135 @@
+# Vocabulary catalogue. See docs/vocabulary.md for why this exists and how the
+# content was chosen.
+#
+# Packs are thematic (a situation), never taxonomic (a category) -- semantic
+# clusters of mutually substitutable words cause cross-association and measurably
+# slow learning. Do not add a pack of "all the adjectives" or "all the colors of
+# the rainbow"; group by scenario instead.
+#
+# `skill:` is optional. A pack with one IS a lesson -- that only happens at A1,
+# where beginners need a starting stock. Above A1 packs are pure word sources
+# and vocabulary rides along inside grammar lessons.
+#
+# A word may appear in several packs. It is still one row, one review schedule.
+# `analyzable: false` means the item is a fixed chunk: never break it into parts
+# in a lesson, no matter how far downstream.
+
+# Tunables. These numbers will be wrong until real users hit them, which is
+# exactly why they live here rather than in code.
+settings:
+  new_words_per_lesson: 2          # in a grammar lesson, words ride along
+  recycled_words_per_lesson: 5
+  new_words_per_vocab_lesson: 8    # A1 vocabulary lessons: this IS the lesson
+  graduation_productions: 3        # correct productions, in separate sessions
+
+packs:
+  - id: intro_yourself
+    name: Introducing yourself
+    cefr_level: A1
+    skill: a1_introduce_yourself
+    words:
+      - {es: hola, en: hello, pos: interjection}
+      - {es: adiós, en: goodbye, pos: interjection}
+      - {es: me llamo, en: "my name is", pos: chunk, analyzable: false,
+         note: "Fixed chunk. Never present as a reflexive verb -- that is Stage 3 grammar to a Stage 1 learner."}
+      - {es: "¿cómo te llamas?", en: "what is your name?", pos: chunk, analyzable: false}
+      - {es: mucho gusto, en: "nice to meet you", pos: chunk, analyzable: false}
+      - {es: hasta luego, en: "see you later", pos: chunk, analyzable: false}
+
+  - id: how_are_you
+    name: Asking how someone is
+    cefr_level: A1
+    skill: a1_how_are_you
+    words:
+      - {es: "¿cómo estás?", en: "how are you?", pos: chunk, analyzable: false,
+         note: "Fixed chunk. estar is not taught until much later."}
+      - {es: bien, en: "well, fine", pos: adverb}
+      - {es: mal, en: "badly, bad", pos: adverb}
+      - {es: más o menos, en: "so-so, more or less", pos: chunk, analyzable: false}
+      - {es: "¿y tú?", en: "and you?", pos: chunk, analyzable: false}
+      - {es: gracias, en: "thank you", pos: interjection}
+      - {es: por favor, en: please, pos: chunk, analyzable: false}
+
+  - id: classroom_operators
+    name: Keeping the conversation going
+    cefr_level: A1
+    skill: a1_keep_talking
+    words:
+      - {es: no entiendo, en: "I do not understand", pos: chunk, analyzable: false}
+      - {es: "¿cómo se dice?", en: "how do you say?", pos: chunk, analyzable: false}
+      - {es: otra vez, en: again, pos: chunk, analyzable: false}
+      - {es: más despacio, en: slower, pos: chunk, analyzable: false}
+      - {es: no sé, en: "I do not know", pos: chunk, analyzable: false}
+      - {es: "¿qué significa?", en: "what does it mean?", pos: chunk, analyzable: false}
+
+  - id: chunks_want_have
+    name: Saying what you want and have
+    cefr_level: A1
+    skill: a1_chunks_want_have
+    words:
+      - {es: quiero, en: "I want", pos: chunk, analyzable: false,
+         note: "A fixed sentence opener the student attaches a noun to, not a conjugation."}
+      - {es: tengo, en: "I have", pos: chunk, analyzable: false}
+      - {es: me gusta, en: "I like", pos: chunk, analyzable: false}
+      - {es: no me gusta, en: "I do not like", pos: chunk, analyzable: false}
+
+  - id: chunks_go_need
+    name: Saying where you go and what you need
+    cefr_level: A1
+    skill: a1_chunks_go_need
+    words:
+      - {es: voy a, en: "I go to, I am going to", pos: chunk, analyzable: false,
+         note: "From ir, the most irregular verb in Spanish. Taught as a chunk precisely so the student gets the useful form without meeting the paradigm. Never conjugate ir here."}
+      - {es: necesito, en: "I need", pos: chunk, analyzable: false}
+      - {es: puedo, en: "I can", pos: chunk, analyzable: false}
+      - {es: hay, en: "there is, there are", pos: chunk, analyzable: false}
+
+  - id: people_words
+    name: Words for people
+    cefr_level: A1
+    skill: a1_people_words
+    words:
+      - {es: yo, en: I, pos: pronoun}
+      - {es: tú, en: you, pos: pronoun}
+      - {es: él, en: he, pos: pronoun}
+      - {es: ella, en: she, pos: pronoun}
+      - {es: nosotros, en: we, pos: pronoun}
+      - {es: ellos, en: "they (masculine or mixed)", pos: pronoun}
+      - {es: ellas, en: "they (feminine)", pos: pronoun}
+
+  - id: action_words
+    name: Words for actions
+    cefr_level: A1
+    skill: a1_action_words
+    words:
+      - {es: hablar, en: "to speak", pos: verb, note: "Teach together with its yo form: hablo."}
+      - {es: comer, en: "to eat", pos: verb, note: "Teach together with its yo form: como."}
+      - {es: correr, en: "to run", pos: verb, note: "Teach together with its yo form: corro."}
+      - {es: trabajar, en: "to work", pos: verb, note: "Teach together with its yo form: trabajo."}
+      - {es: vivir, en: "to live", pos: verb, note: "Teach together with its yo form: vivo."}
+
+  - id: places_everyday
+    name: Everyday places
+    cefr_level: A1
+    skill: a1_place_words
+    words:
+      - {es: casa, en: "house, home", pos: noun, gender: f}
+      - {es: escuela, en: school, pos: noun, gender: f}
+      - {es: gimnasio, en: gym, pos: noun, gender: m}
+      - {es: tienda, en: "store, shop", pos: noun, gender: f}
+      - {es: restaurante, en: restaurant, pos: noun, gender: m}
+      - {es: parque, en: park, pos: noun, gender: m}
+      - {es: ciudad, en: city, pos: noun, gender: f}
+
+  # Examples for the pattern lesson. ciudad also lives in places_everyday -- one
+  # row, two tags, which is what packs-as-tags buys.
+  - id: words_you_already_know
+    name: Spanish you already know
+    cefr_level: A1
+    skill: a1_words_you_know
+    words:
+      - {es: ciudad, en: city, pos: noun, gender: f, note: "-ty becomes -dad."}
+      - {es: información, en: information, pos: noun, gender: f, note: "-tion becomes -ción."}
+      - {es: famoso, en: famous, pos: adjective, note: "-ous becomes -oso."}
+      - {es: rápidamente, en: rapidly, pos: adverb, note: "-ly becomes -mente."}
+      - {es: momento, en: moment, pos: noun, gender: m, note: "-ment becomes -mento."}

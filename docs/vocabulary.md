@@ -288,9 +288,84 @@ produces an incomprehensible wall for someone at absolute zero. That is a
 persona and prompt problem, not a curriculum one, but the beginner path does not
 work until it is solved.
 
-## Open questions
+## Budget, backlog, and scale
 
-- New-words-per-lesson budget. Two is safe and slow; five is fast and leaky.
-- Whether a word ever "graduates" out of scheduling, or decays indefinitely.
-- Whether interest packs are generated once at onboarding or regenerated as
-  interests accumulate.
+**How many words per lesson.** In steady state, if a lesson introduces N new
+words and offers R recycling slots, and a word needs E encounters to stick, then
+R = N x E. With E around ten and six slots in a five-minute lesson, sustainable
+N is under one word per lesson -- absurdly slow.
+
+The equation is wrong because not every encounter needs scheduling. High
+frequency words recur constantly in ordinary Spanish without anyone arranging
+it; only mid-frequency words need deliberate recycling. The budget applies to
+the words that do not show up on their own.
+
+- A1 dedicated vocabulary lessons: **5-8 new words**. That is the lesson's job.
+- Every other lesson: **1-2 new, 4-6 recycled**. Words ride along rather than
+  competing with the grammar point.
+- Recycling skews toward low-frequency words; the frequent ones are
+  self-sustaining.
+
+Fixed for now. Adaptation against `times_seen` / `times_produced` waits for real
+users -- tuning a feedback loop with no data is guessing with extra steps.
+
+**No review debt.** When more words are due than there are slots, take the most
+overdue that fit and reschedule the rest forward. Never accumulate. This is
+where per-word systems usually fail: Anki-style review debt turns a missed week
+into an unrecoverable backlog and people quit. A student who takes two weeks off
+comes back to a normal lesson, not a punishment.
+
+**Graduation is what makes this scale.** At B2 a student knows several thousand
+words; at six slots a lesson, each would return roughly every seven hundred
+lessons. The schedule has not broken, it has become meaningless -- a large
+vocabulary cannot be maintained six words at a time.
+
+It does not need to be. What maintains vocabulary at that stage is volume of
+input: a B2 student reads and converses in Spanish and words maintain themselves
+through ordinary encounter. Deliberate study dominates early, extensive input
+takes over later. The scheduler is an A1-B1 mechanism and is designed to retire.
+
+So: **bound the active set, not the corpus.** A word graduates out of scheduling
+once it has been produced correctly several times across separate sessions. It
+keeps its row and its history and stops consuming slots. Known vocabulary grows
+without limit; words in scheduling stay roughly constant. The arithmetic never
+degrades at any level, and selection stays an indexed lookup on
+`(user, next_due_at)`.
+
+**Demotion closes the loop.** A graduated word used incorrectly, or asked about,
+drops back into scheduling. That is evidence of real forgetting rather than a
+guess about it, and it means the queue self-selects at higher levels: what gets
+recycled shifts from "words you were taught" to "words you demonstrably do not
+have yet."
+
+Graduation thresholds belong in `curriculum/config.yaml`, not in code. They will
+be wrong until real users hit them.
+
+## Interest packs regenerate
+
+Packs are regenerated as interests accumulate, not generated once at onboarding.
+Onboarding is the placement quiz and collects no interests at all -- they arrive
+through elicitation questions during sessions and extraction at session close --
+so a one-shot generation would fire against an empty interest set and never
+improve. The first few A1 lessons are stock by design; personal vocabulary
+arrives once there is something personal to build it from.
+
+## Recording exposure needs no model call
+
+The obvious design is a fourth extraction pass at session close, alongside
+scoring, interests and the feedback sweep. It is not needed. The lesson *injected*
+a known target list, so checking it against the transcript is string matching:
+words in Luz's turns were **seen**, words in the student's turns were
+**produced**.
+
+The limitation is Spanish inflection. `gimnasio` matches cleanly; `comer` against
+"yo como" does not. At A1 the content is nouns, fixed chunks, and infinitives
+taught beside their yo form, so both surface forms are known strings and naive
+matching works. Verbs at B1+ will need stem matching, or a piggyback on the
+structured output `score_session` already produces.
+
+Note that everything in `_close_session_record` is wrapped in
+`except Exception: pass`. That is deliberate -- a failing extractor must never
+block a session from closing -- but a word-recording bug would be silent, and
+unlike a missing score nobody would ever notice absent word rows. Log at error
+rather than swallowing.

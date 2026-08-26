@@ -120,12 +120,12 @@ class Session(models.Model):
         ('onboarding', 'Onboarding'),
         ('srs_review', 'SRS Review'),
         ('new_skill', 'New Skill'),
-        ('vocab_sprint', 'Vocabulary Sprint'),
         ('conversation', 'Conversation'),
+        # Planned, not yet built: reading and writing are two of the five CEFR
+        # modes in the skill grid, so a session type for each is a stub someone
+        # left on purpose, not an abandoned one.
         ('reading', 'Reading'),
         ('writing', 'Writing'),
-        # legacy
-        ('review', 'Review'),
     ]
 
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='sessions')
@@ -277,3 +277,92 @@ class SessionFeedback(models.Model):
 
     def __str__(self):
         return f"Feedback #{self.pk} ({self.created_at:%Y-%m-%d %H:%M})"
+
+
+class LexItem(models.Model):
+    """One vocabulary item: a single word, or a fixed multi-word chunk.
+
+    Chunks are first-class because A1 teaches "me llamo" and "voy a" as
+    unanalyzed wholes (Processability Theory Stage 1 -- see docs/vocabulary.md).
+    `analyzable=False` is what stops a lesson from breaking one apart eleven
+    lessons later, when the description that said not to is long out of scope.
+
+    Packs are tags, not rows: pack metadata lives in curriculum/lexicon.yaml, so
+    a word can sit in several packs without ever being duplicated. One row, one
+    UserWord, one review schedule -- which is the whole point of making words
+    first-class rather than prose inside a skill description.
+
+    `owner` is null for the shared core catalogue and set for words generated
+    from one person's interests. Interest vocabulary is therefore ordinary
+    vocabulary with an owner, not a parallel system.
+    """
+    GENDERS = [('m', 'Masculine'), ('f', 'Feminine')]
+
+    es = models.CharField(max_length=128)
+    en = models.CharField(max_length=256)
+    pos = models.CharField(max_length=32, blank=True)
+    gender = models.CharField(max_length=1, blank=True, choices=GENDERS)
+    analyzable = models.BooleanField(default=True)
+    note = models.TextField(blank=True)              # teaching hint passed to the model
+    packs = models.CharField(max_length=256, blank=True)   # comma-separated pack ids
+    cefr_level = models.CharField(max_length=4, blank=True)
+    owner = models.ForeignKey(
+        User, null=True, blank=True, on_delete=models.CASCADE, related_name='lex_items')
+    active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ['cefr_level', 'es']
+        app_label = 'learner'
+        constraints = [
+            # Postgres treats NULLs as distinct, so a plain unique_together on
+            # (es, owner) would not actually constrain the core catalogue, where
+            # owner is always NULL. Two partial constraints instead.
+            models.UniqueConstraint(
+                fields=['es'], condition=models.Q(owner__isnull=True),
+                name='unique_core_lexitem'),
+            models.UniqueConstraint(
+                fields=['es', 'owner'], condition=models.Q(owner__isnull=False),
+                name='unique_owned_lexitem'),
+        ]
+
+    def __str__(self):
+        return f"{self.es} ({self.en})"
+
+    @property
+    def pack_list(self):
+        return [p for p in (self.packs or '').split(',') if p]
+
+    @property
+    def display_es(self):
+        """casa -> la casa. Articles are rendered, never stored."""
+        if self.pos == 'noun' and self.gender:
+            return f"{'la' if self.gender == 'f' else 'el'} {self.es}"
+        return self.es
+
+
+class UserWord(models.Model):
+    """What one person has been taught, and when it is due again.
+
+    Scheduling is exposure-driven rather than test-driven: meeting a word in
+    context and understanding it counts as a rep, so a word does not need a quiz
+    question to stay alive. Producing one is worth substantially more than
+    seeing one, which is why the two counters are kept apart.
+    """
+    STATES = [('introduced', 'Introduced'), ('practiced', 'Practiced'), ('known', 'Known')]
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='words')
+    item = models.ForeignKey(LexItem, on_delete=models.CASCADE, related_name='user_words')
+    state = models.CharField(max_length=16, choices=STATES, default='introduced')
+    times_seen = models.IntegerField(default=0)
+    times_produced = models.IntegerField(default=0)
+    first_taught_at = models.DateTimeField(auto_now_add=True)
+    last_seen_at = models.DateTimeField(null=True, blank=True)
+    next_due_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        unique_together = ('user', 'item')
+        ordering = ['next_due_at']
+        app_label = 'learner'
+
+    def __str__(self):
+        return f"{self.user} | {self.item.es} ({self.state})"
