@@ -1908,6 +1908,18 @@ async def _close_session_record(session, user):
     except Exception:
         pass
 
+    # Vocabulary exposure. Logged rather than swallowed like its neighbours:
+    # a missing score is visible on the grid, but absent word rows look exactly
+    # like a student who happened to use no vocabulary, so a silent failure here
+    # would never be noticed by anyone.
+    try:
+        from .vocabulary import record_exposure
+        await record_exposure(session, user)
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).error(
+            'record_exposure failed for session %s: %s', session.pk, exc)
+
     # The feedback sweep runs here instead of on a cron: session close batches
     # naturally, scales with usage, needs no scheduler, and costs nothing when
     # nobody is using the bot. It sweeps the recent WINDOW rather than only this

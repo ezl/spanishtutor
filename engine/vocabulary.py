@@ -13,6 +13,7 @@ disappears for a fortnight comes back to an ordinary lesson.
 """
 import os
 import yaml
+from datetime import timedelta
 from asgiref.sync import sync_to_async
 from django.conf import settings as django_settings
 from django.db.models import Q
@@ -115,3 +116,90 @@ def render_block(due: list, new: list) -> str:
 async def block_for(user, skill_id=None) -> str:
     selected = await sync_to_async(_select)(user, skill_id)
     return render_block(selected['due'], selected['new'])
+
+
+# ── Recording exposure ────────────────────────────────────────────────────────
+
+import re
+import unicodedata
+
+REVIEW_INTERVALS_DAYS = [1, 3, 7, 16, 35, 90]
+
+
+def _normalize(text: str) -> str:
+    """Lowercase, strip diacritics, reduce punctuation to spaces.
+
+    Diacritics come off BOTH sides because beginners type "como estas" and mean
+    "¿cómo estás?". Refusing that match would under-record exactly the students
+    who most need the reinforcement.
+    """
+    text = unicodedata.normalize('NFD', (text or '').lower())
+    text = ''.join(c for c in text if unicodedata.category(c) != 'Mn')
+    return ' ' + re.sub(r'[^a-z0-9ñ]+', ' ', text).strip() + ' '
+
+
+def _appears(needle: str, haystack: str) -> bool:
+    """Whole-word (or whole-phrase) match. 'casa' must not match 'casado'."""
+    n = _normalize(needle).strip()
+    return bool(n) and f' {n} ' in haystack
+
+
+def _schedule(word) -> tuple:
+    """Interval ladder. Producing a word counts double -- saying it is stronger
+    evidence than seeing it. Returns (next_due_at, state)."""
+    conf = load_settings()
+    strength = word.times_produced * 2 + word.times_seen
+    days = REVIEW_INTERVALS_DAYS[min(strength, len(REVIEW_INTERVALS_DAYS) - 1)]
+
+    if word.times_produced >= conf['graduation_productions']:
+        # Graduated: stops consuming slots, keeps its row and its history. This
+        # is what bounds the active set while the corpus grows without limit.
+        return None, 'known'
+    return timezone.now() + timedelta(days=days), (
+        'practiced' if word.times_produced else 'introduced')
+
+
+def _record(session, user) -> dict:
+    """Write what this session's transcript shows about the user's vocabulary.
+
+    No model call: matching a known word list against a transcript is string
+    work. Only ONE increment per word per session, which is what makes
+    "produced correctly in N separate sessions" mean what it says.
+
+    Raises on failure rather than returning an empty result. "No words appeared"
+    and "the matcher blew up" must not look identical at the call site -- that
+    ambiguity has produced at least six bugs in this repo already.
+    """
+    from learner.models import LexItem, UserWord
+    from .interests import _split_sides
+
+    events = list(session.events.order_by('timestamp'))
+    tutor_text, student_text = _split_sides(events)
+    tutor, student = _normalize(tutor_text), _normalize(student_text)
+
+    candidates = LexItem.objects.filter(active=True).filter(
+        Q(owner__isnull=True) | Q(owner=user))
+
+    seen = produced = 0
+    for item in candidates:
+        in_student = _appears(item.es, student)
+        in_tutor = _appears(item.es, tutor)
+        if not (in_student or in_tutor):
+            continue
+
+        word, _ = UserWord.objects.get_or_create(user=user, item=item)
+        if in_student:
+            word.times_produced += 1
+            produced += 1
+        else:
+            word.times_seen += 1
+            seen += 1
+        word.last_seen_at = timezone.now()
+        word.next_due_at, word.state = _schedule(word)
+        word.save()
+
+    return {'seen': seen, 'produced': produced}
+
+
+async def record_exposure(session, user) -> dict:
+    return await sync_to_async(_record)(session, user)

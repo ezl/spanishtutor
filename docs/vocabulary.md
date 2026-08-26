@@ -341,6 +341,43 @@ have yet."
 Graduation thresholds belong in `curriculum/config.yaml`, not in code. They will
 be wrong until real users hit them.
 
+## How recording actually matches
+
+At session close the transcript is split into Luz's turns (`content`) and the
+student's (`user_response`), and every word in the user's active catalogue is
+matched against both. In the student's text is **produced**; only in Luz's is
+**seen**. When both, produced wins -- saying a word is stronger evidence than
+meeting it, and Luz having also said it must not downgrade that.
+
+**Accents are not required to match.** A beginner types "como estas" and means
+*cómo estás*. Diacritics come off both sides for comparison; the canonical form
+is what is stored. Refusing that match would under-record precisely the students
+who most need the reinforcement.
+
+**Word boundaries are enforced** so *casa* does not match *casado*, and
+multi-word chunks match as phrases so *me llamo* is found inside "Hola, me llamo
+Eric."
+
+**One increment per word per session**, however many times it appears. That is
+what makes "produced in N separate sessions" mean sessions rather than mentions,
+and it is what graduation counts.
+
+Intervals run 1, 3, 7, 16, 35, 90 days, indexed by `produced * 2 + seen`.
+
+**It raises rather than returning an empty result.** "No words appeared" and
+"the matcher blew up" must be distinguishable at the call site; that ambiguity
+is the most reliable source of silent bugs in this codebase. The `session.py`
+hook logs at error rather than joining its neighbours' `except: pass`, because
+absent word rows look exactly like a student who used no vocabulary, where a
+missing score at least shows up as a gap on the grid.
+
+### Known limit
+
+`_record` scans the user's whole active catalogue on every session close. Fine
+at fifty words; at several thousand it is a full scan plus a regex each.
+Graduation bounds the *scheduling* set but not this loop. A level filter is the
+obvious fix and should land before anyone reaches B2.
+
 ## Interest packs regenerate
 
 Packs are regenerated as interests accumulate, not generated once at onboarding.
