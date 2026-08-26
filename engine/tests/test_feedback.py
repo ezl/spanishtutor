@@ -108,16 +108,24 @@ class TestCaptureWorksInEverySessionType:
         assert "2 questions" in rows[0].user_message
 
     @pytest.mark.asyncio
-    async def test_the_lesson_still_proceeds(self, make_user, make_skill):
-        """Feedback is orthogonal — logging it must not swallow the turn."""
+    async def test_outside_teach_drill_the_turn_stops_at_the_acknowledgment(
+            self, make_user, make_skill):
+        """Superseded contract. This used to assert the lesson continued, on the
+        grounds that feedback is orthogonal. It is orthogonal in teach_drill,
+        where a classifier can separate feedback-with-an-answer from feedback
+        alone. Everywhere else the message is a note to the developer, and
+        letting it through meant Luz tried to converse about it (#23)."""
         from engine.session import handle_session
+        from engine.feedback import FEEDBACK_ACK
 
         user, session = await self._open(make_user, make_skill, 'fb_cont', 'srs_review')
         reply = {"text": "LESSON CONTINUES", "audio_url": None, "session_ended": False}
-        with patch('engine.session._continue_srs_review', new=AsyncMock(return_value=reply)):
+        with patch('engine.session._continue_srs_review',
+                   new=AsyncMock(return_value=reply)) as srs:
             result = await handle_session(user, "Feedback: too fast please slow down")
 
-        assert result["text"] == "LESSON CONTINUES"
+        srs.assert_not_called()
+        assert FEEDBACK_ACK in result["text"]
 
     @pytest.mark.asyncio
     async def test_an_ordinary_answer_is_not_logged(self, make_user, make_skill):
@@ -287,3 +295,114 @@ class TestSweepRunsOnSessionClose:
 
         reloaded = await sync_to_async(Session.objects.get)(pk=closing.pk)
         assert reloaded.ended_at is not None, "close must survive a sweep failure"
+
+
+@pytest.mark.django_db(transaction=True)
+class TestProvisionalUpgrade:
+    """Two layers see the same message and both wrote, producing duplicate rows
+    (#18/#19, #20/#21). Naive dedup keeps whichever landed first — which is the
+    deterministic layer's placeholder, discarding the classifier's real analysis."""
+
+    async def _session(self, make_user, make_skill, uid):
+        from learner.models import Session
+        user = await sync_to_async(make_user)(discord_id=uid, cefr_level='B1')
+        skill = await sync_to_async(make_skill)(skill_id=uid + '_sk')
+        return user, await sync_to_async(Session.objects.create)(
+            user=user, session_type='new_skill', target_skill=skill)
+
+    @pytest.mark.asyncio
+    async def test_a_real_interpretation_upgrades_a_provisional_row(self, make_user, make_skill):
+        from engine.feedback import record_feedback, PROVISIONAL_INTERPRETATION
+        from learner.models import SessionFeedback
+
+        user, session = await self._session(make_user, make_skill, 'prov_up')
+        await record_feedback(session, None, "feedback: weird turn",
+                              PROVISIONAL_INTERPRETATION, provisional=True)
+        await record_feedback(session, None, "feedback: weird turn",
+                              "The drill cue was revised mid-sentence.")
+
+        rows = await sync_to_async(lambda: list(SessionFeedback.objects.filter(session=session)))()
+        assert len(rows) == 1
+        assert rows[0].interpretation == "The drill cue was revised mid-sentence."
+
+    @pytest.mark.asyncio
+    async def test_a_provisional_write_never_downgrades_a_real_one(self, make_user, make_skill):
+        from engine.feedback import record_feedback, PROVISIONAL_INTERPRETATION
+        from learner.models import SessionFeedback
+
+        user, session = await self._session(make_user, make_skill, 'prov_down')
+        await record_feedback(session, None, "feedback: weird turn", "Real analysis.")
+        await record_feedback(session, None, "feedback: weird turn",
+                              PROVISIONAL_INTERPRETATION, provisional=True)
+
+        rows = await sync_to_async(lambda: list(SessionFeedback.objects.filter(session=session)))()
+        assert len(rows) == 1
+        assert rows[0].interpretation == "Real analysis."
+
+    @pytest.mark.asyncio
+    async def test_two_real_interpretations_still_produce_one_row(self, make_user, make_skill):
+        from engine.feedback import record_feedback
+        from learner.models import SessionFeedback
+
+        user, session = await self._session(make_user, make_skill, 'prov_two')
+        await record_feedback(session, None, "feedback: x", "First.")
+        await record_feedback(session, None, "feedback: x", "Second.")
+
+        rows = await sync_to_async(lambda: list(SessionFeedback.objects.filter(session=session)))()
+        assert len(rows) == 1
+        assert rows[0].interpretation == "First."
+
+    def test_teach_drill_no_longer_writes_directly(self):
+        """It bypassed record_feedback entirely, which is why dedup never applied."""
+        import pathlib
+        src = pathlib.Path('engine/teach_drill.py').read_text()
+        assert 'SessionFeedback.objects.create' not in src
+        assert 'record_feedback' in src
+
+
+@pytest.mark.django_db(transaction=True)
+class TestFeedbackShortCircuit:
+    """Outside teach_drill nothing acknowledged capture, so feedback vanished
+    silently — and the message then reached the engine as conversational input,
+    so Luz tried to converse about it (#23)."""
+
+    async def _open(self, make_user, make_skill, uid, session_type, phase):
+        from learner.models import Session, SessionEvent
+        user = await sync_to_async(make_user)(discord_id=uid, cefr_level='B1')
+        skill = await sync_to_async(make_skill)(skill_id=uid + '_sk')
+        session = await sync_to_async(Session.objects.create)(
+            user=user, session_type=session_type, target_skill=skill, current_phase=phase)
+        await sync_to_async(SessionEvent.objects.create)(
+            session=session, event_type='conversation', content='¿Qué tal?', user_response='')
+        return user, session
+
+    @pytest.mark.asyncio
+    async def test_conversation_feedback_is_acknowledged_and_not_routed(self, make_user, make_skill):
+        from engine.session import handle_session
+        from engine.feedback import FEEDBACK_ACK
+        from learner.models import SessionFeedback
+
+        user, session = await self._open(make_user, make_skill, 'fb_sc1', 'conversation', 'conversation')
+        with patch('engine.session._continue_conversation',
+                   new=AsyncMock(return_value={'text': 'SHOULD NOT RUN'})) as convo:
+            result = await handle_session(user, "feedback: this isn't getting caught")
+
+        convo.assert_not_called()
+        assert FEEDBACK_ACK in result['text']
+        count = await sync_to_async(
+            lambda: SessionFeedback.objects.filter(session=session).count())()
+        assert count == 1
+
+    @pytest.mark.asyncio
+    async def test_teach_drill_feedback_still_routes_to_the_classifier(self, make_user, make_skill):
+        """teach_drill has a classifier that can tell feedback-with-an-answer
+        from feedback alone, so it keeps the nuanced path."""
+        from engine.session import handle_session
+
+        user, session = await self._open(make_user, make_skill, 'fb_sc2', 'new_skill', 'teach_drill')
+        with patch('engine.session._continue_new_skill',
+                   new=AsyncMock(return_value={'text': 'LESSON CONTINUES'})) as lesson:
+            result = await handle_session(user, "feedback: too fast, and yo tuve")
+
+        lesson.assert_called_once()
+        assert result['text'] == 'LESSON CONTINUES'

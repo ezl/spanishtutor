@@ -232,3 +232,59 @@ class TestTheAbandonedLessonIsGraded:
 
         scored.assert_not_awaited()
         opened.assert_awaited_once()
+
+
+class TestDissatisfactionVeto:
+    """The cheap gate fires on any message ABOUT lessons, so complaints were
+    routed to the skill picker: "it let me SELECT a lesson? why?" (feedback #24)."""
+
+    @pytest.mark.parametrize("text", [
+        "why do you keep teaching me this lesson",
+        "this lesson is confusing",
+        "unclear what it's asking - what i want to study?",
+        "i don't understand this lesson",
+        "feedback - unclear to me what just happened, it let me SELECT a lesson? why?",
+    ])
+    def test_complaints_are_vetoed(self, text):
+        from engine.skill_request import looks_like_dissatisfaction
+        assert looks_like_dissatisfaction(text) is True
+
+    @pytest.mark.parametrize("text", [
+        "can we do the subjunctive instead",
+        "why don't we do the subjunctive instead?",
+        "teach me the preterite",
+        "quiero aprender el subjuntivo",
+    ])
+    def test_genuine_requests_are_not_vetoed(self, text):
+        from engine.skill_request import looks_like_dissatisfaction
+        assert looks_like_dissatisfaction(text) is False
+
+
+@pytest.mark.django_db(transaction=True)
+class TestNotARequest:
+    """The resolver presupposed a request ("A Spanish student asked for a lesson.
+    Map their request to skills"), so handed a rambling complaint it obligingly
+    found candidates. It can now decline."""
+
+    def test_prompt_allows_declining(self):
+        from engine.skill_request import SKILL_LOOKUP_PROMPT
+        assert 'NOT_A_REQUEST' in SKILL_LOOKUP_PROMPT
+
+    @pytest.mark.asyncio
+    async def test_not_a_request_returns_none_so_the_turn_continues(self, make_user, grid):
+        from engine.skill_request import handle_skill_request
+        user, session = await _session_for(make_user, 'nar_1', grid)
+        with patch('engine.skill_request.call_llm',
+                   new=AsyncMock(return_value='NOT_A_REQUEST')):
+            result = await handle_skill_request(user, session, "what just happened here")
+        assert result is None, "a non-request must not hijack the turn"
+
+    @pytest.mark.asyncio
+    async def test_a_real_request_for_an_unknown_topic_still_answers(self, make_user, grid):
+        """Distinct case: they DID ask, we just don't teach it."""
+        from engine.skill_request import handle_skill_request, NOT_IN_CURRICULUM
+        user, session = await _session_for(make_user, 'nar_2', grid)
+        with patch('engine.skill_request.call_llm', new=AsyncMock(return_value='NONE')):
+            result = await handle_skill_request(user, session, "teach me Klingon")
+        assert result is not None
+        assert result['text'] == NOT_IN_CURRICULUM

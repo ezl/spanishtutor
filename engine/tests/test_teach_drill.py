@@ -1823,3 +1823,69 @@ class TestInlineClassifierCapturesSystemFeedback:
         from engine.teach_drill import CLASSIFY_FIRST_CHECK
         low = CLASSIFY_FIRST_CHECK.lower()
         assert 'phrased as a question' in low
+
+
+class TestFeedbackHoldsPosition:
+    """#21/#7: commenting on the teaching lost your place. META-FEEDBACK was the
+    only non-answer branch that advanced the lesson — (b) and (d) both restate
+    the pending drill and defer state."""
+
+    def _branch(self):
+        from engine.teach_drill import CLASSIFY_FIRST_CHECK
+        start = CLASSIFY_FIRST_CHECK.find('(c) META-FEEDBACK')
+        return CLASSIFY_FIRST_CHECK[start:CLASSIFY_FIRST_CHECK.find('(d) AMBIENT', start)]
+
+    def test_feedback_alone_restates_the_pending_question(self):
+        assert 'restate' in self._branch().lower()
+
+    def test_feedback_alone_defers_state(self):
+        assert '<<QUESTION_ANSWERED>>' in self._branch()
+
+    def test_feedback_carrying_an_answer_still_advances(self):
+        """Orthogonality is preserved where it matters: 'Yo tuve, and this is
+        too fast' must still be graded."""
+        branch = self._branch().lower()
+        assert 'answer' in branch and ('also' in branch or 'both' in branch or 'contains' in branch)
+
+
+class TestOneCuePerTeachTurn:
+    """The model rewrote a cue twice in the visible output before landing on a
+    third question. build_teach_instruction already says 'Ask EXACTLY ONE
+    production question'; nothing verified it."""
+
+    SHIPPED = ('How would you say "I am delicious" — wait, no, how would you say '
+               '"I think this coffee is delicious" — actually: how would you say '
+               '"I\'m rich" meaning you have a lot of money?')
+    CLEAN = ('**rico** cambia de significado.\n\nHow would you say "I\'m rich" '
+             'meaning you have a lot of money?')
+
+    def test_detects_the_turn_that_shipped(self):
+        from engine.teach_drill import count_drill_cues
+        assert count_drill_cues(self.SHIPPED) == 3
+
+    def test_a_clean_turn_has_exactly_one(self):
+        from engine.teach_drill import count_drill_cues
+        assert count_drill_cues(self.CLEAN) == 1
+
+    def test_spanish_cues_are_counted(self):
+        from engine.teach_drill import count_drill_cues
+        assert count_drill_cues('¿Cómo dices "tengo hambre"?') == 1
+
+    def test_prose_without_a_cue_counts_zero(self):
+        from engine.teach_drill import count_drill_cues
+        assert count_drill_cues('Perfecto, muy bien dicho.') == 0
+
+
+class TestDeclineAtCheckIn:
+    """#25: 'no continuamos con el programa' was answered by teaching the lesson
+    anyway. The check-in asks a yes/no question and ignored the answer."""
+
+    def test_opening_prompt_handles_pushback(self):
+        from engine.teach_drill import TEACH_DRILL_OPENING_PROMPT
+        low = TEACH_DRILL_OPENING_PROMPT.lower()
+        assert 'declin' in low or 'pushed back' in low or 'push back' in low
+
+    def test_opening_prompt_says_not_to_teach_on_a_refusal(self):
+        from engine.teach_drill import TEACH_DRILL_OPENING_PROMPT
+        low = TEACH_DRILL_OPENING_PROMPT.lower()
+        assert 'do not teach' in low or "don't teach" in low

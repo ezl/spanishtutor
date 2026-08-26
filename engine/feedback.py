@@ -27,6 +27,16 @@ from .core import call_llm
 # drill answer must never be logged as one.
 _EXPLICIT = re.compile(r'\bfeedback\b', re.IGNORECASE)
 
+# Written by the deterministic layer, which guarantees capture but cannot explain
+# what was said. A later layer that CAN explain -- the inline classifier, or the
+# sweep -- overwrites it. Carried as a sentinel string rather than a model field
+# so this needs no migration; other sessions are adding migrations concurrently.
+PROVISIONAL_INTERPRETATION = (
+    "Captured verbatim: the student labelled this feedback. Not yet interpreted."
+)
+
+FEEDBACK_ACK = "Got it — that's logged and a human will read it. ¡Gracias! 🙏"
+
 
 def looks_like_explicit_feedback(text: str) -> bool:
     """True when the message announces itself as feedback.
@@ -40,11 +50,17 @@ def looks_like_explicit_feedback(text: str) -> bool:
 
 
 async def record_feedback(session, anchor_event, user_message: str,
-                          interpretation: str) -> bool:
+                          interpretation: str, provisional: bool = False) -> bool:
     """Write one SessionFeedback row. Returns True if a row was created.
 
     Idempotent on (session, user_message): the deterministic layer and the
     inline classifier both see the same turn, and neither knows about the other.
+
+    A provisional row -- capture guaranteed, meaning not yet known -- is UPGRADED
+    when a real interpretation arrives, rather than the second write being
+    dropped. Plain dedup kept whichever landed first, and the deterministic layer
+    always lands first, so the log filled with placeholders while the classifier's
+    actual analysis was discarded.
     """
     from learner.models import SessionFeedback
 
@@ -52,11 +68,18 @@ async def record_feedback(session, anchor_event, user_message: str,
     if not message:
         return False
 
-    exists = await sync_to_async(
+    existing = await sync_to_async(
         lambda: SessionFeedback.objects.filter(
-            session=session, user_message=message).exists()
+            session=session, user_message=message).first()
     )()
-    if exists:
+    if existing is not None:
+        upgradable = (existing.interpretation == PROVISIONAL_INTERPRETATION
+                      and not provisional)
+        if upgradable:
+            await sync_to_async(
+                lambda: SessionFeedback.objects.filter(pk=existing.pk).update(
+                    interpretation=interpretation)
+            )()
         return False
 
     await sync_to_async(SessionFeedback.objects.create)(

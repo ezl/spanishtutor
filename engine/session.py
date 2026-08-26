@@ -350,8 +350,14 @@ Open with a genuine question about their life. Go somewhere we do NOT already
 know about -- the interests above are what we have already, and asking about
 them again is how the same few topics kept coming back. Prefer new ground.
 Let the conversation flow naturally.{elicitation}
-Correct significant errors inline using the standard correction format.
+Correct significant errors by MODELLING the right form inline — say it correctly
+in passing and carry on. Do NOT ask them to rewrite it: that is a drill device,
+and in conversation it competes with whatever you asked next, leaving the student
+holding two open requests and unsure which to answer.
 Minor errors (accents, small typos): ignore, never interrupt flow.
+
+End the turn with exactly ONE question. React, correct if needed, then ask one
+thing — never a correction-exercise and a question in the same turn.
 
 Generate the opening question now. Spanish if B1+, English if A1-A2."""
 
@@ -807,15 +813,26 @@ async def handle_session(user, text: str, attachments: list = None) -> dict:
     # so feedback typed during an SRS review or a conversation had nowhere to go.
     # Logging only -- the turn continues normally, because feedback is orthogonal
     # to whatever the student was doing.
-    from .feedback import looks_like_explicit_feedback, record_feedback
+    from .feedback import (
+        FEEDBACK_ACK, PROVISIONAL_INTERPRETATION, looks_like_explicit_feedback,
+        record_feedback,
+    )
     if looks_like_explicit_feedback(text):
         anchor = await sync_to_async(
             lambda: session.events.order_by('-timestamp').first()
         )()
-        await record_feedback(
-            session, anchor, text,
-            "Student explicitly labelled this feedback; captured verbatim for review.",
-        )
+        await record_feedback(session, anchor, text, PROVISIONAL_INTERPRETATION,
+                              provisional=True)
+        # teach_drill has a classifier that can tell feedback-carrying-an-answer
+        # from feedback alone, so it keeps the nuanced path and interprets this
+        # row properly. Everywhere else, a message labelled "feedback" is a note
+        # to the developer, not lesson input: acknowledge it and stop. Letting it
+        # through meant Luz received the meta-commentary as conversation and tried
+        # to reply to it in Spanish, and nothing ever confirmed the capture.
+        in_teach_drill = (session.session_type == 'new_skill'
+                          and session.current_phase == 'teach_drill')
+        if not in_teach_drill:
+            return {"text": FEEDBACK_ACK, "audio_url": None, "session_ended": False}
 
     # Skill requests are handled above phase routing, so a request made at the
     # check-in greeting is caught as readily as one made mid-drill. The original
@@ -823,12 +840,15 @@ async def handle_session(user, text: str, attachments: list = None) -> dict:
     # inside teach_drill. Resolution of a pending clarifying question comes
     # first, so a one-word answer ("formation") isn't re-read as a new request.
     from .skill_request import (
-        handle_skill_request, looks_like_skill_request, resolve_pending_request,
+        handle_skill_request, looks_like_dissatisfaction, looks_like_skill_request,
+        resolve_pending_request,
     )
     if session.current_phase == 'skill_request':
         return await resolve_pending_request(user, session, text)
-    if looks_like_skill_request(text):
-        return await handle_skill_request(user, session, text)
+    if looks_like_skill_request(text) and not looks_like_dissatisfaction(text):
+        requested = await handle_skill_request(user, session, text)
+        if requested is not None:
+            return requested
 
     if session.current_phase == 'check_in':
         return await _handle_check_in(user, session, text)

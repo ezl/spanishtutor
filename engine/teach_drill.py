@@ -339,6 +339,8 @@ Structure (2-4 short sentences total):
    - A1/A2: "Ready to start?"
    - B1+: "¿Listo/a para empezar?"
 
+IF THE STUDENT PUSHED BACK (read their reply above, if there is one): if they declined, said no, or asked for something else rather than agreeing to start, do NOT teach and do NOT run the structure above. Acknowledge it in one line and ask what they would rather do — offer that they can name a topic, or say `!menu` to see what is available. The check-in asked them a yes/no question; answering "no" has to mean something.
+
 Chat style. No headers, no bullet points, no textbook tone.
 Do not preview specific verbs or forms — the actual teaching starts next turn.{elicitation}"""
 
@@ -496,7 +498,10 @@ CLASSIFY_FIRST_CHECK = """FIRST DECISION (do this BEFORE anything else): classif
 
   (c) META-FEEDBACK — commenting on the SYSTEM rather than doing the lesson. That covers you and your teaching (the pedagogy, the pacing, the cues, the style) AND how the system behaves around it: review scheduling and how often something comes back, how many questions a review asks, what it remembers about them, which interests it draws on, session structure and length. Examples: "that cue was ambiguous", "you keep asking me the same person", "this is going too fast", "shouldn't 'I was at the wedding' be estar?" (meta because the student is questioning YOUR choice), "the last time it said 2nd pass, this would be 3rd", "2 questions isn't enough for a review", "we keep coming back to the same few topics".
       A complaint, a frustration, a suggestion and a bug report are all META-FEEDBACK. So is one phrased as a question ("why does it keep asking me this?", "how did that get incorporated already?") — the question form does NOT make it a CONTENT QUESTION, because it is not asking about Spanish.
-      → Emit <<FEEDBACK>>[one-sentence paraphrase]<<END_FEEDBACK>> block, then CONTINUE with the teach/drill steps below this check. FEEDBACK is orthogonal — proceed normally with the lesson.
+      → Emit the <<FEEDBACK>>[one-sentence paraphrase]<<END_FEEDBACK>> block, then:
+        * If the message ALSO contains an attempt at the pending drill question, evaluate that answer per CORRECTNESS EVALUATION and continue normally. Feedback is orthogonal to answering.
+        * If the message is feedback ALONE, with no attempt at the question, your ENTIRE response is: the FEEDBACK block, one line restating the pending drill question verbatim or near-verbatim ("Volviendo a lo que te preguntaba: [restate]" for B1+, "Back to what I was asking: [restate]" for A1/A2), and the literal marker <<QUESTION_ANSWERED>> on its own line at the end.
+          Do NOT teach a new unit and do NOT ask a different question. Commenting on the teaching must not cost the student their place in the lesson.
       Do NOT write any acknowledgment yourself — code prepends a canonical acknowledgment automatically after the marker is stripped. Any acknowledgment you write will duplicate it.
       Do NOT promise to change your behavior in future turns (e.g., "I'll drop the hybrid phrasing going forward"). You cannot actually change your prompt — feedback is logged for the developer to review offline. A promise you can't keep is worse than no promise.
 
@@ -600,6 +605,28 @@ def find_degenerate_contrast_rows(text: str) -> list[str]:
         if known and known.casefold() == target.casefold():
             bad.append(row)
     return bad
+
+
+# Phrases that introduce a production question. build_teach_instruction already
+# says "Ask EXACTLY ONE production question"; nothing verified it, and a turn
+# shipped that rewrote its cue twice in front of the student before landing on a
+# third question. Counting cues turns that instruction into something checkable.
+_DRILL_CUES = re.compile(
+    r'how would you say|how do you say|\bcómo dices\b|\bcomo dices\b'
+    r'|\bcómo se dice\b|\bcomo se dice\b',
+    re.IGNORECASE,
+)
+
+CUE_CORRECTION_INSTRUCTION = """Your previous message contained more than one drill question. You started a cue, changed your mind, and rewrote it in front of the student.
+
+Choose the question BEFORE you write. Send exactly ONE production question, stated once. Never show a discarded cue, and never revise a cue mid-sentence.
+
+Resend the entire message, corrected. Keep everything else identical: same unit, same teaching, same end markers."""
+
+
+def count_drill_cues(text: str) -> int:
+    """How many production questions this turn poses."""
+    return len(_DRILL_CUES.findall(text or ''))
 
 
 def build_teach_instruction(unit: dict, person_new: str, is_final: bool) -> str:
@@ -814,6 +841,17 @@ async def handle_teach_drill_turn(user, session, text: str) -> dict:
     # teaches no transformation and is always wrong. Regenerate once with an
     # explicit correction rather than ship a bad form to the student. Runs before
     # marker stripping so the retry sees the message exactly as the model wrote it.
+    # A teach turn must pose exactly one question. More than one means the model
+    # rewrote its cue in the visible output rather than before writing.
+    if turn_type == "teach" and count_drill_cues(response) > 1:
+        logger.warning("teach turn posed %d drill cues; regenerating",
+                       count_drill_cues(response))
+        response = await call_llm(
+            history + [{"role": "assistant", "content": response},
+                       {"role": "user", "content": CUE_CORRECTION_INSTRUCTION}],
+            user=user, system_suffix=suffix,
+        )
+
     degenerate_rows = find_degenerate_contrast_rows(response)
     if degenerate_rows:
         retry_history = history + [
@@ -836,14 +874,12 @@ async def handle_teach_drill_turn(user, session, text: str) -> dict:
     # Log feedback if the LLM captured any. Anchor to the most recent existing
     # SessionEvent — that's the assistant turn the user was reacting to.
     if feedback_interpretation:
-        from learner.models import SessionFeedback
+        from .feedback import record_feedback
         anchor = events[-1] if events else None
-        await sync_to_async(SessionFeedback.objects.create)(
-            session=session,
-            anchor_event=anchor,
-            user_message=text,
-            interpretation=feedback_interpretation,
-        )
+        # Through record_feedback, not a direct create: the deterministic layer
+        # above handler routing may already have written a provisional row for
+        # this same message, and this interpretation upgrades it.
+        await record_feedback(session, anchor, text, feedback_interpretation)
         # Prepend the canonical acknowledgment. Prompt tells the LLM to skip
         # writing one; code guarantees the exact wording so the ack is
         # deterministic across every feedback interaction (no LLM drift,

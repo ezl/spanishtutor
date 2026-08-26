@@ -978,3 +978,22 @@ class TestInactivityWindow:
         user, session = await self._session_idle_for(make_user, make_skill, 'idle_359', 359)
         stale, _ = await _check_inactivity(user, session)
         assert stale is False
+
+
+class TestConversationCorrections:
+    """#22: a conversation turn demanded a rewrite AND asked a new question, so
+    two asks were open at once. The rewrite device belongs to drills."""
+
+    def test_conversation_does_not_import_the_drill_correction_format(self):
+        from engine.session import CONVERSATION_PROMPT
+        assert 'standard correction format' not in CONVERSATION_PROMPT
+
+    def test_conversation_states_one_ask_per_turn(self):
+        from engine.session import CONVERSATION_PROMPT
+        low = CONVERSATION_PROMPT.lower()
+        assert 'one question' in low or 'one thing' in low or 'single question' in low
+
+    def test_conversation_corrects_by_modelling_not_by_setting_an_exercise(self):
+        from engine.session import CONVERSATION_PROMPT
+        low = CONVERSATION_PROMPT.lower()
+        assert 'do not ask them to rewrite' in low or 'never ask them to rewrite' in low
