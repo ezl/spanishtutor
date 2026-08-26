@@ -7,21 +7,112 @@ modes:
 
 skills:
   # ─── A1 ───────────────────────────────────────────────
-  - id: a1_greetings
-    name: Greetings & basic expressions
+  # Lessons 1-3 are formulaic chunks, taught whole and NOT analyzed.
+  # Processability Theory Stage 1 is words and formulas with no syntax; see
+  # docs/vocabulary.md. Do not decompose "me llamo" into a reflexive verb here.
+  - id: a1_introduce_yourself
+    name: Introduce yourself
     cefr_level: A1
-    description: "Hola, adiós, por favor, gracias, mucho gusto, cómo estás, cómo te llamas"
+    description: "hola, me llamo ___, ¿cómo te llamas?, mucho gusto, adiós. Taught as whole phrases, never broken into parts. The student should be able to meet a person and say their own name by the end."
 
-  - id: a1_numbers
-    name: Numbers 1-1000
+  - id: a1_how_are_you
+    name: Ask how someone is
     cefr_level: A1
-    description: "Cardinal numbers 1-1000; basic arithmetic phrases; how many, how much"
+    description: "¿cómo estás?, bien, mal, más o menos, ¿y tú?, gracias, por favor. Whole phrases. This is the first two-turn exchange — the student asks, hears an answer, and answers back."
+    prerequisites: [a1_introduce_yourself]
+
+  - id: a1_keep_talking
+    name: Keep the conversation going
+    cefr_level: A1
+    description: "no entiendo, ¿cómo se dice ___?, otra vez, más despacio, no sé, ¿qué significa? Whole phrases. These let the lesson itself run in Spanish, so every one that lands raises how much Spanish the student can be given from here on."
+    prerequisites: [a1_how_are_you]
+
+  # "Power verbs" — first-person forms taught as unanalyzed chunks, not as
+  # conjugation. Each one is a sentence starter the student can attach anything to.
+  - id: a1_chunks_want_have
+    name: Saying what you want and have
+    cefr_level: A1
+    description: "quiero ___, tengo ___, me gusta ___, no me gusta ___. Taught as fixed sentence openers the student attaches a noun to, not as verb conjugation. quiero un café, tengo un perro."
+    prerequisites: [a1_keep_talking]
+
+  - id: a1_chunks_go_need
+    name: Saying where you go and what you need
+    cefr_level: A1
+    description: "voy a ___, necesito ___, puedo ___, hay ___. Again fixed openers, not conjugation. voy a is taught as one unit precisely because ir is maximally irregular — the student gets the useful form without meeting the paradigm."
+    prerequisites: [a1_chunks_want_have]
+
+  # Never say the word "cognate" to a student. Frame it as discovering Spanish
+  # they already know.
+  - id: a1_words_you_know
+    name: Spanish you already know
+    cefr_level: A1
+    description: "Recognizing the huge set of Spanish words an English speaker already knows: -tion→-ción (information/información), -ty→-dad (city/ciudad), -ly→-mente (rapidly/rápidamente), -ous→-oso (famous/famoso), -ment→-mento. Recognition only — this is about reading and hearing, not producing. Do not use the word 'cognate'."
+    prerequisites: [a1_keep_talking]
+
+  # Lessons below build toward deliberate telegraphic speech ("yo ir escuela").
+  # This is Processability Theory Stage 2 and the Basic Variety (Klein & Perdue):
+  # the developmental stage that follows formulas. See docs/vocabulary.md for the
+  # fossilization risk and the three guardrails.
+  - id: a1_people_words
+    name: Words for people
+    cefr_level: A1
+    description: "yo, tú, él, ella, nosotros, ellos, ellas. Just the words and who they point at. No verb agreement yet."
+    prerequisites: [a1_words_you_know]
+
+  - id: a1_action_words
+    name: Words for actions
+    cefr_level: A1
+    description: "hablar/hablo, comer/como, correr/corro, trabajar/trabajo, vivir/vivo. Each action word is taught together with its 'I' form from the start, so the anchor is already there when present tense arrives later. Regular verbs only — ir is handled as the chunk 'voy a'."
+    prerequisites: [a1_people_words]
+
+  - id: a1_place_words
+    name: Words for places
+    cefr_level: A1
+    description: "casa, escuela, trabajo, gimnasio, tienda, restaurante, parque, ciudad. Draw on the student's own interests for which places matter to them."
+    prerequisites: [a1_action_words]
+
+  - id: a1_say_something_real
+    name: Putting words together
+    cefr_level: A1
+    description: "Combining a person word, an action word and a place into something meaningful even though it is not yet grammatical: 'yo comer casa', 'ella correr parque'. TELL THE STUDENT PLAINLY that this is a temporary scaffold — it is how they will speak this week, and they will learn the correct forms shortly. Never present it as correct Spanish. When the student produces one of these, reply naturally using the CORRECT form (recast) without stopping to correct them: they say 'ella comer taco', you answer 'sí, ella come tacos'. The goal is conveying real meaning today."
+    prerequisites: [a1_place_words]
+
+  # Numbers split on Spanish's own morphology, not round English boundaries:
+  # 1-15 are unique words, 16-19 compound on diez, 21-29 on veinti-, 30+ take y.
+  - id: a1_numbers_1_5
+    name: Numbers 1-5
+    cefr_level: A1
+    description: "uno, dos, tres, cuatro, cinco. Five words."
+
+  - id: a1_numbers_6_10
+    name: Numbers 6-10
+    cefr_level: A1
+    description: "seis, siete, ocho, nueve, diez. Five words."
+    prerequisites: [a1_numbers_1_5]
+
+  - id: a1_numbers_11_15
+    name: Numbers 11-15
+    cefr_level: A1
+    description: "once, doce, trece, catorce, quince. Still unique words with no pattern — this is the last of the pure memorization."
+    prerequisites: [a1_numbers_6_10]
+
+  - id: a1_numbers_16_20
+    name: Numbers 16-20
+    cefr_level: A1
+    description: "dieciséis, diecisiete, dieciocho, diecinueve, veinte. A pattern lesson, not memorization: these are diez y seis collapsed into one word."
+    prerequisites: [a1_numbers_11_15]
+
+  - id: a1_numbers_21_100
+    name: Numbers 21-100
+    cefr_level: A1
+    description: "veintiuno through veintinueve on the veinti- pattern; treinta, cuarenta, cincuenta, sesenta, setenta, ochenta, noventa, cien; then treinta y uno and the y pattern. One rule generates every number to 100."
+    prerequisites: [a1_numbers_16_20]
 
   - id: a1_dates_time
     name: Dates and telling time
     cefr_level: A1
     description: "Days of the week, months, seasons; qué hora es; times of day (mañana, tarde, noche)"
-    prerequisites: [a1_numbers]
+    prerequisites: [a1_numbers_21_100]
 
   - id: a1_nouns_gender
     name: Nouns and grammatical gender
