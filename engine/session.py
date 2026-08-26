@@ -9,7 +9,13 @@ from .core import call_llm
 from .curriculum import LEVEL_ORDER, get_skill, next_new_skill, next_new_vocab_skill
 
 GOODBYE_WORDS = {'bye', 'adiós', 'adios', 'chao', 'hasta luego', 'goodbye', 'ciao', 'nos vemos'}
-INACTIVITY_TIMEOUT_MINUTES = 60
+# Six hours. Long enough that stepping away for an afternoon leaves the lesson
+# where you left it -- you just carry on, with no notice and no restart. Past
+# that the lesson is closed and the next message opens a fresh session, since
+# resuming a drill you have no memory of is worse than starting cleanly.
+# NOTE: settings.INACTIVITY_TIMEOUT_MINUTES also exists (default 15) and nothing
+# reads it. This is the live value.
+INACTIVITY_TIMEOUT_MINUTES = 360
 
 LESSON_COMPLETE_MARKER = '<<LESSON_COMPLETE>>'
 CHUNKED_LESSON_MAX_TURNS = 8  # Safety cap: force lesson_complete after N chunked turns.

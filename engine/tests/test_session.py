@@ -932,3 +932,49 @@ class TestPassRestartAsksTheFirstQuestion:
         # The bug consumed Q0 without ever asking it.
         assert 'question 1 of' in suffix, (
             f"restart skipped the first question; got: {suffix[:200]}")
+
+
+@pytest.mark.django_db(transaction=True)
+class TestInactivityWindow:
+    """A lesson used to be closed after an hour idle. Six hours instead, so
+    stepping away for an afternoon lets you pick the same lesson back up."""
+
+    async def _session_idle_for(self, make_user, make_skill, uid, minutes):
+        from learner.models import Session, SessionEvent
+        user = await sync_to_async(make_user)(discord_id=uid, cefr_level='B1')
+        skill = await sync_to_async(make_skill)(skill_id=uid + '_sk')
+        session = await sync_to_async(Session.objects.create)(
+            user=user, session_type='new_skill', target_skill=skill,
+            current_phase='teach_drill')
+        event = await sync_to_async(SessionEvent.objects.create)(
+            session=session, event_type='quiz', content='Q', user_response='A')
+        stale_at = timezone.now() - timedelta(minutes=minutes)
+        await sync_to_async(
+            lambda: SessionEvent.objects.filter(pk=event.pk).update(timestamp=stale_at))()
+        return user, session
+
+    def test_the_window_is_six_hours(self):
+        from engine.session import INACTIVITY_TIMEOUT_MINUTES
+        assert INACTIVITY_TIMEOUT_MINUTES == 360
+
+    @pytest.mark.asyncio
+    async def test_five_hours_idle_is_still_the_same_lesson(self, make_user, make_skill):
+        from engine.session import _check_inactivity
+        user, session = await self._session_idle_for(make_user, make_skill, 'idle_5h', 300)
+        stale, idle_minutes = await _check_inactivity(user, session)
+        assert stale is False
+        assert idle_minutes == 300
+
+    @pytest.mark.asyncio
+    async def test_seven_hours_idle_ends_the_lesson(self, make_user, make_skill):
+        from engine.session import _check_inactivity
+        user, session = await self._session_idle_for(make_user, make_skill, 'idle_7h', 420)
+        stale, _ = await _check_inactivity(user, session)
+        assert stale is True
+
+    @pytest.mark.asyncio
+    async def test_just_under_six_hours_survives(self, make_user, make_skill):
+        from engine.session import _check_inactivity
+        user, session = await self._session_idle_for(make_user, make_skill, 'idle_359', 359)
+        stale, _ = await _check_inactivity(user, session)
+        assert stale is False
