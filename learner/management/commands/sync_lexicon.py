@@ -7,7 +7,7 @@ interests carry an owner and are never created, updated or deactivated here.
 """
 import os
 import yaml
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
 from django.conf import settings
 
 from learner.models import LexItem
@@ -40,6 +40,17 @@ class Command(BaseCommand):
                         entry[field] = value
                 if word.get('analyzable') is False:
                     entry['analyzable'] = False
+
+        # An empty parse is never a legitimate state, and the sweep below cannot
+        # tell it from a real one: exclude(es__in=[]) excludes NOTHING, so a
+        # truncated write or a `packs:` key with nothing under it would deactivate
+        # the entire catalogue and report success. Raise rather than guard the
+        # update -- guarding would leave an empty file silently doing nothing,
+        # which is the same bug one layer up.
+        if not merged:
+            raise CommandError(
+                f'{path} parsed to zero words. Refusing to sync: this would '
+                f'deactivate every word in the catalogue.')
 
         created = updated = 0
         for es, entry in merged.items():

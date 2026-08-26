@@ -93,3 +93,23 @@ class TestUserWord:
         UserWord.objects.create(user=user, item=word)
         with pytest.raises(IntegrityError):
             UserWord.objects.create(user=user, item=word)
+
+
+class TestAnEmptyParseIsRefused:
+    """exclude(es__in=[]) excludes nothing, so an empty parse would deactivate
+    the whole catalogue and print a success message. The same shape, unguarded,
+    sits in sync_skills.py where it would take all 82 active skills."""
+
+    def test_zero_words_raises_instead_of_wiping(self, synced):
+        from unittest.mock import patch
+        from django.core.management.base import CommandError
+
+        before = LexItem.objects.filter(active=True).count()
+        assert before > 0
+
+        with patch('learner.management.commands.sync_lexicon.yaml.safe_load',
+                   return_value={'packs': []}):
+            with pytest.raises(CommandError, match='zero words'):
+                call_command('sync_lexicon')
+
+        assert LexItem.objects.filter(active=True).count() == before
