@@ -85,7 +85,7 @@ questions:
 
   - id: pets_have
     category: pets
-    grammar: [present, tener]
+    grammar: [present]
     opener_es: "¿Tienes mascotas? ¿O has tenido alguna?"
     opener_en: "Do you have any pets? Or have you had one before?"
     follow_up_es: "¿Cómo se llama? ¿Cómo es?"
@@ -102,7 +102,7 @@ questions:
 
   - id: media_watching
     category: music_media
-    grammar: [present, present_perfect]
+    grammar: [present, compound_tenses]
     opener_es: "¿Qué estás viendo o leyendo estos días?"
     opener_en: "What are you watching or reading these days?"
     follow_up_es: "¿De qué se trata? ¿Lo recomiendas?"
@@ -194,7 +194,7 @@ questions:
   # ── present perfect ────────────────────────────────────────────────────────
   - id: perfect_new_restaurant
     category: food
-    grammar: [present_perfect]
+    grammar: [compound_tenses]
     opener_es: "¿Has probado algún restaurante nuevo últimamente?"
     opener_en: "Have you tried any new restaurants lately?"
     follow_up_es: "¿Cómo se llama? ¿Qué pediste?"
@@ -202,7 +202,7 @@ questions:
 
   - id: perfect_travelled
     category: travel
-    grammar: [present_perfect]
+    grammar: [compound_tenses]
     opener_es: "¿Has viajado a algún lugar que te haya gustado mucho?"
     opener_en: "Have you been anywhere you really loved?"
     follow_up_es: "¿Qué tenía de especial? ¿Volverías?"
@@ -210,7 +210,7 @@ questions:
 
   - id: perfect_tried_new
     category: hobbies
-    grammar: [present_perfect]
+    grammar: [compound_tenses]
     opener_es: "¿Has empezado algo nuevo este año? Algo que no hacías antes."
     opener_en: "Have you started anything new this year — something you didn't do before?"
     follow_up_es: "¿Cómo te ha ido con eso?"
@@ -278,7 +278,7 @@ questions:
   # ── comparatives / preferences ─────────────────────────────────────────────
   - id: comparative_prefer
     category: hobbies
-    grammar: [comparatives, present]
+    grammar: [comparisons, present]
     opener_es: "¿Prefieres un plan tranquilo en casa o salir con gente?"
     opener_en: "Do you prefer a quiet plan at home or going out with people?"
     follow_up_es: "¿Cuándo fue la última vez que hiciste eso?"
@@ -311,7 +311,7 @@ questions:
 
   - id: prefer_two_things
     category: preferences
-    grammar: [comparatives, gustar]
+    grammar: [comparisons, gustar]
     opener_es: "¿Prefieres las mañanas o las noches?"
     opener_en: "Are you more of a morning person or a night person?"
     follow_up_es: "¿Por qué? ¿Qué haces normalmente a esa hora?"

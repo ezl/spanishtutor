@@ -4,7 +4,7 @@ Safe to run repeatedly — upserts by skill_id, updates prerequisites M2M.
 """
 import os
 import yaml
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
 from django.conf import settings
 from learner.models import Skill
 
@@ -17,7 +17,19 @@ class Command(BaseCommand):
         with open(path) as f:
             data = yaml.safe_load(f)
 
-        skills_data = data['skills']
+        skills_data = (data or {}).get('skills') or []
+        if not skills_data:
+            # Refuse rather than proceed. The deactivation below uses
+            # exclude(skill_id__in=yaml_ids), and exclude(__in=[]) excludes
+            # NOTHING -- so an empty parse deactivates the entire curriculum (82
+            # skills in production) and still reports success. A truncated write
+            # or a `skills:` key with nothing under it is enough to trigger it.
+            # Zero skills is never a legitimate state for this file.
+            raise CommandError(
+                f'{path} parsed to zero skills. Refusing to sync: this would '
+                f'deactivate every active skill. Check the file is complete.'
+            )
+
         created = updated = 0
 
         for order, entry in enumerate(skills_data):

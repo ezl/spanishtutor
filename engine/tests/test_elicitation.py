@@ -221,3 +221,30 @@ class TestTheSameQuestionIsNotAskedTwice:
         # tried loses to every category that has not been.
         gaps = category_gaps({}, ask_counts={'pets': 3})
         assert gaps[-1] == 'pets'
+
+
+class TestNoOrphanedGrammarTags:
+    """grammar_tags_for_skill() substring-matches bank tags against skill ids and
+    fails soft — a question whose tag matches no skill simply never gets picked by
+    grammar, with no error. That is correct for deliberately untagged skills, but
+    it means a rename can silently detach a question and nothing says so."""
+
+    def test_every_bank_tag_matches_a_real_skill(self):
+        import pathlib, yaml
+        from engine.elicitation import orphaned_grammar_tags
+        skills = yaml.safe_load(pathlib.Path('curriculum/skills.yaml').read_text())
+        ids = [s['id'] for s in skills['skills']]
+        orphans = orphaned_grammar_tags(ids)
+        assert orphans == [], (
+            f"elicitation questions tagged with grammar no skill id carries: {orphans}. "
+            "A rename probably detached them; they can now only be chosen by gap order."
+        )
+
+    def test_a_renamed_skill_is_detected(self):
+        from engine.elicitation import orphaned_grammar_tags
+        orphans = orphaned_grammar_tags(['a1_greetings', 'a1_numbers_1_5'])
+        assert 'subjunctive' in orphans and 'preterite' in orphans
+
+    def test_matching_ids_are_not_reported(self):
+        from engine.elicitation import orphaned_grammar_tags
+        assert 'preterite' not in orphaned_grammar_tags(['b1_preterite_vs_imperfect'])

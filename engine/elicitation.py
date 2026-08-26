@@ -165,3 +165,18 @@ def build_elicitation_block(question: dict | None, cefr_level: str = 'B1') -> st
         "do NOT treat it as a lesson answer. React like a person who is "
         "interested, then move on.\n"
     )
+
+
+def orphaned_grammar_tags(skill_ids) -> list:
+    """Bank grammar tags that no skill id carries.
+
+    grammar_tags_for_skill() matches by substring and fails soft: a question
+    whose tag matches nothing is simply never chosen by grammar, and falls back
+    to gap order with no error. That is the right behaviour for skills which
+    deliberately have no grammar (the A1 formulaic chunks), but it also means a
+    rename can quietly detach a question from the lesson it was written for and
+    nothing anywhere says so. This makes that visible.
+    """
+    ids = [(sid or '').lower() for sid in skill_ids]
+    tags = {tag for q in load_bank()['questions'] for tag in q['grammar']}
+    return sorted(tag for tag in tags if not any(tag in sid for sid in ids))
