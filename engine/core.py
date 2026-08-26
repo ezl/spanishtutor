@@ -90,4 +90,15 @@ async def handle_message(user, text: str, attachments: list = None) -> dict:
     if not user.onboarding_complete:
         return await handle_onboarding(user, text, attachments)
 
+    # This turn's vocabulary targets, attached for the persona to render. A
+    # failure here must never cost the student their lesson, but it is logged
+    # rather than swallowed: unlike a missing score, absent word rows are
+    # invisible and nobody would ever notice them.
+    try:
+        from .vocabulary import block_for
+        user._vocab_block = await block_for(user)
+    except Exception as exc:
+        logger.error('vocabulary block failed for user %s: %s', user.pk, exc)
+        user._vocab_block = ''
+
     return await handle_session(user, text, attachments)

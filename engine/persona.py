@@ -45,6 +45,12 @@ def get_system_prompt(user=None):
         base += f"\n- Native language: {user.native_language}"
     if user and user.target_use:
         base += f"\n- Why learning Spanish: {user.target_use}"
+    # Set once per turn by core.handle_message. The query cannot happen here:
+    # get_system_prompt runs synchronously inside an async call path, where the
+    # ORM refuses to be touched.
+    block = getattr(user, '_vocab_block', '') if user else ''
+    if block:
+        base += "\n" + block
     if user and user.instruction_language == 'english':
         base += "\n\n## Language override\nThe student has requested English instructions. Give all instructions, explanations, and corrections in English regardless of their CEFR level. Spanish content (example sentences, prompts to produce Spanish) is still in Spanish."
     elif user and user.instruction_language == 'spanish':
