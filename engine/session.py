@@ -1890,6 +1890,28 @@ async def _continue_session(user, session, text: str, attachments: list = None) 
 
 # ── Session close ──────────────────────────────────────────────────────────────
 
+def _lesson_was_completed(session) -> bool:
+    """True when this session's lesson actually finished.
+
+    An abandoned new_skill lesson used to be scored exactly like a finished one,
+    and because next_new_skill picks the first UNSCORED skill, any score at all
+    retired the skill from teaching. Covering 3 of 9 irregular futures and
+    stepping away therefore marked the whole skill done, and the six stems never
+    taught could only ever return as review questions.
+
+    Other session types are always "complete": a review or a conversation IS its
+    own assessment -- the questions asked are the measurement, so there is no
+    partial state to protect against.
+    """
+    if session.session_type != 'new_skill':
+        return True
+    if session.current_phase == 'complete':
+        # Legacy phase-flow lessons signal completion here rather than in state.
+        return True
+    state = (session.quiz_state or {}).get('teach_drill') or {}
+    return bool(state.get('lesson_complete'))
+
+
 async def _close_session_record(session, user):
     """Close a session silently (inactivity timeout). Run scoring + interests."""
     from learner.models import Session
@@ -1899,10 +1921,21 @@ async def _close_session_record(session, user):
     await sync_to_async(
         lambda: Session.objects.filter(pk=session.pk).update(ended_at=timezone.now())
     )()
-    try:
-        await score_session(session, user)
-    except Exception:
-        pass
+    # Do not grade a lesson that never finished. Leaving the skill unscored is
+    # what makes next_new_skill serve it again -- after hours away from brand-new
+    # material, repeating it is the right outcome, not assessing it.
+    if _lesson_was_completed(session):
+        try:
+            await score_session(session, user)
+        except Exception:
+            pass
+    else:
+        import logging
+        logging.getLogger(__name__).info(
+            'session %s ended mid-lesson; not scoring so %s is taught again',
+            session.pk,
+            session.target_skill.skill_id if session.target_skill else 'the skill',
+        )
     try:
         await extract_and_store_interests(session, user)
     except Exception:
@@ -1961,11 +1994,18 @@ async def _close_session(user, explicit: bool = True) -> dict:
         facts = await extract_and_store_interests(session, user)
 
         scored = []
-        try:
-            scored = await score_session(session, user)
-        except Exception as exc:
+        if _lesson_was_completed(session):
+            try:
+                scored = await score_session(session, user)
+            except Exception as exc:
+                import logging
+                logging.getLogger(__name__).error("score_session failed: %s", exc)
+        else:
+            # Same rule as the idle close: saying goodbye partway through a new
+            # lesson leaves it unscored, so it comes back to be taught properly.
             import logging
-            logging.getLogger(__name__).error("score_session failed: %s", exc)
+            logging.getLogger(__name__).info(
+                'session %s closed mid-lesson; not scoring', session.pk)
 
         # Same feedback sweep as the silent close path -- see _close_session_record.
         try:

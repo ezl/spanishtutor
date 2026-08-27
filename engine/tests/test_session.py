@@ -997,3 +997,83 @@ class TestConversationCorrections:
         from engine.session import CONVERSATION_PROMPT
         low = CONVERSATION_PROMPT.lower()
         assert 'do not ask them to rewrite' in low or 'never ask them to rewrite' in low
+
+
+@pytest.mark.django_db(transaction=True)
+class TestUnfinishedLessonsAreNotScored:
+    """A lesson abandoned a third of the way through was scored as though it had
+    finished, and any score retires a skill from next_new_skill — so covering 3
+    of 9 irregular futures marked the whole skill done. After hours away from a
+    brand-new skill, repeating it is the right outcome, not grading it."""
+
+    async def _lesson(self, make_user, make_skill, uid, taught, complete, phase='teach_drill'):
+        from learner.models import Session
+        user = await sync_to_async(make_user)(discord_id=uid, cefr_level='B1')
+        skill = await sync_to_async(make_skill)(skill_id=uid + '_sk')
+        session = await sync_to_async(Session.objects.create)(
+            user=user, session_type='new_skill', target_skill=skill, current_phase=phase,
+            quiz_state={'teach_drill': {
+                'units': [{'id': f'u{i}', 'label': f'u{i}', 'note': ''} for i in range(9)],
+                'taught': taught, 'drills': {}, 'turn_count': 7,
+                'lesson_complete': complete,
+            }},
+        )
+        return user, session
+
+    @pytest.mark.asyncio
+    async def test_a_partial_lesson_is_not_complete(self, make_user, make_skill):
+        from engine.session import _lesson_was_completed
+        user, session = await self._lesson(make_user, make_skill, 'nf_part', ['a', 'b', 'c'], False)
+        assert _lesson_was_completed(session) is False
+
+    @pytest.mark.asyncio
+    async def test_a_finished_lesson_is_complete(self, make_user, make_skill):
+        from engine.session import _lesson_was_completed
+        user, session = await self._lesson(make_user, make_skill, 'nf_done', ['a'], True)
+        assert _lesson_was_completed(session) is True
+
+    @pytest.mark.asyncio
+    async def test_the_legacy_phase_flow_counts_as_complete(self, make_user, make_skill):
+        """Non-teach_drill lessons signal completion through the phase, not state."""
+        from engine.session import _lesson_was_completed
+        user, session = await self._lesson(make_user, make_skill, 'nf_phase', [], False,
+                                           phase='complete')
+        assert _lesson_was_completed(session) is True
+
+    @pytest.mark.asyncio
+    async def test_other_session_types_are_always_scored(self, make_user, make_skill):
+        """A review IS its assessment — the questions asked are the measurement."""
+        from engine.session import _lesson_was_completed
+        from learner.models import Session
+        user = await sync_to_async(make_user)(discord_id='nf_srs', cefr_level='B1')
+        session = await sync_to_async(Session.objects.create)(
+            user=user, session_type='srs_review', current_phase='review')
+        assert _lesson_was_completed(session) is True
+
+    @pytest.mark.asyncio
+    async def test_idle_close_skips_scoring_an_unfinished_lesson(self, make_user, make_skill):
+        from engine.session import _close_session_record
+        from learner.models import Session
+
+        user, session = await self._lesson(make_user, make_skill, 'nf_idle', ['a', 'b', 'c'], False)
+        with patch('engine.scoring.score_session', new=AsyncMock(return_value=[])) as scorer, \
+             patch('engine.interests.extract_and_store_interests', new=AsyncMock()) as interests, \
+             patch('engine.feedback.sweep', new=AsyncMock()):
+            await _close_session_record(session, user)
+
+        scorer.assert_not_called()
+        interests.assert_called_once()  # still worth learning from, just not grading
+        reloaded = await sync_to_async(Session.objects.get)(pk=session.pk)
+        assert reloaded.ended_at is not None
+
+    @pytest.mark.asyncio
+    async def test_idle_close_still_scores_a_finished_lesson(self, make_user, make_skill):
+        from engine.session import _close_session_record
+
+        user, session = await self._lesson(make_user, make_skill, 'nf_idle2', ['a'], True)
+        with patch('engine.scoring.score_session', new=AsyncMock(return_value=[])) as scorer, \
+             patch('engine.interests.extract_and_store_interests', new=AsyncMock()), \
+             patch('engine.feedback.sweep', new=AsyncMock()):
+            await _close_session_record(session, user)
+
+        scorer.assert_called_once()
