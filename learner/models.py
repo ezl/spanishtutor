@@ -355,6 +355,11 @@ class UserWord(models.Model):
     state = models.CharField(max_length=16, choices=STATES, default='introduced')
     times_seen = models.IntegerField(default=0)
     times_produced = models.IntegerField(default=0)
+    times_failed = models.IntegerField(default=0)
+    # Explicit rather than derived from the counters: seeing a word refreshes it
+    # without promoting it, so position on the ladder is no longer a function of
+    # how many times it was met.
+    interval_index = models.IntegerField(default=0)
     first_taught_at = models.DateTimeField(auto_now_add=True)
     last_seen_at = models.DateTimeField(null=True, blank=True)
     next_due_at = models.DateTimeField(null=True, blank=True)

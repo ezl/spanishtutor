@@ -1077,3 +1077,57 @@ class TestUnfinishedLessonsAreNotScored:
             await _close_session_record(session, user)
 
         scorer.assert_called_once()
+
+
+@pytest.mark.django_db(transaction=True)
+class TestMilestonesAreNotTerminal:
+    """"You've gone as far as we can take you" fired on EVERY session once the
+    grid was complete, which is both false and a dead end for a product aiming
+    at fluency. It should land once, as a milestone, and then the tutor carries
+    on in maintenance."""
+
+    async def _complete_grid(self, make_user, make_skill, uid, n=3):
+        from learner.models import SkillScore
+        user = await sync_to_async(make_user)(discord_id=uid, cefr_level='B1')
+        for i in range(n):
+            sk = await sync_to_async(make_skill)(skill_id=f'{uid}_s{i}', cefr_level='A1')
+            await sync_to_async(SkillScore.objects.create)(
+                user=user, skill=sk, mode='writing', score=4)
+        return user
+
+    @pytest.mark.asyncio
+    async def test_a_milestone_is_recorded_and_then_remembered(self, make_user, make_skill):
+        from engine.session import _milestone_recorded, _record_milestone
+        from learner.models import Session
+        user = await self._complete_grid(make_user, make_skill, 'ms_rec')
+        session = await sync_to_async(Session.objects.create)(
+            user=user, session_type='conversation')
+
+        assert await _milestone_recorded(user, 'A1') is False
+        await _record_milestone(session, 'A1')
+        assert await _milestone_recorded(user, 'A1') is True
+
+    @pytest.mark.asyncio
+    async def test_grid_completion_is_announced_once_then_falls_through(
+            self, make_user, make_skill):
+        from engine.session import _select_session, _record_milestone, GRID_MILESTONE
+        from learner.models import Session
+
+        user = await self._complete_grid(make_user, make_skill, 'ms_once')
+        stype, context, _ = await _select_session(user)
+        assert context.get('win_state') is True, 'the first time should celebrate'
+
+        session = await sync_to_async(Session.objects.create)(
+            user=user, session_type='conversation')
+        await _record_milestone(session, GRID_MILESTONE)
+
+        stype, context, _ = await _select_session(user)
+        assert not context.get('win_state'), \
+            'after celebrating once the tutor must keep going, not re-announce'
+
+    @pytest.mark.asyncio
+    async def test_level_milestone_text_names_the_level(self, make_user, make_skill):
+        from engine.session import build_milestone_line
+        line = build_milestone_line(['A2'], advanced=False)
+        assert 'A2' in line
+        assert build_milestone_line([], advanced=False) == ''

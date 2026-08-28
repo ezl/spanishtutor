@@ -7,6 +7,8 @@ from datetime import timedelta
 
 import anthropic
 from asgiref.sync import sync_to_async
+
+from .curriculum import LEVEL_ORDER
 from django.conf import settings
 from django.utils import timezone
 
@@ -213,12 +215,60 @@ async def _bump_to_now(user, skill, mode):
     )()
 
 
+MILESTONE_SCORE = 3  # "you can use this" — 4 is reserved for SRS scheduling.
+
+
 async def check_win_state(user) -> bool:
-    """True if all active skills have writing score >= 3."""
+    """True if every ACTIVE skill has a writing score >= MILESTONE_SCORE.
+
+    The active filter is load-bearing: this used to compare a count of the
+    user's scores against a count of active skills without filtering the scores
+    the same way, so a score on a retired skill counted toward completing the
+    live grid. Six skills were deactivated in one afternoon during the A1
+    rebuild, any of which would have inflated it.
+    """
     from learner.models import Skill, SkillScore
 
     total = await sync_to_async(lambda: Skill.objects.filter(active=True).count())()
     mastered = await sync_to_async(
-        lambda: SkillScore.objects.filter(user=user, mode='writing', score__gte=3).count()
+        lambda: SkillScore.objects.filter(
+            user=user, mode='writing', score__gte=MILESTONE_SCORE, skill__active=True
+        ).count()
     )()
     return total > 0 and mastered >= total
+
+
+async def level_progress(user) -> dict:
+    """{CEFR level: (skills at MILESTONE_SCORE or above, active skills)}.
+
+    Per-level rather than one total so milestones arrive six times instead of
+    once, and so adding skills to B2 cannot push an A2 learner's next milestone
+    further away.
+    """
+    from learner.models import Skill, SkillScore
+
+    def _counts():
+        totals, done = {}, {}
+        for level in Skill.objects.filter(active=True).values_list('cefr_level', flat=True):
+            totals[level] = totals.get(level, 0) + 1
+        rows = SkillScore.objects.filter(
+            user=user, mode='writing', score__gte=MILESTONE_SCORE, skill__active=True
+        ).select_related('skill')
+        for r in rows:
+            if r.skill:
+                done[r.skill.cefr_level] = done.get(r.skill.cefr_level, 0) + 1
+        return {lvl: (done.get(lvl, 0), total) for lvl, total in totals.items()}
+
+    return await sync_to_async(_counts)()
+
+
+async def completed_levels(user) -> list:
+    """Levels where every active skill has reached MILESTONE_SCORE, in order.
+
+    A level with no active skills is never complete -- otherwise an empty C2
+    would be "won" on day one.
+    """
+    progress = await level_progress(user)
+    return [lvl for lvl in LEVEL_ORDER
+            if lvl in progress and progress[lvl][1] > 0
+            and progress[lvl][0] >= progress[lvl][1]]

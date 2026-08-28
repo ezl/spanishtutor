@@ -186,7 +186,7 @@ class TestRecordingExposure:
         self._turn(session, tutor='Hola.', student='Hola.')
         result = self._record(session, user)
         assert UserWord.objects.filter(user=user).count() == 0
-        assert result == {'seen': 0, 'produced': 0}
+        assert result == {'seen': 0, 'produced': 0, 'failed': 0}
 
     def test_one_increment_per_session_however_often_it_appears(self, session, user):
         """'Produced in N separate sessions' has to mean sessions, not mentions."""
@@ -250,3 +250,120 @@ class TestFailureIsNotAnEmptyResult:
             _word('casa', en='house')
             with pytest.raises(RuntimeError):
                 _record(session, user)
+
+
+class TestCorrectnessNotAppearance:
+    """Counting a word as produced because it appeared in the student's text
+    marks words mastered on the evidence that the student typed them. Luz's
+    correction format is the failure signal, and it was already being emitted."""
+
+    @pytest.fixture
+    def session(self, user, db):
+        from learner.models import Session
+        return Session.objects.create(user=user, session_type='new_skill')
+
+    def _turn(self, session, tutor='', student=''):
+        from learner.models import SessionEvent
+        return SessionEvent.objects.create(
+            session=session, event_type='conversation',
+            content=tutor, user_response=student)
+
+    def _record(self, session, user):
+        from engine.vocabulary import _record
+        return _record(session, user)
+
+    def test_a_corrected_word_counts_as_failed_not_produced(self, session, user):
+        _word('gimnasio', en='gym')
+        self._turn(
+            session,
+            tutor="Dijiste: 'yo ir gimnasio'. Sería más natural: 'voy al gimnasio'.",
+            student='yo ir gimnasio')
+        self._record(session, user)
+        uw = UserWord.objects.get(user=user, item__es='gimnasio')
+        assert (uw.times_produced, uw.times_failed) == (0, 1)
+
+    def test_an_uncorrected_word_still_counts_as_produced(self, session, user):
+        _word('gimnasio', en='gym')
+        self._turn(session, tutor='¡Muy bien!', student='Voy al gimnasio.')
+        self._record(session, user)
+        uw = UserWord.objects.get(user=user, item__es='gimnasio')
+        assert (uw.times_produced, uw.times_failed) == (1, 0)
+
+    def test_only_the_word_inside_the_correction_fails(self, session, user):
+        """Other words in the same turn were used fine."""
+        _word('gimnasio', en='gym'); _word('casa', en='house')
+        self._turn(
+            session,
+            tutor="Dijiste: 'yo ir gimnasio'. Sería más natural: 'voy al gimnasio'.",
+            student='yo ir gimnasio, luego a la casa')
+        self._record(session, user)
+        assert UserWord.objects.get(user=user, item__es='gimnasio').times_failed == 1
+        assert UserWord.objects.get(user=user, item__es='casa').times_produced == 1
+
+    def test_failure_drops_the_word_to_the_shortest_interval(self, session, user):
+        from engine.vocabulary import REVIEW_INTERVALS_DAYS
+        item = _word('casa', en='house')
+        uw = UserWord.objects.create(user=user, item=item, interval_index=4,
+                                     times_produced=2)
+        self._turn(session,
+                   tutor="Dijiste: 'la casa es azul'. Sería más natural: 'la casa está azul'.",
+                   student='la casa es azul')
+        self._record(session, user)
+        uw.refresh_from_db()
+        assert uw.interval_index == 0
+
+    def test_a_word_that_keeps_failing_never_graduates(self, session, user):
+        """Otherwise volume of attempts substitutes for getting it right."""
+        from engine.vocabulary import load_settings
+        item = _word('casa', en='house')
+        for _ in range(load_settings()['graduation_productions'] + 2):
+            s2 = session.__class__.objects.create(user=user, session_type='new_skill')
+            self._turn(s2, tutor="Dijiste: 'casa mal'. Sería más natural: 'la casa'.",
+                       student='casa mal')
+            self._record(s2, user)
+        assert UserWord.objects.get(user=user, item=item).state != 'known'
+
+
+class TestSeeingDoesNotPromote:
+    """Retrieval and exposure are not on the same scale. Being shown a word
+    again refreshes it against decay; it is not progress."""
+
+    @pytest.fixture
+    def session(self, user, db):
+        from learner.models import Session
+        return Session.objects.create(user=user, session_type='new_skill')
+
+    def _turn(self, session, tutor='', student=''):
+        from learner.models import SessionEvent
+        return SessionEvent.objects.create(
+            session=session, event_type='conversation',
+            content=tutor, user_response=student)
+
+    def _record(self, session, user):
+        from engine.vocabulary import _record
+        return _record(session, user)
+
+    def test_seeing_holds_position_on_the_ladder(self, session, user):
+        item = _word('casa', en='house')
+        uw = UserWord.objects.create(user=user, item=item, interval_index=3)
+        self._turn(session, tutor='Mi casa es grande.', student='ok')
+        self._record(session, user)
+        uw.refresh_from_db()
+        assert uw.interval_index == 3
+        assert uw.times_seen == 1
+
+    def test_producing_advances_it(self, session, user):
+        item = _word('casa', en='house')
+        uw = UserWord.objects.create(user=user, item=item, interval_index=3)
+        self._turn(session, tutor='¿Dónde estás?', student='En mi casa.')
+        self._record(session, user)
+        uw.refresh_from_db()
+        assert uw.interval_index == 4
+
+
+class TestRetrieveToCorrectRecall:
+    def test_the_block_asks_for_one_at_a_time_and_a_retry(self, db):
+        from engine.vocabulary import render_block
+        block = render_block([], [_word('casa', en='house')])
+        assert 'ONE AT A TIME' in block
+        assert 'RETURN to it' in block

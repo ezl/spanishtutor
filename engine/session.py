@@ -13,8 +13,10 @@ GOODBYE_WORDS = {'bye', 'adiós', 'adios', 'chao', 'hasta luego', 'goodbye', 'ci
 # where you left it -- you just carry on, with no notice and no restart. Past
 # that the lesson is closed and the next message opens a fresh session, since
 # resuming a drill you have no memory of is worse than starting cleanly.
-# NOTE: settings.INACTIVITY_TIMEOUT_MINUTES also exists (default 15) and nothing
-# reads it. This is the live value.
+# Six hours, so a session survives a long gap: a student who answers, walks away
+# and comes back after lunch is still in the same lesson. A duplicate of this
+# name used to sit unread in settings.py at 15 minutes -- deleted, because two
+# settings with one name is how someone later "fixes" the timeout in the dead one.
 INACTIVITY_TIMEOUT_MINUTES = 360
 
 LESSON_COMPLETE_MARKER = '<<LESSON_COMPLETE>>'
@@ -681,7 +683,13 @@ async def _select_session(user):
     level = user.estimated_cefr_level or 'A1'
     level_idx = LEVEL_ORDER.index(level) if level in LEVEL_ORDER else 0
 
-    if await check_win_state(user):
+    # Announce grid completion once, then fall through to normal selection.
+    # This used to return unconditionally, so "you've gone as far as we can take
+    # you" fired on every subsequent session -- false, and a dead end for a
+    # product meant to reach fluency. Falling through gives review, conversation
+    # and (when no new skill remains) free conversation: maintenance, not an end
+    # screen.
+    if await check_win_state(user) and not await _milestone_recorded(user, GRID_MILESTONE):
         return 'conversation', {'win_state': True}, []
 
     frontier_skills = await get_frontier_skills(user)
@@ -738,6 +746,55 @@ async def _select_session(user):
 
 
 # ── Session lifecycle ──────────────────────────────────────────────────────────
+
+# Milestones are recorded as SessionEvents rather than a User column, so this
+# needs no migration -- another session has models.py open and migrations in
+# flight. A milestone IS an event, so the log is a reasonable home for it.
+MILESTONE_PREFIX = 'milestone:'
+GRID_MILESTONE = 'GRID'
+
+
+async def _milestone_recorded(user, key: str) -> bool:
+    from learner.models import SessionEvent
+    return await sync_to_async(
+        lambda: SessionEvent.objects.filter(
+            session__user=user, skill_id=f'{MILESTONE_PREFIX}{key}').exists()
+    )()
+
+
+async def _record_milestone(session, key: str) -> None:
+    from learner.models import SessionEvent
+    await sync_to_async(SessionEvent.objects.create)(
+        session=session, event_type='system', skill_id=f'{MILESTONE_PREFIX}{key}',
+        content=f'Milestone reached: {key}', user_response='',
+    )
+
+
+def build_milestone_line(levels, advanced: bool) -> str:
+    """One line marking a newly completed CEFR level, or '' if none.
+
+    Levels rather than a single finish line: they arrive six times instead of
+    once, early enough to matter, and adding skills to B2 cannot push an A2
+    learner's next milestone away.
+    """
+    if not levels:
+        return ''
+    named = ', '.join(levels)
+    if advanced:
+        return f'🎉 ¡Terminaste todo el nivel {named}! Sigamos.\n\n'
+    return f'🎉 You just finished everything at {named}! Let\'s keep going.\n\n'
+
+
+async def _pending_level_milestones(user) -> list:
+    """Completed CEFR levels that have not been announced yet."""
+    from .scoring import completed_levels
+    done = await completed_levels(user)
+    pending = []
+    for level in done:
+        if not await _milestone_recorded(user, level):
+            pending.append(level)
+    return pending
+
 
 def _is_goodbye(text: str) -> bool:
     return text.strip().lower() in GOODBYE_WORDS
@@ -1185,6 +1242,16 @@ async def _open_session(user, text: str, forced_skill: dict = None) -> dict:
             cefr_level=level, interests=interests, last_summary=last_summary
         )
         opening = await call_llm([{"role": "user", "content": prompt}], user=user)
+
+    # Announce any CEFR level finished since last time, once each, and mark the
+    # grid milestone if this is the session celebrating it.
+    pending = await _pending_level_milestones(user)
+    if pending:
+        opening = build_milestone_line(pending, _is_advanced(user)) + opening
+        for level in pending:
+            await _record_milestone(session, level)
+    if win_state:
+        await _record_milestone(session, GRID_MILESTONE)
 
     await sync_to_async(SessionEvent.objects.create)(
         session=session, event_type='conversation',

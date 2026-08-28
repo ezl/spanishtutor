@@ -100,7 +100,15 @@ def render_block(due: list, new: list) -> str:
         return ''
     lines = ['\n## Vocabulary for this lesson']
     if new:
-        lines.append('Introduce these words naturally. Do not list them; use them.')
+        lines.append(
+            'Introduce these ONE AT A TIME: use a word in context, then ask for it '
+            'back before moving to the next. Do not present them all and test '
+            'afterwards -- a word met once and never retrieved is barely learned, '
+            'and a student who leaves early should take away two solid words '
+            'rather than six half-met ones.')
+        lines.append(
+            'If the student gets one wrong, correct it and RETURN to it later in '
+            'this lesson until they get it right.')
         for item in new:
             lines.append(f'- {item.display_es} = {item.en}'
                          + (f' ({item.note})' if item.note else '')
@@ -144,19 +152,57 @@ def _appears(needle: str, haystack: str) -> bool:
     return bool(n) and f' {n} ' in haystack
 
 
-def _schedule(word) -> tuple:
-    """Interval ladder. Producing a word counts double -- saying it is stronger
-    evidence than seeing it. Returns (next_due_at, state)."""
-    conf = load_settings()
-    strength = word.times_produced * 2 + word.times_seen
-    days = REVIEW_INTERVALS_DAYS[min(strength, len(REVIEW_INTERVALS_DAYS) - 1)]
+def _corrected_text(tutor_text: str) -> str:
+    """What the student said WRONG, per Luz's fixed correction format.
 
-    if word.times_produced >= conf['graduation_productions']:
-        # Graduated: stops consuming slots, keeps its row and its history. This
-        # is what bounds the active set while the corpus grows without limit.
-        return None, 'known'
-    return timezone.now() + timedelta(days=days), (
-        'practiced' if word.times_produced else 'introduced')
+    The persona corrects in one shape: Dijiste: '<what they said>'. Sería más
+    natural: '<correction>'. So the span between them is, by construction, the
+    student's own erroneous words -- a failure signal the system already emits
+    and nobody was reading.
+
+    Only errors Luz judged worth correcting appear here. Minor slips are
+    silently logged per the persona rules, which is the right filter: a word
+    worth interrupting the lesson for is a word that failed.
+    """
+    spans = re.findall(r'Dijiste:\s*[\'"“‘]?(.+?)[\'"”’]?\s*\.?\s*Ser[íi]a',
+                       tutor_text or '', flags=re.IGNORECASE | re.DOTALL)
+    return _normalize(' '.join(spans))
+
+
+def _schedule(word, outcome: str) -> tuple:
+    """Advance, hold, or drop a word on the interval ladder.
+
+    Retrieval and exposure are not on the same scale, so they no longer share a
+    counter. Producing a word correctly advances it. Merely meeting it refreshes
+    it against decay but does not promote it -- being shown a word again is weak
+    evidence and treating it as progress inflates the schedule. Getting it wrong
+    is the most informative outcome available and drops it to the bottom.
+
+    Returns (next_due_at, state, interval_index).
+    """
+    conf = load_settings()
+    idx = word.interval_index
+
+    if outcome == 'failed':
+        idx = 0
+    elif outcome == 'produced':
+        idx = min(idx + 1, len(REVIEW_INTERVALS_DAYS) - 1)
+    # 'seen' holds position: refreshed, not promoted.
+
+    # Graduation needs correct productions to outnumber failures. Without that,
+    # a word the student keeps getting wrong would still graduate on volume.
+    net = word.times_produced - word.times_failed
+    if outcome != 'failed' and net >= conf['graduation_productions']:
+        return None, 'known', idx
+
+    days = REVIEW_INTERVALS_DAYS[idx]
+    if outcome == 'failed':
+        # Demotion: a graduated word that fails re-enters scheduling. This is
+        # evidence of real forgetting rather than a guess about it.
+        state = 'practiced' if word.times_produced else 'introduced'
+    else:
+        state = 'practiced' if word.times_produced else 'introduced'
+    return timezone.now() + timedelta(days=days), state, idx
 
 
 def _record(session, user) -> dict:
@@ -176,11 +222,12 @@ def _record(session, user) -> dict:
     events = list(session.events.order_by('timestamp'))
     tutor_text, student_text = _split_sides(events)
     tutor, student = _normalize(tutor_text), _normalize(student_text)
+    corrected = _corrected_text(tutor_text)
 
     candidates = LexItem.objects.filter(active=True).filter(
         Q(owner__isnull=True) | Q(owner=user))
 
-    seen = produced = 0
+    seen = produced = failed = 0
     for item in candidates:
         in_student = _appears(item.es, student)
         in_tutor = _appears(item.es, tutor)
@@ -188,17 +235,26 @@ def _record(session, user) -> dict:
             continue
 
         word, _ = UserWord.objects.get_or_create(user=user, item=item)
-        if in_student:
+        if in_student and _appears(item.es, corrected):
+            # Appearing in the student's text is not the same as using it right.
+            # Counting appearance as mastery would graduate words on the evidence
+            # that the student typed them.
+            outcome = 'failed'
+            word.times_failed += 1
+            failed += 1
+        elif in_student:
+            outcome = 'produced'
             word.times_produced += 1
             produced += 1
         else:
+            outcome = 'seen'
             word.times_seen += 1
             seen += 1
         word.last_seen_at = timezone.now()
-        word.next_due_at, word.state = _schedule(word)
+        word.next_due_at, word.state, word.interval_index = _schedule(word, outcome)
         word.save()
 
-    return {'seen': seen, 'produced': produced}
+    return {'seen': seen, 'produced': produced, 'failed': failed}
 
 
 async def record_exposure(session, user) -> dict:

@@ -290,3 +290,85 @@ async def test_get_frontier_skills_cold_start(make_user, make_skill):
     pool = await get_frontier_skills(user)
     assert len(pool) > 0
     assert pool[0].skill_id == 'cold_0'
+
+
+@pytest.mark.django_db(transaction=True)
+class TestWinStateScoping:
+    """check_win_state compared a count of scores against a count of ACTIVE
+    skills, but never filtered the scores by active. A score on a deactivated
+    skill therefore counted toward completing the live grid."""
+
+    @pytest.mark.asyncio
+    async def test_a_score_on_an_inactive_skill_does_not_count(self, make_user, make_skill):
+        from engine.scoring import check_win_state
+        from learner.models import SkillScore
+
+        user = await sync_to_async(make_user)(discord_id='win_inactive', cefr_level='A1')
+        live = await sync_to_async(make_skill)(skill_id='win_live', active=True)
+        dead = await sync_to_async(make_skill)(skill_id='win_dead', active=False)
+        await sync_to_async(SkillScore.objects.create)(
+            user=user, skill=dead, mode='writing', score=4)
+
+        assert await check_win_state(user) is False, \
+            'a retired skill must not complete the grid'
+
+    @pytest.mark.asyncio
+    async def test_completing_every_active_skill_wins(self, make_user, make_skill):
+        from engine.scoring import check_win_state
+        from learner.models import SkillScore
+
+        user = await sync_to_async(make_user)(discord_id='win_all', cefr_level='A1')
+        for i in range(3):
+            sk = await sync_to_async(make_skill)(skill_id=f'win_all_{i}', active=True)
+            await sync_to_async(SkillScore.objects.create)(
+                user=user, skill=sk, mode='writing', score=3)
+
+        assert await check_win_state(user) is True
+
+
+@pytest.mark.django_db(transaction=True)
+class TestLevelProgress:
+    """Milestones fire per CEFR level rather than once at the end, so they arrive
+    often enough to matter and adding skills to B2 cannot push an A2 learner's
+    next milestone away."""
+
+    @pytest.mark.asyncio
+    async def test_counts_are_per_level_and_active_only(self, make_user, make_skill):
+        from engine.scoring import level_progress
+        from learner.models import SkillScore
+
+        user = await sync_to_async(make_user)(discord_id='lvl_1', cefr_level='A1')
+        a = await sync_to_async(make_skill)(skill_id='lvl_a1_a', cefr_level='A1')
+        b = await sync_to_async(make_skill)(skill_id='lvl_a1_b', cefr_level='A1')
+        c = await sync_to_async(make_skill)(skill_id='lvl_a2_a', cefr_level='A2')
+        await sync_to_async(make_skill)(skill_id='lvl_dead', cefr_level='A1', active=False)
+        await sync_to_async(SkillScore.objects.create)(user=user, skill=a, mode='writing', score=3)
+
+        progress = await level_progress(user)
+        assert progress['A1'] == (1, 2)
+        assert progress['A2'] == (0, 1)
+
+    @pytest.mark.asyncio
+    async def test_a_level_is_complete_when_every_active_skill_reaches_three(
+            self, make_user, make_skill):
+        from engine.scoring import completed_levels
+        from learner.models import SkillScore
+
+        user = await sync_to_async(make_user)(discord_id='lvl_2', cefr_level='A1')
+        for i in range(2):
+            sk = await sync_to_async(make_skill)(skill_id=f'lvl2_a1_{i}', cefr_level='A1')
+            await sync_to_async(SkillScore.objects.create)(
+                user=user, skill=sk, mode='writing', score=3)
+        sk = await sync_to_async(make_skill)(skill_id='lvl2_a2', cefr_level='A2')
+        await sync_to_async(SkillScore.objects.create)(user=user, skill=sk, mode='writing', score=2)
+
+        done = await completed_levels(user)
+        assert 'A1' in done and 'A2' not in done
+
+    @pytest.mark.asyncio
+    async def test_a_level_with_no_skills_is_not_complete(self, make_user, make_skill):
+        """Otherwise every empty level counts as won."""
+        from engine.scoring import completed_levels
+        user = await sync_to_async(make_user)(discord_id='lvl_3', cefr_level='A1')
+        await sync_to_async(make_skill)(skill_id='lvl3_a1', cefr_level='A1')
+        assert await completed_levels(user) == []

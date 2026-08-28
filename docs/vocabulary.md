@@ -371,6 +371,57 @@ hook logs at error rather than joining its neighbours' `except: pass`, because
 absent word rows look exactly like a student who used no vocabulary, where a
 missing score at least shows up as a gap on the grid.
 
+### Correctness, not appearance
+
+A word appearing in the student's text is not evidence they used it right.
+Counting it that way marked words mastered on the evidence that the student
+typed them -- three appearances of *gimnasio* in "yo ir gimnasio" would have
+graduated it out of scheduling permanently.
+
+The failure signal already existed and nothing read it. The persona corrects in
+one fixed shape -- `Dijiste: '<what they said>'. Sería más natural:
+'<correction>'` -- so the span between those two markers is, by construction,
+the student's own erroneous words. A target word inside that span failed.
+
+Only errors Luz judged worth correcting appear there; minor slips are silently
+logged per the persona rules. That is the right filter: a word worth
+interrupting a lesson for is a word that failed.
+
+Graduation now requires correct productions to outnumber failures, so a word the
+student keeps getting wrong cannot graduate on volume of attempts. A graduated
+word that fails is demoted back into scheduling -- evidence of real forgetting
+rather than a guess about it.
+
+### Exposure refreshes; retrieval promotes
+
+Retrieval and exposure are not on the same scale, so they no longer share a
+counter. `interval_index` is stored explicitly rather than derived from
+`produced * 2 + seen`:
+
+- **produced correctly** -- advance one rung
+- **seen only** -- hold position; refreshed against decay, not promoted
+- **failed** -- drop to the bottom rung
+
+Being shown a word again is weak evidence, and treating it as progress inflated
+the schedule for exactly the words a student was meeting passively and never
+using.
+
+### Present and retrieve, one word at a time
+
+A lesson that presents eight words and retrieves two is a presentation, not
+learning: six of them are met once and never retrieved in the session that
+introduced them, which is the weakest possible encoding.
+
+So words are introduced one at a time -- use it in context, ask for it back,
+then move on -- and a word the student gets wrong is returned to later in the
+same lesson until it lands (successive relearning, Rawson & Dunlosky: retrieve
+to correct recall in each session rather than attempting once).
+
+This also satisfies the prefix rule. A student who leaves after four turns takes
+away two solid words instead of six half-met ones, and pack size stops
+constraining lesson length -- eight words is a target, not a contract, and
+whatever is not reached comes back through injection.
+
 ### Known limit
 
 `_record` scans the user's whole active catalogue on every session close. Fine
