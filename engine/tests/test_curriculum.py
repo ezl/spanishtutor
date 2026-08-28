@@ -128,3 +128,41 @@ class TestNumberCoverage:
         phrase "más o menos", so that check passes on a curriculum with no
         arithmetic at all. Look for something only arithmetic says."""
         assert self._mentions('dividido') or self._mentions('arithmetic')
+
+
+class TestCurriculumIntegrity:
+    """Structural guards for skills.yaml, which is edited by hand and reordered
+    fairly often. None of these check pedagogy — only that the file is coherent."""
+
+    def _skills(self):
+        import pathlib, yaml
+        return yaml.safe_load(pathlib.Path('curriculum/skills.yaml').read_text())['skills']
+
+    def test_ids_are_unique(self):
+        ids = [s['id'] for s in self._skills()]
+        dupes = sorted({i for i in ids if ids.count(i) > 1})
+        assert dupes == [], f"duplicate skill ids: {dupes}"
+
+    def test_every_prerequisite_exists(self):
+        skills = self._skills()
+        known = {s['id'] for s in skills}
+        dangling = [(s['id'], p) for s in skills
+                    for p in (s.get('prerequisites') or []) if p not in known]
+        assert dangling == [], f"prerequisites pointing at nothing: {dangling}"
+
+    def test_no_prerequisite_is_taught_later_than_its_dependent(self):
+        """File order is teaching order — next_new_skill walks it. A skill whose
+        prerequisite sits below it can be served before its foundation."""
+        skills = self._skills()
+        pos = {s['id']: i for i, s in enumerate(skills)}
+        backwards = [(s['id'], p) for s in skills
+                     for p in (s.get('prerequisites') or [])
+                     if p in pos and pos[p] > pos[s['id']]]
+        assert backwards == [], f"prerequisite taught after its dependent: {backwards}"
+
+    def test_levels_are_valid_and_non_decreasing(self):
+        order = {'A1': 0, 'A2': 1, 'B1': 2, 'B2': 3, 'C1': 4, 'C2': 5}
+        levels = [s['cefr_level'] for s in self._skills()]
+        assert all(l in order for l in levels), 'unknown CEFR level present'
+        ranks = [order[l] for l in levels]
+        assert ranks == sorted(ranks), 'levels are interleaved rather than grouped'

@@ -223,6 +223,12 @@ skills:
     description: "tener (tengo), venir (vengo), hacer (hago), poner (pongo), salir (salgo), traer (traigo), saber (sé), conocer (conozco)"
     prerequisites: [a1_present_ar]
 
+  - id: a2_saber_conocer
+    name: Saber vs. conocer
+    cefr_level: A2
+    description: "Saber for facts and learned skills (sé nadar, sé que viene); conocer for familiarity with people and places (conozco a María, conozco Medellín). Both are go-verbs in the yo form: sé, conozco."
+    prerequisites: [a2_go_verbs]
+
   - id: a2_reflexive_verbs
     name: Reflexive verbs
     cefr_level: A2
@@ -294,6 +300,12 @@ skills:
     description: "Gustar, encantar, molestar, interesar, doler, parecer — reverse construction; me/te/le/nos + gusta/gustan"
     prerequisites: [a2_indirect_object_pronouns]
 
+  - id: a2_por_para_basic
+    name: Por and para — the core split
+    cefr_level: A2
+    description: "para for purpose, destination and deadlines (para ti, para el lunes, para aprender); por for cause, duration, exchange and movement through (por la lluvia, por dos horas, por veinte mil, por el parque). The frequent uses only — the full list comes later."
+    prerequisites: [a1_present_ar]
+
   - id: a2_vocab_travel_directions
     name: Vocabulary — travel & directions
     cefr_level: A2
@@ -358,6 +370,18 @@ skills:
     description: "Completed events (preterite) vs. background/habitual (imperfect); trigger words; narrating a story"
     prerequisites: [b1_imperfect_er_ir, a2_preterite_ar]
 
+  - id: b1_present_perfect
+    name: Present perfect — he hablado
+    cefr_level: B1
+    description: "haber + participio: he hablado, has comido, ha vivido; irregular participles (hecho, dicho, visto, puesto, escrito). In Colombia the indefinido carries most past reference, but the perfect is everywhere in ¿has comido?, he estado pensando, todavía no he ido."
+    prerequisites: [b1_preterite_vs_imperfect]
+
+  - id: b1_por_para_contrast
+    name: Por vs. para — the pairs that change meaning
+    cefr_level: B1
+    description: "trabajo para Ana vs trabajo por Ana; salgo para Bogotá vs paso por Bogotá; lo hice para ti vs lo hice por ti. Plus the fixed expressions — por favor, por eso, por fin, para siempre."
+    prerequisites: [a2_por_para_basic]
+
   - id: b1_future_regular
     name: Future tense — regular verbs
     cefr_level: B1
@@ -399,6 +423,18 @@ skills:
     cefr_level: B1
     description: "Two clauses joined by que, with its own subject and verb in the second: creo que viene, sé que está aquí, dice que llega tarde, parece que va a llover. Verbs of certainty and reporting, which keep the indicative. The structure only; the mood does not change yet"
     prerequisites: [a2_pattern_verb_infinitive, a2_preterite_er_ir]
+
+  - id: b1_relative_pronouns
+    name: Joining sentences — que, quien, donde, lo que
+    cefr_level: B1
+    description: "que for people and things (el libro que leí); quien/quienes after a preposition or comma (la amiga con quien fui); donde for places; lo que for a whole idea (lo que dijiste). Turning two sentences into one."
+    prerequisites: [b1_pattern_que_clauses]
+
+  - id: b1_verbs_with_prepositions
+    name: Verbs that carry their own preposition
+    cefr_level: B1
+    description: "soñar con, pensar en, contar con, insistir en, acordarse de, tratar de, empezar a, ayudar a. The preposition belongs to the verb — it is not a choice, and translating from English gets it wrong."
+    prerequisites: [a2_pattern_verb_infinitive]
 
   - id: b1_subjunctive_formation
     name: Subjunctive — present formation
@@ -504,6 +540,48 @@ skills:
     description: "sin embargo, no obstante, a pesar de que, dado que, aunque + subjunctive/indicative; por lo tanto, en cambio"
     prerequisites: [b1_vocab_opinions]
 
+  - id: b2_se_accidental
+    name: Accidental se — se me olvidó
+    cefr_level: B2
+    description: "se me olvidó, se me cayó, se nos acabó — the construction that removes blame. se + indirect object pronoun + verb agreeing with the thing, not the person. Se me cayeron las llaves, not se me cayó."
+    prerequisites: [b2_passive_se, a2_indirect_object_pronouns]
+
+  - id: b2_perifrasis_verbales
+    name: Verbal periphrases — acabar de, volver a, seguir
+    cefr_level: B2
+    description: "empezar a, acabar de, volver a, seguir + gerundio, ponerse a, dejar de, llevar + gerundio. How Spanish says just did it, did it again, kept doing it, has been doing it for a while."
+    prerequisites: [a2_pattern_present_progressive, a2_pattern_verb_infinitive]
+
+  - id: b2_subjunctive_temporal
+    name: Subjunctive after time expressions
+    cefr_level: B2
+    description: "cuando, hasta que, en cuanto, antes de que, después de que — subjunctive when the event has not happened yet (cuando llegues, te aviso), indicative when it is habitual or already past (cuando llego, siempre saludo)."
+    prerequisites: [b1_subjunctive_triggers_want]
+
+  - id: b2_subjunctive_concessive
+    name: Aunque — indicative or subjunctive
+    cefr_level: B2
+    description: "aunque + indicative for a fact the speaker accepts (aunque llueve, voy); + subjunctive for a hypothetical or conceded one (aunque llueva, voy). Same choice after a pesar de que and por más que."
+    prerequisites: [b2_subjunctive_temporal]
+
+  - id: b2_future_conditional_conjecture
+    name: Guessing with future and conditional
+    cefr_level: B2
+    description: "Future and conditional used for probability rather than time: serán las tres (it must be three), estaría cansado (he was probably tired), ¿dónde estará? This is Spanish's main way of saying probably."
+    prerequisites: [b1_future_regular, b1_conditional]
+
+  - id: b2_narrate_an_experience
+    name: Telling a story that holds together
+    cefr_level: B2
+    description: "Setting the scene in imperfect, moving events with preterite, marking sequence with connectors, and holding the floor across several turns. Function rather than new grammar — deploying what you already have at length."
+    prerequisites: [b1_preterite_vs_imperfect, b1_vocab_conversation_fillers]
+
+  - id: b2_argue_a_position
+    name: Making and defending a point
+    cefr_level: B2
+    description: "Stating a view, conceding ground, then coming back: creo que, es cierto que... pero, por un lado / por otro, en cambio, sin embargo. Disagreeing without sounding rude."
+    prerequisites: [b1_vocab_opinions, b2_discourse_markers]
+
   - id: b2_vocab_abstract
     name: Vocabulary — abstract concepts
     cefr_level: B2
@@ -555,6 +633,30 @@ skills:
     name: Register shifts — formal, informal, written
     cefr_level: C1
     description: "Navigating formal/informal registers; written vs spoken grammar differences; voseo; academic vs colloquial style"
+
+  - id: c1_hedging_and_softening
+    name: Saying things less directly
+    cefr_level: C1
+    description: "quizá / tal vez + subjunctive, parece que, no es que... sino que, diría que, si no me equivoco. Controlling how committed you sound — the difference between an opinion and an assertion."
+    prerequisites: [b2_subjunctive_impersonal]
+
+  - id: c1_nominalization
+    name: Turning clauses into things
+    cefr_level: C1
+    description: "lo + adjective (lo importante, lo difícil de esto), el hecho de que + subjunctive, lo que + verb. How formal and written Spanish compresses a whole idea into a noun phrase."
+    prerequisites: [b1_relative_pronouns]
+
+  - id: c1_connectors_argumentative
+    name: Connectors that carry an argument
+    cefr_level: C1
+    description: "por ende, no obstante, siempre y cuando, a menos que, dado que, en la medida en que, con tal de que. Several govern the subjunctive, which is what makes them hard rather than the meaning."
+    prerequisites: [b2_discourse_markers, b2_subjunctive_impersonal]
+
+  - id: c1_summarise_and_synthesise
+    name: Summarising and reporting an argument
+    cefr_level: C1
+    description: "Compressing something long without losing the point: reporting what someone argued, drawing out an implication, separating what was said from what was meant."
+    prerequisites: [b2_reported_speech, c1_register_shifts]
 
   - id: c1_vocab_literary_academic
     name: Vocabulary — literary & academic
