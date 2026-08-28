@@ -373,7 +373,7 @@ skills:
   - id: b1_present_perfect
     name: Present perfect — he hablado
     cefr_level: B1
-    description: "haber + participio: he hablado, has comido, ha vivido; irregular participles (hecho, dicho, visto, puesto, escrito). In Colombia the indefinido carries most past reference, but the perfect is everywhere in ¿has comido?, he estado pensando, todavía no he ido."
+    description: "haber + participio: he hablado, has comido, ha vivido; irregular participles (hecho, dicho, visto, puesto, escrito). Colombian Spanish reaches for the indefinido where Spain uses the perfect (¿ya comiste?, not ¿has comido?), so this earns its place through the experiential and still-open uses: ¿has estado alguna vez en Cartagena?, todavía no he ido, he estado pensando en eso."
     prerequisites: [b1_preterite_vs_imperfect]
 
   - id: b1_por_para_contrast
@@ -570,6 +570,19 @@ skills:
     description: "Future and conditional used for probability rather than time: serán las tres (it must be three), estaría cansado (he was probably tired), ¿dónde estará? This is Spanish's main way of saying probably."
     prerequisites: [b1_future_regular, b1_conditional]
 
+  # ── Functional skills ──────────────────────────────────────────────────────
+  # The entries below describe what the student can DO rather than a structure
+  # to conjugate. Spanish runs out of new grammar around B2, and CEFR is a
+  # functional framework at root, so a syllabus that keeps adding structures
+  # past that point answers the wrong question.
+  #
+  # They are deliberately written as PHRASE INVENTORIES — "creo que, es cierto
+  # que... pero, por un lado / por otro, en cambio" — and not as abstract
+  # descriptions of a competence. That is load-bearing: extract_units has to
+  # enumerate teachable units from the description, and a phrase list enumerates
+  # exactly as cleanly as a verb paradigm does. Rewriting these into prose about
+  # what the student should be able to do would leave nothing to extract, and
+  # the lesson would silently fall through to the legacy dense prompt.
   - id: b2_narrate_an_experience
     name: Telling a story that holds together
     cefr_level: B2
