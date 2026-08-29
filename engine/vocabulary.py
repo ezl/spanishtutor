@@ -280,3 +280,10 @@ def _record(session, user) -> dict:
 
 async def record_exposure(session, user) -> dict:
     return await sync_to_async(_record)(session, user)
+
+
+def due_word_count(user) -> int:
+    """How many words are due right now. Gates the micro-reading session type."""
+    from learner.models import UserWord
+    return (UserWord.objects.filter(user=user, next_due_at__lte=timezone.now())
+                            .exclude(state='known').count())

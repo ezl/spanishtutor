@@ -727,15 +727,25 @@ async def _select_session(user):
                 return 'reading', {}, frontier_skills
 
     # 3. Conversation — B1+, has prior sessions, not in last 4 sessions (~20% cadence)
+    recent_types = await sync_to_async(
+        lambda: list(
+            Session.objects.filter(user=user, ended_at__isnull=False)
+                           .exclude(session_type='onboarding')
+                           .order_by('-ended_at')
+                           .values_list('session_type', flat=True)[:4]
+        )
+    )()
+
+    # 3a. Micro-reading: the reception channel. Gated on due WORDS rather than a
+    # fixed cadence, so a passage only fires when there is something worth
+    # reinforcing -- a brand-new user never gets one seeded with nothing. It
+    # carries no target_skill on purpose; above B2 "the next unscored skill"
+    # stops meaning anything, and reading has to keep working there.
+    from .vocabulary import due_word_count
+    if 'reading' not in recent_types and await sync_to_async(due_word_count)(user) >= 4:
+        return 'reading', {}, frontier_skills
+
     if level_idx >= 2:
-        recent_types = await sync_to_async(
-            lambda: list(
-                Session.objects.filter(user=user, ended_at__isnull=False)
-                               .exclude(session_type='onboarding')
-                               .order_by('-ended_at')
-                               .values_list('session_type', flat=True)[:4]
-            )
-        )()
         if recent_types and 'conversation' not in recent_types:
             return 'conversation', {}, frontier_skills
 
@@ -1220,12 +1230,41 @@ async def _open_session(user, text: str, forced_skill: dict = None) -> dict:
         )()
 
     elif session_type == 'reading':
-        prompt = READING_PROMPT.format(
-            skill_name=target_skill_obj.name if target_skill_obj else 'Spanish',
-            skill_description=target_skill_obj.description if target_skill_obj else '',
-            cefr_level=level, interests=interests,
-        )
-        opening = await call_llm([{"role": "user", "content": prompt}], user=user)
+        # A reading session with no target skill is a micro-reading: a short
+        # personalised passage seeded with the words that are actually due. The
+        # older skill-driven READING_PROMPT below still serves a reading session
+        # that was opened against a specific skill.
+        if target_skill_obj is None:
+            from .micro_reading import open_reading
+            try:
+                opening = (await open_reading(user))['text']
+            except Exception as exc:
+                # Never serve nothing. open_reading raises rather than returning
+                # an empty string precisely so this is distinguishable, so fall
+                # back to a conversation and correct the session type, otherwise
+                # _continue_reading would look for a comprehension arc that was
+                # never started.
+                import logging
+                logging.getLogger(__name__).error(
+                    'micro-reading generation failed for user %s, falling back '
+                    'to conversation: %s', user.pk, exc)
+                session_type = 'conversation'
+                await sync_to_async(
+                    lambda: Session.objects.filter(pk=session.pk).update(
+                        session_type='conversation')
+                )()
+                opening = await call_llm([{"role": "user", "content":
+                    CONVERSATION_PROMPT.format(
+                        elicitation=await _elicitation_block(user),
+                        cefr_level=level, interests=interests,
+                        last_summary=last_summary)}], user=user)
+        else:
+            prompt = READING_PROMPT.format(
+                skill_name=target_skill_obj.name,
+                skill_description=target_skill_obj.description,
+                cefr_level=level, interests=interests,
+            )
+            opening = await call_llm([{"role": "user", "content": prompt}], user=user)
         if target_skill_obj:
             await sync_to_async(
                 lambda: Session.objects.filter(pk=session.pk).update(
@@ -1771,6 +1810,13 @@ async def _continue_reading(user, session, text: str) -> dict:
     from learner.models import SessionEvent, Session
     from .interests import extract_and_store_interests
     from .scoring import score_session
+
+    # A micro-reading carries no target skill, so there is no four-question
+    # comprehension arc to run. The passage was already complete on its own;
+    # from here the student is engaged and their due words are in front of them,
+    # so it continues as ordinary interleaved practice rather than closing.
+    if session.target_skill_id is None:
+        return await _continue_conversation(user, session, text)
 
     skill = session.target_skill
     skill_name = skill.name if skill else 'this skill'

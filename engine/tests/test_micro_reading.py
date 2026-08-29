@@ -79,7 +79,7 @@ class TestCompleteAfterOneMessage:
     @pytest.mark.asyncio
     async def test_passage_and_question_arrive_together(self, user, db):
         with patch('engine.micro_reading.call_llm', new_callable=AsyncMock) as llm:
-            llm.side_effect = ['Voy al gimnasio.', '¿Adónde va?']
+            llm.return_value = 'Voy al gimnasio.\n\n¿Adónde va?'
             result = await micro_reading.open_reading(user)
         assert result['text'].startswith('Voy al gimnasio.')
         assert '¿Adónde va?' in result['text']
@@ -118,3 +118,62 @@ class TestNoSkillRow:
 
         assert result['passage'] == 'Voy al gimnasio.'
 
+
+
+class TestOneCallNotTwo:
+    """The student is waiting on this path. Asking for the question in a second
+    call doubled the latency for nothing -- the model already has the passage in
+    front of it when it writes the question."""
+
+    @pytest.mark.asyncio
+    async def test_passage_and_question_come_from_a_single_call(self, user, db):
+        with patch('engine.micro_reading.call_llm', new_callable=AsyncMock) as llm:
+            llm.return_value = 'Voy al gimnasio cada día.\n\n¿Adónde va cada día?'
+            result = await micro_reading.open_reading(user)
+
+        assert llm.await_count == 1
+        assert result['passage'] == 'Voy al gimnasio cada día.'
+        assert result['question'] == '¿Adónde va cada día?'
+
+    @pytest.mark.asyncio
+    async def test_a_run_together_reply_still_yields_a_passage(self, user, db):
+        """A passage with no question is degraded, not broken -- reading it is
+        still the point, so this must not raise."""
+        with patch('engine.micro_reading.call_llm', new_callable=AsyncMock) as llm:
+            llm.return_value = 'Voy al gimnasio cada día y me gusta mucho.'
+            result = await micro_reading.open_reading(user)
+
+        assert result['passage'] == 'Voy al gimnasio cada día y me gusta mucho.'
+        assert result['question'] == ''
+        assert result['text'] == 'Voy al gimnasio cada día y me gusta mucho.'
+
+
+class TestTheGate:
+    """Micro-reading fires on due WORDS, not a fixed cadence, so a passage is
+    only generated when there is something worth reinforcing."""
+
+    @pytest.mark.django_db
+    def test_counts_only_words_that_are_actually_due(self, db):
+        from datetime import timedelta
+        from django.utils import timezone
+        from engine.vocabulary import due_word_count
+
+        u = User.objects.create(discord_id='gate1', display_name='Eric')
+        now = timezone.now()
+        for n, due in enumerate([-1, -1, -1, 5]):      # three overdue, one future
+            item = LexItem.objects.create(es=f'w{n}', en=f'w{n}')
+            UserWord.objects.create(user=u, item=item,
+                                    next_due_at=now + timedelta(days=due))
+        assert due_word_count(u) == 3
+
+    @pytest.mark.django_db
+    def test_graduated_words_do_not_count_toward_the_gate(self, db):
+        from datetime import timedelta
+        from django.utils import timezone
+        from engine.vocabulary import due_word_count
+
+        u = User.objects.create(discord_id='gate2', display_name='Eric')
+        item = LexItem.objects.create(es='dominado', en='mastered')
+        UserWord.objects.create(user=u, item=item, state='known',
+                                next_due_at=timezone.now() - timedelta(days=1))
+        assert due_word_count(u) == 0

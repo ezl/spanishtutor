@@ -31,7 +31,7 @@ SENTENCES = 4
 MAX_WORDS_SEEDED = 6
 
 PASSAGE_PROMPT = """Write {sentences} sentences of connected Spanish prose for a \
-CEFR {level} learner.
+CEFR {level} learner, then ask ONE question about it.
 
 It must read as one small piece about a real situation, not {sentences} unrelated \
 example sentences. Someone should be able to follow it as a story or a scene.
@@ -47,7 +47,13 @@ Rules:
 - Do not gloss anything inside the passage and do not add a translation.
 - No title, no preamble, no commentary. Only the passage.
 - If a word will not fit without contorting the sentence, leave it out. A natural \
-passage carrying four words beats a stilted one carrying six."""
+passage carrying four words beats a stilted one carrying six.
+
+Then, after a blank line, ask ONE question about the passage in {question_language}. \
+It must be answerable only by having understood the passage, not by pattern-matching \
+a word out of it. One sentence. No preamble, no label, no numbering.
+
+Output only the passage, a blank line, and the question."""
 
 QUESTION_PROMPT = """Here is a Spanish passage a student has just read:
 
@@ -75,8 +81,13 @@ def _strip(raw: str) -> str:
     return text.strip()
 
 
-async def build_passage(user, words: list) -> str:
-    """Words are LexItems to seed. Returns the passage, or raises."""
+async def build_passage(user, words: list) -> tuple:
+    """Returns (passage, question), or raises.
+
+    One call rather than two: the student is waiting on this path, and asking
+    for the question separately doubled the latency for no gain -- the model
+    already has the passage in front of it when it writes the question.
+    """
     interests = (user.interests or '').strip() or 'No interests recorded yet.'
     seeded = ', '.join(w.es for w in words[:MAX_WORDS_SEEDED]) or '(none in particular)'
 
@@ -85,15 +96,23 @@ async def build_passage(user, words: list) -> str:
             sentences=SENTENCES,
             level=user.estimated_cefr_level or 'A1',
             interests=interests,
-            words=seeded)}],
+            words=seeded,
+            question_language=_question_language(user.estimated_cefr_level or ''))}],
         user=user,
-        max_tokens=600,
+        max_tokens=700,
     )
-    passage = _strip(raw)
-    if not passage:
+    body = _strip(raw)
+    if not body:
         raise PassageGenerationFailed(
             f'empty passage for user {user.pk} (seeded: {seeded})')
-    return passage
+
+    # The question is the last paragraph. If the model ran them together there
+    # is still a passage worth reading, so fall back rather than failing: a
+    # passage with no question is degraded, not broken.
+    parts = [p.strip() for p in body.split('\n\n') if p.strip()]
+    if len(parts) >= 2:
+        return '\n\n'.join(parts[:-1]), parts[-1]
+    return body, ''
 
 
 async def build_question(user, passage: str) -> str:
@@ -123,13 +142,12 @@ async def open_reading(user) -> dict:
     selected = await sync_to_async(_select)(user)
     words = selected['due'] + selected['new']
 
-    passage = await build_passage(user, words)
-    question = await build_question(user, passage)
+    passage, question = await build_passage(user, words)
 
     logger.info('micro-reading for user %s seeded with %d words', user.pk, len(words))
     return {
         'passage': passage,
         'question': question,
         'seeded': [w.es for w in words[:MAX_WORDS_SEEDED]],
-        'text': f'{passage}\n\n{question}',
+        'text': f'{passage}\n\n{question}'.strip(),
     }
