@@ -133,3 +133,1552 @@ packs:
       - {es: famoso, en: famous, pos: adjective, note: "-ous becomes -oso."}
       - {es: rápidamente, en: rapidly, pos: adverb, note: "-ly becomes -mente."}
       - {es: momento, en: moment, pos: noun, gender: m, note: "-ment becomes -mento."}
+
+  # ── A1 legacy vocabulary skills ─────────────────────────────────────────────
+  # These lessons existed before the lexicon and improvised their words. Backing
+  # them with packs is what stops the model choosing different words each run.
+  #
+  # NOTE: a1_vocab_core_adjectives deliberately has NO pack. It is a set of
+  # opposites -- grande/pequeño, caro/barato, fácil/difícil -- which is exactly
+  # the semantically clustered presentation that Tinkham, Waring and Erten &
+  # Tekin all found slows learning and causes cross-association. Its adjectives
+  # are distributed into the thematic packs below instead, where they attach to
+  # a situation rather than to each other. The skill should be retired.
+
+  - id: family_people
+    name: Family and the people around you
+    cefr_level: A1
+    skill: a1_vocab_family
+    words:
+      - {es: madre, en: mother, pos: noun, gender: f}
+      - {es: padre, en: father, pos: noun, gender: m}
+      - {es: hermano, en: brother, pos: noun, gender: m}
+      - {es: hermana, en: sister, pos: noun, gender: f}
+      - {es: hijo, en: son, pos: noun, gender: m}
+      - {es: abuela, en: grandmother, pos: noun, gender: f}
+      - {es: amigo, en: friend, pos: noun, gender: m}
+
+  - id: meals_and_eating
+    name: Meals and eating
+    cefr_level: A1
+    skill: a1_vocab_food_drink
+    words:
+      - {es: desayuno, en: breakfast, pos: noun, gender: m}
+      - {es: almuerzo, en: lunch, pos: noun, gender: m}
+      - {es: cena, en: dinner, pos: noun, gender: f}
+      - {es: agua, en: water, pos: noun, gender: f, note: "Feminine but takes el in the singular: el agua fría."}
+      - {es: café, en: coffee, pos: noun, gender: m}
+      - {es: pan, en: bread, pos: noun, gender: m}
+      - {es: pollo, en: chicken, pos: noun, gender: m}
+      - {es: rico, en: "tasty, delicious", pos: adjective}
+
+  - id: getting_dressed
+    name: Getting dressed
+    cefr_level: A1
+    skill: a1_vocab_colors_clothing
+    words:
+      - {es: camisa, en: shirt, pos: noun, gender: f}
+      - {es: pantalón, en: trousers, pos: noun, gender: m}
+      - {es: zapato, en: shoe, pos: noun, gender: m}
+      - {es: vestido, en: dress, pos: noun, gender: m}
+      - {es: llevar, en: "to wear, to carry", pos: verb, note: "Teach with its yo form: llevo."}
+      - {es: rojo, en: red, pos: adjective}
+      - {es: negro, en: black, pos: adjective}
+      - {es: bonito, en: "pretty, nice", pos: adjective}
+
+  - id: rooms_and_furniture
+    name: Rooms and things in them
+    cefr_level: A1
+    skill: a1_vocab_home_objects
+    words:
+      - {es: cocina, en: kitchen, pos: noun, gender: f}
+      - {es: baño, en: bathroom, pos: noun, gender: m}
+      - {es: sala, en: living room, pos: noun, gender: f}
+      - {es: cama, en: bed, pos: noun, gender: f}
+      - {es: mesa, en: table, pos: noun, gender: f}
+      - {es: silla, en: chair, pos: noun, gender: f}
+      - {es: puerta, en: door, pos: noun, gender: f}
+      - {es: grande, en: big, pos: adjective}
+
+  - id: aches_and_body
+    name: The body, and what hurts
+    cefr_level: A1
+    skill: a1_vocab_body
+    words:
+      - {es: cabeza, en: head, pos: noun, gender: f}
+      - {es: mano, en: hand, pos: noun, gender: f, note: "Feminine despite ending in -o: la mano."}
+      - {es: pie, en: foot, pos: noun, gender: m}
+      - {es: ojo, en: eye, pos: noun, gender: m}
+      - {es: espalda, en: back, pos: noun, gender: f}
+      - {es: pierna, en: leg, pos: noun, gender: f}
+      - {es: me duele, en: "it hurts me", pos: chunk, analyzable: false, note: "Fixed chunk. Do not teach the gustar-type structure here."}
+
+  - id: asking_questions
+    name: Asking a question
+    cefr_level: A1
+    skill: a1_vocab_question_words
+    words:
+      - {es: qué, en: what, pos: pronoun}
+      - {es: quién, en: who, pos: pronoun}
+      - {es: cuándo, en: when, pos: adverb}
+      - {es: dónde, en: where, pos: adverb}
+      - {es: por qué, en: why, pos: chunk, analyzable: false}
+      - {es: cómo, en: how, pos: adverb}
+      - {es: cuánto, en: "how much, how many", pos: adverb}
+
+  # ── A2 ──────────────────────────────────────────────────────────────────────
+  - id: joining_sentences
+    name: Joining ideas together
+    cefr_level: A2
+    skill: a2_vocab_connectors_basic
+    words:
+      - {es: pero, en: but, pos: conjunction}
+      - {es: porque, en: because, pos: conjunction}
+      - {es: cuando, en: when, pos: conjunction}
+      - {es: también, en: also, pos: adverb}
+      - {es: además, en: "besides, moreover", pos: adverb}
+      - {es: antes de, en: before, pos: chunk, analyzable: false}
+      - {es: después de, en: after, pos: chunk, analyzable: false}
+
+  - id: finding_your_way
+    name: Finding your way
+    cefr_level: A2
+    skill: a2_vocab_travel_directions
+    words:
+      - {es: estación, en: station, pos: noun, gender: f}
+      - {es: boleto, en: ticket, pos: noun, gender: m}
+      - {es: izquierda, en: left, pos: noun, gender: f}
+      - {es: derecha, en: right, pos: noun, gender: f}
+      - {es: seguir, en: "to continue, to follow", pos: verb, note: "Teach with its yo form: sigo."}
+      - {es: cruzar, en: to cross, pos: verb, note: "Teach with its yo form: cruzo."}
+      - {es: esquina, en: corner, pos: noun, gender: f}
+
+  - id: furnishing_a_home
+    name: Furnishing a home
+    cefr_level: A2
+    skill: a2_vocab_home_furniture
+    words:
+      - {es: sofá, en: sofa, pos: noun, gender: m, note: "Masculine despite ending in -a: el sofá."}
+      - {es: nevera, en: fridge, pos: noun, gender: f}
+      - {es: armario, en: wardrobe, pos: noun, gender: m}
+      - {es: lavadora, en: washing machine, pos: noun, gender: f}
+      - {es: escritorio, en: desk, pos: noun, gender: m}
+      - {es: estante, en: shelf, pos: noun, gender: m}
+      - {es: mudarse, en: to move house, pos: verb, note: "Reflexive. Teach with its yo form: me mudo."}
+
+  - id: buying_something
+    name: Buying something
+    cefr_level: A2
+    skill: a2_vocab_shopping
+    words:
+      - {es: precio, en: price, pos: noun, gender: m}
+      - {es: caro, en: expensive, pos: adjective}
+      - {es: barato, en: cheap, pos: adjective}
+      - {es: talla, en: size, pos: noun, gender: f}
+      - {es: probarse, en: to try on, pos: verb, note: "Reflexive and stem-changing. Teach with its yo form: me pruebo."}
+      - {es: rebaja, en: "discount, sale", pos: noun, gender: f}
+      - {es: cuánto cuesta, en: how much does it cost, pos: chunk, analyzable: false}
+
+  - id: feeling_ill
+    name: Feeling ill
+    cefr_level: A2
+    skill: a2_vocab_health
+    words:
+      - {es: fiebre, en: fever, pos: noun, gender: f}
+      - {es: dolor, en: pain, pos: noun, gender: m}
+      - {es: medicina, en: medicine, pos: noun, gender: f}
+      - {es: receta, en: prescription, pos: noun, gender: f}
+      - {es: enfermo, en: ill, pos: adjective}
+      - {es: resfriado, en: "a cold", pos: noun, gender: m}
+      - {es: cita, en: appointment, pos: noun, gender: f}
+
+  - id: talking_about_weather
+    name: Talking about the weather
+    cefr_level: A2
+    skill: a2_vocab_weather
+    words:
+      - {es: llover, en: to rain, pos: verb, note: "Only used in the third person: llueve."}
+      - {es: nevar, en: to snow, pos: verb, note: "Only used in the third person: nieva."}
+      - {es: calor, en: heat, pos: noun, gender: m, note: "hace calor, not es caliente."}
+      - {es: frío, en: cold, pos: noun, gender: m}
+      - {es: viento, en: wind, pos: noun, gender: m}
+      - {es: nube, en: cloud, pos: noun, gender: f}
+      - {es: pronóstico, en: forecast, pos: noun, gender: m}
+
+  # ── B1 ──────────────────────────────────────────────────────────────────────
+  - id: sounding_natural
+    name: Sounding natural while you think
+    cefr_level: B1
+    skill: b1_vocab_conversation_fillers
+    words:
+      - {es: bueno, en: "well…", pos: chunk, analyzable: false, note: "As a filler, not the adjective."}
+      - {es: pues, en: "well, so", pos: chunk, analyzable: false}
+      - {es: o sea, en: "I mean, that is", pos: chunk, analyzable: false}
+      - {es: a ver, en: "let's see", pos: chunk, analyzable: false}
+      - {es: es que, en: "the thing is", pos: chunk, analyzable: false}
+      - {es: la verdad es que, en: "the truth is", pos: chunk, analyzable: false}
+      - {es: "¿no?", en: "right?", pos: chunk, analyzable: false}
+
+  - id: work_and_career
+    name: Work and career
+    cefr_level: B1
+    skill: b1_vocab_work_career
+    words:
+      - {es: sueldo, en: salary, pos: noun, gender: m}
+      - {es: jefe, en: boss, pos: noun, gender: m}
+      - {es: reunión, en: meeting, pos: noun, gender: f}
+      - {es: contratar, en: to hire, pos: verb}
+      - {es: renunciar, en: to resign, pos: verb}
+      - {es: entrevista, en: interview, pos: noun, gender: f}
+      - {es: horario, en: schedule, pos: noun, gender: m}
+
+  - id: saying_what_you_think
+    name: Saying what you think
+    cefr_level: B1
+    skill: b1_vocab_opinions
+    words:
+      - {es: creo que, en: "I think that", pos: chunk, analyzable: false}
+      - {es: en mi opinión, en: in my opinion, pos: chunk, analyzable: false}
+      - {es: estar de acuerdo, en: to agree, pos: chunk, analyzable: false}
+      - {es: sin embargo, en: however, pos: chunk, analyzable: false}
+      - {es: aunque, en: although, pos: conjunction}
+      - {es: por eso, en: "that's why", pos: chunk, analyzable: false}
+      - {es: dudar, en: to doubt, pos: verb, note: "Triggers the subjunctive: dudo que sea."}
+
+  - id: online_life
+    name: Life online
+    cefr_level: B1
+    skill: b1_vocab_media_tech
+    words:
+      - {es: descargar, en: to download, pos: verb}
+      - {es: publicar, en: to post, pos: verb}
+      - {es: compartir, en: to share, pos: verb}
+      - {es: red social, en: social network, pos: chunk, analyzable: false}
+      - {es: pantalla, en: screen, pos: noun, gender: f}
+      - {es: contraseña, en: password, pos: noun, gender: f}
+      - {es: enterarse, en: to find out, pos: verb, note: "Reflexive, takes de: me enteré de la noticia."}
+
+  - id: how_you_feel
+    name: How you feel
+    cefr_level: B1
+    skill: b1_vocab_emotions
+    words:
+      - {es: orgulloso, en: proud, pos: adjective}
+      - {es: enojado, en: angry, pos: adjective}
+      - {es: tranquilo, en: "calm, relaxed", pos: adjective}
+      - {es: agobiado, en: overwhelmed, pos: adjective}
+      - {es: sentirse, en: to feel, pos: verb, note: "Reflexive and stem-changing: me siento."}
+      - {es: alegrarse, en: to cheer up, pos: verb, note: "Reflexive: me alegro. For change of state with an adjective, ponerse is taught at A1."}
+      - {es: echar de menos, en: to miss (someone), pos: chunk, analyzable: false}
+
+  # ── B2 ──────────────────────────────────────────────────────────────────────
+  - id: society_and_rights
+    name: Society and rights
+    cefr_level: B2
+    skill: b2_vocab_abstract
+    words:
+      - {es: justicia, en: justice, pos: noun, gender: f}
+      - {es: libertad, en: freedom, pos: noun, gender: f}
+      - {es: igualdad, en: equality, pos: noun, gender: f}
+      - {es: derecho, en: "right, law", pos: noun, gender: m}
+      - {es: poder, en: power, pos: noun, gender: m, note: "The noun, not the verb."}
+      - {es: desigualdad, en: inequality, pos: noun, gender: f}
+      - {es: ciudadanía, en: citizenship, pos: noun, gender: f}
+
+  - id: working_formally
+    name: Working formally
+    cefr_level: B2
+    skill: b2_vocab_professional
+    words:
+      - {es: plazo, en: deadline, pos: noun, gender: m}
+      - {es: acuerdo, en: agreement, pos: noun, gender: m}
+      - {es: propuesta, en: proposal, pos: noun, gender: f}
+      - {es: negociar, en: to negotiate, pos: verb}
+      - {es: plantear, en: "to raise, to put forward", pos: verb}
+      - {es: convocar, en: to call (a meeting), pos: verb}
+      - {es: atentamente, en: "yours sincerely", pos: adverb, note: "Standard sign-off in formal correspondence."}
+
+  # ── C1 ──────────────────────────────────────────────────────────────────────
+  - id: academic_register
+    name: Academic register
+    cefr_level: C1
+    skill: c1_vocab_literary_academic
+    words:
+      - {es: planteamiento, en: "approach, framing", pos: noun, gender: m}
+      - {es: matiz, en: nuance, pos: noun, gender: m}
+      - {es: ámbito, en: "field, sphere", pos: noun, gender: m}
+      - {es: enfoque, en: focus, pos: noun, gender: m}
+      - {es: discrepar, en: to disagree, pos: verb}
+      - {es: esbozar, en: to outline, pos: verb}
+      - {es: índole, en: "nature, kind", pos: noun, gender: f}
+
+  # ── A1 core floor ───────────────────────────────────────────────────────────
+  # Packs from here down carry no `skill:`. They are word sources, reaching the
+  # student through injection into grammar lessons and through micro-reading,
+  # not as lessons of their own. Scaling vocabulary does not mean scaling
+  # vocabulary lessons.
+
+  - id: days_of_the_week
+    name: Days of the week
+    cefr_level: A1
+    words:
+      - {es: lunes, en: Monday, pos: noun, gender: m}
+      - {es: viernes, en: Friday, pos: noun, gender: m}
+      - {es: sábado, en: Saturday, pos: noun, gender: m}
+      - {es: domingo, en: Sunday, pos: noun, gender: m}
+      - {es: fin de semana, en: weekend, pos: chunk, analyzable: false}
+      - {es: hoy, en: today, pos: adverb}
+      - {es: mañana, en: "tomorrow, morning", pos: adverb, note: "Both meanings: mañana (tomorrow) and la mañana (the morning)."}
+      - {es: ayer, en: yesterday, pos: adverb}
+
+  - id: months_and_seasons
+    name: Months and seasons
+    cefr_level: A1
+    words:
+      - {es: mes, en: month, pos: noun, gender: m}
+      - {es: año, en: year, pos: noun, gender: m}
+      - {es: enero, en: January, pos: noun, gender: m}
+      - {es: julio, en: July, pos: noun, gender: m}
+      - {es: verano, en: summer, pos: noun, gender: m}
+      - {es: invierno, en: winter, pos: noun, gender: m}
+      - {es: primavera, en: spring, pos: noun, gender: f}
+      - {es: cumpleaños, en: birthday, pos: noun, gender: m, note: "Always ends in -s, singular and plural."}
+
+  - id: telling_the_time
+    name: Telling the time
+    cefr_level: A1
+    words:
+      - {es: hora, en: hour, pos: noun, gender: f}
+      - {es: minuto, en: minute, pos: noun, gender: m}
+      - {es: media, en: half, pos: noun, gender: f, note: "las dos y media."}
+      - {es: cuarto, en: quarter, pos: noun, gender: m}
+      - {es: reloj, en: clock, pos: noun, gender: m}
+      - {es: temprano, en: early, pos: adverb}
+      - {es: ahora, en: now, pos: adverb}
+      - {es: "¿qué hora es?", en: what time is it, pos: chunk, analyzable: false}
+
+  - id: morning_routine
+    name: Getting up in the morning
+    cefr_level: A1
+    words:
+      - {es: despertarse, en: to wake up, pos: verb, note: "Reflexive: me despierto."}
+      - {es: levantarse, en: to get up, pos: verb, note: "Reflexive: me levanto."}
+      - {es: ducharse, en: to shower, pos: verb, note: "Reflexive: me ducho."}
+      - {es: vestirse, en: to get dressed, pos: verb, note: "Reflexive and stem-changing: me visto."}
+      - {es: desayunar, en: to have breakfast, pos: verb}
+      - {es: cepillarse, en: to brush, pos: verb, note: "me cepillo los dientes."}
+      - {es: listo, en: ready, pos: adjective, note: "estar listo = ready; ser listo = clever."}
+      - {es: rápido, en: quick, pos: adjective}
+
+  - id: evening_routine
+    name: Winding down at night
+    cefr_level: A1
+    words:
+      - {es: cenar, en: to have dinner, pos: verb}
+      - {es: acostarse, en: to go to bed, pos: verb, note: "Reflexive and stem-changing: me acuesto."}
+      - {es: dormir, en: to sleep, pos: verb, note: "Stem-changing: duermo."}
+      - {es: descansar, en: to rest, pos: verb}
+      - {es: cansado, en: tired, pos: adjective}
+      - {es: película, en: film, pos: noun, gender: f}
+      - {es: noche, en: night, pos: noun, gender: f}
+      - {es: sueño, en: "sleep, dream", pos: noun, gender: m, note: "tengo sueño = I'm sleepy."}
+
+  - id: getting_around_town
+    name: Getting around town
+    cefr_level: A1
+    words:
+      - {es: calle, en: street, pos: noun, gender: f}
+      - {es: carro, en: car, pos: noun, gender: m, note: "Colombian usage; coche in Spain."}
+      - {es: autobús, en: bus, pos: noun, gender: m}
+      - {es: caminar, en: to walk, pos: verb}
+      - {es: cerca, en: near, pos: adverb}
+      - {es: lejos, en: far, pos: adverb}
+      - {es: llegar, en: to arrive, pos: verb}
+      - {es: parada, en: stop, pos: noun, gender: f}
+
+  - id: at_the_market
+    name: At the market
+    cefr_level: A1
+    words:
+      - {es: mercado, en: market, pos: noun, gender: m}
+      - {es: comprar, en: to buy, pos: verb}
+      - {es: dinero, en: money, pos: noun, gender: m}
+      - {es: pagar, en: to pay, pos: verb}
+      - {es: bolsa, en: bag, pos: noun, gender: f}
+      - {es: fruta, en: fruit, pos: noun, gender: f}
+      - {es: verdura, en: vegetable, pos: noun, gender: f}
+      - {es: costar, en: to cost, pos: verb, note: "Stem-changing: cuesta."}
+
+  - id: making_a_salad
+    name: Making something to eat
+    cefr_level: A1
+    words:
+      - {es: ensalada, en: salad, pos: noun, gender: f}
+      - {es: tomate, en: tomato, pos: noun, gender: m}
+      - {es: lechuga, en: lettuce, pos: noun, gender: f}
+      - {es: aceite, en: oil, pos: noun, gender: m}
+      - {es: sal, en: salt, pos: noun, gender: f}
+      - {es: cortar, en: to cut, pos: verb}
+      - {es: cocinar, en: to cook, pos: verb}
+      - {es: plato, en: "plate, dish", pos: noun, gender: m}
+
+  - id: at_a_cafe
+    name: At a café
+    cefr_level: A1
+    words:
+      - {es: té, en: tea, pos: noun, gender: m}
+      - {es: jugo, en: juice, pos: noun, gender: m}
+      - {es: vaso, en: glass, pos: noun, gender: m}
+      - {es: taza, en: cup, pos: noun, gender: f}
+      - {es: pedir, en: to order, pos: verb, note: "Stem-changing: pido."}
+      - {es: azúcar, en: sugar, pos: noun, gender: m}
+      - {es: cuenta, en: bill, pos: noun, gender: f}
+      - {es: propina, en: tip, pos: noun, gender: f}
+
+  - id: pets
+    name: Pets
+    cefr_level: A1
+    words:
+      - {es: perro, en: dog, pos: noun, gender: m}
+      - {es: gato, en: cat, pos: noun, gender: m}
+      - {es: pájaro, en: bird, pos: noun, gender: m}
+      - {es: mascota, en: pet, pos: noun, gender: f}
+      - {es: cuidar, en: to look after, pos: verb}
+      - {es: pasear, en: to walk (a dog), pos: verb}
+      - {es: comida, en: food, pos: noun, gender: f}
+      - {es: cariñoso, en: affectionate, pos: adjective}
+
+  - id: dressing_for_the_cold
+    name: Dressing for the cold
+    cefr_level: A1
+    words:
+      - {es: chaqueta, en: jacket, pos: noun, gender: f}
+      - {es: gorra, en: cap, pos: noun, gender: f}
+      - {es: bota, en: boot, pos: noun, gender: f}
+      - {es: guante, en: glove, pos: noun, gender: m}
+      - {es: bufanda, en: scarf, pos: noun, gender: f}
+      - {es: ponerse, en: to put on, pos: verb, note: "Reflexive: me pongo el abrigo."}
+      - {es: abrigo, en: coat, pos: noun, gender: m}
+      - {es: paraguas, en: umbrella, pos: noun, gender: m}
+
+  - id: school_things
+    name: School things
+    cefr_level: A1
+    words:
+      - {es: libro, en: book, pos: noun, gender: m}
+      - {es: cuaderno, en: notebook, pos: noun, gender: m}
+      - {es: lápiz, en: pencil, pos: noun, gender: m}
+      - {es: mochila, en: backpack, pos: noun, gender: f}
+      - {es: clase, en: class, pos: noun, gender: f}
+      - {es: profesor, en: teacher, pos: noun, gender: m}
+      - {es: estudiar, en: to study, pos: verb}
+      - {es: examen, en: exam, pos: noun, gender: m}
+
+  - id: describing_a_friend
+    name: Describing a friend
+    cefr_level: A1
+    words:
+      - {es: alto, en: tall, pos: adjective}
+      - {es: pelo, en: hair, pos: noun, gender: m}
+      - {es: simpático, en: nice, pos: adjective}
+      - {es: gafas, en: glasses, pos: noun, gender: f}
+      - {es: parecer, en: to seem, pos: verb, note: "se parece a = looks like."}
+      - {es: siempre, en: always, pos: adverb}
+      - {es: divertido, en: fun, pos: adjective}
+      - {es: joven, en: young, pos: adjective}
+
+  - id: how_you_feel_today
+    name: How you feel today
+    cefr_level: A1
+    words:
+      - {es: contento, en: happy, pos: adjective}
+      - {es: triste, en: sad, pos: adjective}
+      - {es: nervioso, en: nervous, pos: adjective}
+      - {es: tener miedo, en: to be afraid, pos: chunk, analyzable: false}
+      - {es: tener hambre, en: to be hungry, pos: chunk, analyzable: false}
+      - {es: tener sed, en: to be thirsty, pos: chunk, analyzable: false}
+      - {es: tener razón, en: to be right, pos: chunk, analyzable: false}
+      - {es: porque, en: because, pos: conjunction}
+
+  - id: paying_for_things
+    name: Paying for things
+    cefr_level: A1
+    words:
+      - {es: tarjeta, en: card, pos: noun, gender: f}
+      - {es: efectivo, en: cash, pos: noun, gender: m}
+      - {es: cambio, en: change, pos: noun, gender: m}
+      - {es: gastar, en: to spend, pos: verb}
+      - {es: ahorrar, en: to save, pos: verb}
+      - {es: cuánto, en: how much, pos: adverb}
+      - {es: billete, en: note (money), pos: noun, gender: m}
+      - {es: moneda, en: coin, pos: noun, gender: f}
+
+  - id: around_the_building
+    name: Around the building
+    cefr_level: A1
+    words:
+      - {es: jardín, en: garden, pos: noun, gender: m}
+      - {es: edificio, en: building, pos: noun, gender: m}
+      - {es: piso, en: "floor, apartment", pos: noun, gender: m}
+      - {es: vecino, en: neighbour, pos: noun, gender: m}
+      - {es: llave, en: key, pos: noun, gender: f}
+      - {es: entrar, en: to enter, pos: verb}
+      - {es: salir, en: to leave, pos: verb, note: "Irregular yo form: salgo."}
+      - {es: escalera, en: stairs, pos: noun, gender: f}
+
+  - id: free_time
+    name: Free time
+    cefr_level: A1
+    words:
+      - {es: música, en: music, pos: noun, gender: f}
+      - {es: leer, en: to read, pos: verb}
+      - {es: jugar, en: to play, pos: verb, note: "Stem-changing: juego."}
+      - {es: bailar, en: to dance, pos: verb}
+      - {es: nadar, en: to swim, pos: verb}
+      - {es: viajar, en: to travel, pos: verb}
+      - {es: fiesta, en: party, pos: noun, gender: f}
+      - {es: juntos, en: together, pos: adverb}
+
+  - id: asking_for_help
+    name: Asking for help
+    cefr_level: A1
+    words:
+      - {es: ayuda, en: help, pos: noun, gender: f}
+      - {es: ayudar, en: to help, pos: verb}
+      - {es: disculpe, en: excuse me, pos: chunk, analyzable: false}
+      - {es: perdón, en: sorry, pos: interjection}
+      - {es: claro, en: "of course, clear", pos: adverb}
+      - {es: problema, en: problem, pos: noun, gender: m, note: "Masculine despite ending in -a: el problema."}
+      - {es: esperar, en: "to wait, to hope", pos: verb}
+      - {es: buscar, en: to look for, pos: verb, note: "Takes no preposition: busco el libro."}
+
+  - id: everyday_verbs_one
+    name: Verbs you use constantly
+    cefr_level: A1
+    words:
+      - {es: venir, en: to come, pos: verb, note: "Irregular: vengo, vienes."}
+      - {es: dar, en: to give, pos: verb, note: "Irregular yo form: doy."}
+      - {es: ver, en: to see, pos: verb, note: "Irregular yo form: veo."}
+      - {es: saber, en: to know (a fact), pos: verb, note: "Irregular yo form: sé. Contrast with conocer."}
+      - {es: decir, en: to say, pos: verb, note: "Irregular: digo, dices."}
+      - {es: hacer, en: "to do, to make", pos: verb, note: "Irregular yo form: hago."}
+      - {es: poner, en: to put, pos: verb, note: "Irregular yo form: pongo."}
+      - {es: traer, en: to bring, pos: verb, note: "Irregular yo form: traigo."}
+
+  - id: everyday_verbs_two
+    name: More verbs you use constantly
+    cefr_level: A1
+    words:
+      - {es: deber, en: "should, to owe", pos: verb}
+      - {es: empezar, en: to begin, pos: verb, note: "Stem-changing: empiezo."}
+      - {es: terminar, en: to finish, pos: verb}
+      - {es: usar, en: to use, pos: verb}
+      - {es: abrir, en: to open, pos: verb}
+      - {es: cerrar, en: to close, pos: verb, note: "Stem-changing: cierro."}
+      - {es: encontrar, en: to find, pos: verb, note: "Stem-changing: encuentro."}
+      - {es: recordar, en: to remember, pos: verb, note: "Stem-changing: recuerdo."}
+
+  - id: where_things_are
+    name: Where things are
+    cefr_level: A1
+    words:
+      - {es: aquí, en: here, pos: adverb}
+      - {es: allí, en: there, pos: adverb}
+      - {es: dentro, en: inside, pos: adverb}
+      - {es: fuera, en: outside, pos: adverb}
+      - {es: encima, en: on top, pos: adverb}
+      - {es: debajo, en: underneath, pos: adverb}
+      - {es: al lado de, en: next to, pos: chunk, analyzable: false}
+      - {es: entre, en: between, pos: preposition}
+
+  - id: when_things_happen
+    name: When things happen
+    cefr_level: A1
+    words:
+      - {es: luego, en: later, pos: adverb}
+      - {es: nunca, en: never, pos: adverb}
+      - {es: a veces, en: sometimes, pos: chunk, analyzable: false}
+      - {es: todavía, en: still, pos: adverb}
+      - {es: ya, en: "already, now", pos: adverb}
+      - {es: pronto, en: soon, pos: adverb}
+      - {es: tarde, en: late, pos: adverb}
+      - {es: casi, en: almost, pos: adverb}
+
+  # ── A2 core floor ───────────────────────────────────────────────────────────
+  - id: making_plans
+    name: Making plans
+    cefr_level: A2
+    words:
+      - {es: quedar, en: to arrange to meet, pos: verb, note: "quedamos a las ocho."}
+      - {es: invitar, en: to invite, pos: verb}
+      - {es: plan, en: plan, pos: noun, gender: m}
+      - {es: quizás, en: maybe, pos: adverb}
+      - {es: ocupado, en: busy, pos: adjective}
+      - {es: libre, en: free, pos: adjective}
+      - {es: avisar, en: to let someone know, pos: verb}
+      - {es: apetecer, en: to feel like, pos: verb, note: "Works like gustar: me apetece."}
+
+  - id: taking_a_trip
+    name: Taking a trip
+    cefr_level: A2
+    words:
+      - {es: tren, en: train, pos: noun, gender: m}
+      - {es: avión, en: plane, pos: noun, gender: m}
+      - {es: viaje, en: trip, pos: noun, gender: m}
+      - {es: maleta, en: suitcase, pos: noun, gender: f}
+      - {es: aeropuerto, en: airport, pos: noun, gender: m}
+      - {es: equipaje, en: luggage, pos: noun, gender: m}
+      - {es: salida, en: departure, pos: noun, gender: f}
+      - {es: pasaporte, en: passport, pos: noun, gender: m}
+
+  - id: at_the_hotel
+    name: At the hotel
+    cefr_level: A2
+    words:
+      - {es: habitación, en: room, pos: noun, gender: f}
+      - {es: reserva, en: reservation, pos: noun, gender: f}
+      - {es: recepción, en: reception, pos: noun, gender: f}
+      - {es: alojarse, en: to stay, pos: verb, note: "Reflexive: me alojo en."}
+      - {es: incluir, en: to include, pos: verb}
+      - {es: ascensor, en: lift, pos: noun, gender: m}
+      - {es: toalla, en: towel, pos: noun, gender: f}
+      - {es: ruido, en: noise, pos: noun, gender: m}
+
+  - id: eating_out
+    name: Eating out
+    cefr_level: A2
+    words:
+      - {es: menú, en: menu, pos: noun, gender: m}
+      - {es: mesero, en: waiter, pos: noun, gender: m, note: "Colombian usage; camarero in Spain."}
+      - {es: postre, en: dessert, pos: noun, gender: m}
+      - {es: bebida, en: drink, pos: noun, gender: f}
+      - {es: reservar, en: to book, pos: verb}
+      - {es: recomendar, en: to recommend, pos: verb, note: "Stem-changing: recomiendo."}
+      - {es: picante, en: spicy, pos: adjective}
+      - {es: delicioso, en: delicious, pos: adjective}
+
+  - id: describing_your_town
+    name: Describing your town
+    cefr_level: A2
+    words:
+      - {es: barrio, en: neighbourhood, pos: noun, gender: m}
+      - {es: tranquilo, en: quiet, pos: adjective}
+      - {es: ruidoso, en: noisy, pos: adjective}
+      - {es: plaza, en: square, pos: noun, gender: f}
+      - {es: iglesia, en: church, pos: noun, gender: f}
+      - {es: museo, en: museum, pos: noun, gender: m}
+      - {es: centro, en: centre, pos: noun, gender: m}
+      - {es: ambiente, en: atmosphere, pos: noun, gender: m}
+
+  - id: talking_about_the_past
+    name: Talking about the past
+    cefr_level: A2
+    words:
+      - {es: anoche, en: last night, pos: adverb}
+      - {es: la semana pasada, en: last week, pos: chunk, analyzable: false}
+      - {es: hace, en: ago, pos: chunk, analyzable: false, note: "hace dos años = two years ago."}
+      - {es: entonces, en: then, pos: adverb}
+      - {es: después, en: afterwards, pos: adverb}
+      - {es: antes, en: before, pos: adverb}
+      - {es: de repente, en: suddenly, pos: chunk, analyzable: false}
+      - {es: mientras, en: while, pos: conjunction}
+
+  - id: when_you_were_small
+    name: When you were small
+    cefr_level: A2
+    words:
+      - {es: infancia, en: childhood, pos: noun, gender: f}
+      - {es: de pequeño, en: as a child, pos: chunk, analyzable: false}
+      - {es: recuerdo, en: memory, pos: noun, gender: m}
+      - {es: colegio, en: school, pos: noun, gender: m}
+      - {es: pueblo, en: "town, village", pos: noun, gender: m}
+      - {es: soler, en: to usually do, pos: verb, note: "Stem-changing, used mostly in the imperfect: solía ir."}
+      - {es: travieso, en: naughty, pos: adjective}
+      - {es: crecer, en: to grow up, pos: verb, note: "Irregular yo form: crezco."}
+
+  - id: household_chores
+    name: Household chores
+    cefr_level: A2
+    words:
+      - {es: limpiar, en: to clean, pos: verb}
+      - {es: lavar, en: to wash, pos: verb}
+      - {es: barrer, en: to sweep, pos: verb}
+      - {es: planchar, en: to iron, pos: verb}
+      - {es: basura, en: rubbish, pos: noun, gender: f}
+      - {es: ordenar, en: to tidy, pos: verb}
+      - {es: tarea, en: "task, homework", pos: noun, gender: f}
+      - {es: turno, en: turn, pos: noun, gender: m}
+
+  - id: at_the_gym
+    name: At the gym
+    cefr_level: A2
+    words:
+      - {es: pesa, en: weight, pos: noun, gender: f, note: "Usually plural: levantar pesas."}
+      - {es: entrenar, en: to train, pos: verb}
+      - {es: sudar, en: to sweat, pos: verb}
+      - {es: músculo, en: muscle, pos: noun, gender: m}
+      - {es: rutina, en: routine, pos: noun, gender: f}
+      - {es: levantar, en: to lift, pos: verb}
+      - {es: esfuerzo, en: effort, pos: noun, gender: m}
+      - {es: fuerte, en: strong, pos: adjective}
+
+  - id: at_the_pharmacy
+    name: At the pharmacy
+    cefr_level: A2
+    words:
+      - {es: farmacia, en: pharmacy, pos: noun, gender: f}
+      - {es: pastilla, en: pill, pos: noun, gender: f}
+      - {es: jarabe, en: syrup, pos: noun, gender: m}
+      - {es: dosis, en: dose, pos: noun, gender: f}
+      - {es: alergia, en: allergy, pos: noun, gender: f}
+      - {es: síntoma, en: symptom, pos: noun, gender: m, note: "Masculine despite ending in -a."}
+      - {es: mejorar, en: to improve, pos: verb}
+      - {es: empeorar, en: to get worse, pos: verb}
+
+  - id: what_someone_is_like
+    name: What someone is like
+    cefr_level: A2
+    words:
+      - {es: amable, en: kind, pos: adjective}
+      - {es: tímido, en: shy, pos: adjective}
+      - {es: generoso, en: generous, pos: adjective}
+      - {es: terco, en: stubborn, pos: adjective}
+      - {es: paciente, en: patient, pos: adjective}
+      - {es: carácter, en: character, pos: noun, gender: m}
+      - {es: confiar, en: to trust, pos: verb, note: "Takes en: confío en ella."}
+      - {es: llevarse bien, en: to get on well, pos: chunk, analyzable: false}
+
+  - id: a_busy_day
+    name: A busy day
+    cefr_level: A2
+    words:
+      - {es: prisa, en: hurry, pos: noun, gender: f, note: "tengo prisa = I'm in a hurry."}
+      - {es: reunirse, en: to meet, pos: verb, note: "Reflexive: me reúno."}
+      - {es: llamar, en: to call, pos: verb}
+      - {es: correo, en: "email, post", pos: noun, gender: m}
+      - {es: agenda, en: diary, pos: noun, gender: f}
+      - {es: apurarse, en: to hurry, pos: verb, note: "Colombian usage; darse prisa in Spain."}
+      - {es: retrasarse, en: to be delayed, pos: verb}
+      - {es: pendiente, en: outstanding, pos: adjective}
+
+  - id: devices_and_messages
+    name: Devices and messages
+    cefr_level: A2
+    words:
+      - {es: computador, en: computer, pos: noun, gender: m, note: "Colombian usage; ordenador in Spain."}
+      - {es: celular, en: mobile phone, pos: noun, gender: m, note: "Colombian usage; móvil in Spain."}
+      - {es: mensaje, en: message, pos: noun, gender: m}
+      - {es: archivo, en: file, pos: noun, gender: m}
+      - {es: guardar, en: to save, pos: verb}
+      - {es: borrar, en: to delete, pos: verb}
+      - {es: cargador, en: charger, pos: noun, gender: m}
+      - {es: apagar, en: to switch off, pos: verb}
+
+  - id: trying_clothes_on
+    name: Trying clothes on
+    cefr_level: A2
+    words:
+      - {es: probador, en: fitting room, pos: noun, gender: m}
+      - {es: quedar bien, en: to suit, pos: chunk, analyzable: false, note: "Te queda bien = it suits you."}
+      - {es: cambiar, en: to change, pos: verb}
+      - {es: recibo, en: receipt, pos: noun, gender: m}
+      - {es: oferta, en: offer, pos: noun, gender: f}
+      - {es: estilo, en: style, pos: noun, gender: m}
+      - {es: elegir, en: to choose, pos: verb, note: "Stem-changing: elijo."}
+      - {es: apretado, en: tight, pos: adjective}
+
+  - id: what_the_weather_will_do
+    name: What the weather will do
+    cefr_level: A2
+    words:
+      - {es: nublado, en: cloudy, pos: adjective}
+      - {es: despejado, en: clear, pos: adjective}
+      - {es: húmedo, en: humid, pos: adjective}
+      - {es: tormenta, en: storm, pos: noun, gender: f}
+      - {es: temperatura, en: temperature, pos: noun, gender: f}
+      - {es: grado, en: degree, pos: noun, gender: m}
+      - {es: según, en: according to, pos: preposition}
+      - {es: subir, en: "to go up, to rise", pos: verb}
+
+  - id: family_celebrations
+    name: Family celebrations
+    cefr_level: A2
+    words:
+      - {es: boda, en: wedding, pos: noun, gender: f}
+      - {es: aniversario, en: anniversary, pos: noun, gender: m}
+      - {es: invitado, en: guest, pos: noun, gender: m}
+      - {es: regalo, en: present, pos: noun, gender: m}
+      - {es: celebrar, en: to celebrate, pos: verb}
+      - {es: brindis, en: toast, pos: noun, gender: m}
+      - {es: novia, en: "bride, girlfriend", pos: noun, gender: f}
+      - {es: emocionante, en: exciting, pos: adjective}
+
+  - id: cooking_properly
+    name: Cooking properly
+    cefr_level: A2
+    words:
+      - {es: hervir, en: to boil, pos: verb, note: "Stem-changing: hiervo."}
+      - {es: freír, en: to fry, pos: verb}
+      - {es: hornear, en: to bake, pos: verb}
+      - {es: sartén, en: frying pan, pos: noun, gender: f}
+      - {es: olla, en: pot, pos: noun, gender: f}
+      - {es: ingrediente, en: ingredient, pos: noun, gender: m}
+      - {es: sabor, en: flavour, pos: noun, gender: m}
+      - {es: dulce, en: sweet, pos: adjective}
+
+  - id: stronger_feelings
+    name: Stronger feelings
+    cefr_level: A2
+    words:
+      - {es: enfadado, en: annoyed, pos: adjective}
+      - {es: preocupado, en: worried, pos: adjective}
+      - {es: sorprendido, en: surprised, pos: adjective}
+      - {es: aburrido, en: "bored, boring", pos: adjective, note: "estar aburrido = bored; ser aburrido = boring."}
+      - {es: emocionado, en: excited, pos: adjective}
+      - {es: ánimo, en: spirits, pos: noun, gender: m}
+      - {es: molestar, en: to bother, pos: verb, note: "Works like gustar: me molesta."}
+      - {es: alegría, en: joy, pos: noun, gender: f}
+
+  - id: when_travel_goes_wrong
+    name: When travel goes wrong
+    cefr_level: A2
+    words:
+      - {es: retraso, en: delay, pos: noun, gender: m}
+      - {es: perder, en: "to miss, to lose", pos: verb, note: "Stem-changing: pierdo. perder el tren."}
+      - {es: tráfico, en: traffic, pos: noun, gender: m}
+      - {es: trancón, en: traffic jam, pos: noun, gender: m, note: "Colombian usage; atasco in Spain."}
+      - {es: puntual, en: on time, pos: adjective}
+      - {es: andén, en: platform, pos: noun, gender: m}
+      - {es: cancelar, en: to cancel, pos: verb}
+      - {es: quejarse, en: to complain, pos: verb, note: "Reflexive, takes de: me quejo del ruido."}
+
+  - id: banking_and_bills
+    name: Banking and bills
+    cefr_level: A2
+    words:
+      - {es: banco, en: bank, pos: noun, gender: m}
+      - {es: préstamo, en: loan, pos: noun, gender: m}
+      - {es: deuda, en: debt, pos: noun, gender: f}
+      - {es: cobrar, en: to charge, pos: verb}
+      - {es: factura, en: invoice, pos: noun, gender: f}
+      - {es: presupuesto, en: budget, pos: noun, gender: m}
+      - {es: firmar, en: to sign, pos: verb}
+      - {es: retirar, en: to withdraw, pos: verb}
+
+  - id: shops_on_the_corner
+    name: Shops on the corner
+    cefr_level: A2
+    words:
+      - {es: panadería, en: bakery, pos: noun, gender: f}
+      - {es: carnicería, en: butcher's, pos: noun, gender: f}
+      - {es: frutería, en: greengrocer's, pos: noun, gender: f}
+      - {es: peluquería, en: hairdresser's, pos: noun, gender: f}
+      - {es: atender, en: to serve, pos: verb, note: "Stem-changing: atiendo."}
+      - {es: cliente, en: customer, pos: noun, gender: m}
+      - {es: fila, en: queue, pos: noun, gender: f}
+      - {es: fresco, en: fresh, pos: adjective}
+
+  - id: learning_a_language
+    name: Learning a language
+    cefr_level: A2
+    words:
+      - {es: practicar, en: to practise, pos: verb}
+      - {es: repasar, en: to revise, pos: verb}
+      - {es: equivocarse, en: to make a mistake, pos: verb, note: "Reflexive: me equivoco."}
+      - {es: corregir, en: to correct, pos: verb, note: "Stem-changing: corrijo."}
+      - {es: pronunciar, en: to pronounce, pos: verb}
+      - {es: traducir, en: to translate, pos: verb, note: "Irregular yo form: traduzco."}
+      - {es: avanzar, en: to make progress, pos: verb}
+      - {es: costar trabajo, en: to be hard work, pos: chunk, analyzable: false}
+
+  - id: describing_objects
+    name: Describing objects
+    cefr_level: A2
+    words:
+      - {es: pesado, en: heavy, pos: adjective}
+      - {es: ligero, en: light, pos: adjective}
+      - {es: blando, en: soft, pos: adjective}
+      - {es: duro, en: hard, pos: adjective}
+      - {es: redondo, en: round, pos: adjective}
+      - {es: material, en: material, pos: noun, gender: m}
+      - {es: servir, en: to be useful, pos: verb, note: "Stem-changing: sirvo. ¿Para qué sirve?"}
+      - {es: roto, en: broken, pos: adjective}
+
+  - id: comparing_things
+    name: Comparing things
+    cefr_level: A2
+    words:
+      - {es: más que, en: more than, pos: chunk, analyzable: false}
+      - {es: menos que, en: less than, pos: chunk, analyzable: false}
+      - {es: tan como, en: as … as, pos: chunk, analyzable: false}
+      - {es: mejor, en: better, pos: adjective}
+      - {es: peor, en: worse, pos: adjective}
+      - {es: mayor, en: "older, greater", pos: adjective}
+      - {es: menor, en: "younger, lesser", pos: adjective}
+      - {es: parecido, en: similar, pos: adjective}
+
+  - id: how_often
+    name: How often
+    cefr_level: A2
+    words:
+      - {es: a menudo, en: often, pos: chunk, analyzable: false}
+      - {es: rara vez, en: rarely, pos: chunk, analyzable: false}
+      - {es: de vez en cuando, en: from time to time, pos: chunk, analyzable: false}
+      - {es: todos los días, en: every day, pos: chunk, analyzable: false}
+      - {es: dos veces, en: twice, pos: chunk, analyzable: false}
+      - {es: normalmente, en: normally, pos: adverb}
+      - {es: cada, en: each, pos: adjective}
+      - {es: apenas, en: hardly, pos: adverb}
+
+  # ── B1 core floor ───────────────────────────────────────────────────────────
+  - id: making_an_argument
+    name: Making an argument
+    cefr_level: B1
+    words:
+      - {es: argumento, en: argument, pos: noun, gender: m}
+      - {es: punto de vista, en: point of view, pos: chunk, analyzable: false}
+      - {es: estar en contra, en: to be against, pos: chunk, analyzable: false}
+      - {es: defender, en: to defend, pos: verb, note: "Stem-changing: defiendo."}
+      - {es: convencer, en: to convince, pos: verb}
+      - {es: insistir, en: to insist, pos: verb, note: "Takes en: insisto en ir."}
+      - {es: debate, en: debate, pos: noun, gender: m}
+      - {es: contradecir, en: to contradict, pos: verb}
+
+  - id: looking_for_work
+    name: Looking for work
+    cefr_level: B1
+    words:
+      - {es: hoja de vida, en: CV, pos: chunk, analyzable: false, note: "Colombian usage; currículum in Spain."}
+      - {es: solicitar, en: to apply for, pos: verb}
+      - {es: puesto, en: position, pos: noun, gender: m}
+      - {es: requisito, en: requirement, pos: noun, gender: m}
+      - {es: experiencia, en: experience, pos: noun, gender: f}
+      - {es: capacitado, en: qualified, pos: adjective}
+      - {es: ascenso, en: promotion, pos: noun, gender: m}
+      - {es: postularse, en: to apply, pos: verb, note: "Reflexive: me postulo a."}
+
+  - id: pay_and_contracts
+    name: Pay and contracts
+    cefr_level: B1
+    words:
+      - {es: impuesto, en: tax, pos: noun, gender: m}
+      - {es: nómina, en: payroll, pos: noun, gender: f}
+      - {es: jornada, en: working day, pos: noun, gender: f}
+      - {es: independiente, en: freelance, pos: adjective}
+      - {es: contrato, en: contract, pos: noun, gender: m}
+      - {es: despedir, en: to dismiss, pos: verb, note: "Stem-changing: despido."}
+      - {es: jubilarse, en: to retire, pos: verb}
+      - {es: prestación, en: benefit, pos: noun, gender: f}
+
+  - id: health_and_habits
+    name: Health and habits
+    cefr_level: B1
+    words:
+      - {es: dieta, en: diet, pos: noun, gender: f}
+      - {es: hábito, en: habit, pos: noun, gender: m}
+      - {es: adelgazar, en: to lose weight, pos: verb}
+      - {es: engordar, en: to put on weight, pos: verb}
+      - {es: dejar de, en: to stop doing, pos: chunk, analyzable: false}
+      - {es: estrés, en: stress, pos: noun, gender: m}
+      - {es: bienestar, en: wellbeing, pos: noun, gender: m}
+      - {es: chequeo, en: check-up, pos: noun, gender: m}
+
+  - id: following_the_news
+    name: Following the news
+    cefr_level: B1
+    words:
+      - {es: noticia, en: news item, pos: noun, gender: f}
+      - {es: periódico, en: newspaper, pos: noun, gender: m}
+      - {es: titular, en: headline, pos: noun, gender: m}
+      - {es: fuente, en: source, pos: noun, gender: f}
+      - {es: informar, en: to report, pos: verb}
+      - {es: testigo, en: witness, pos: noun, gender: m}
+      - {es: suceso, en: event, pos: noun, gender: m}
+      - {es: enterarse de, en: to find out about, pos: chunk, analyzable: false}
+
+  - id: politics_and_society
+    name: Politics and society
+    cefr_level: B1
+    words:
+      - {es: gobierno, en: government, pos: noun, gender: m}
+      - {es: elección, en: election, pos: noun, gender: f}
+      - {es: votar, en: to vote, pos: verb}
+      - {es: partido, en: "party, match", pos: noun, gender: m}
+      - {es: ley, en: law, pos: noun, gender: f}
+      - {es: ciudadano, en: citizen, pos: noun, gender: m}
+      - {es: protesta, en: protest, pos: noun, gender: f}
+      - {es: apoyar, en: to support, pos: verb}
+
+  - id: the_environment
+    name: The environment
+    cefr_level: B1
+    words:
+      - {es: medio ambiente, en: environment, pos: chunk, analyzable: false}
+      - {es: contaminación, en: pollution, pos: noun, gender: f}
+      - {es: reciclar, en: to recycle, pos: verb}
+      - {es: residuo, en: waste, pos: noun, gender: m}
+      - {es: energía, en: energy, pos: noun, gender: f}
+      - {es: clima, en: climate, pos: noun, gender: m, note: "Masculine despite ending in -a."}
+      - {es: sostenible, en: sustainable, pos: adjective}
+      - {es: proteger, en: to protect, pos: verb, note: "Irregular yo form: protejo."}
+
+  - id: city_problems
+    name: City problems
+    cefr_level: B1
+    words:
+      - {es: delincuencia, en: crime, pos: noun, gender: f}
+      - {es: seguridad, en: safety, pos: noun, gender: f}
+      - {es: vivienda, en: housing, pos: noun, gender: f}
+      - {es: alquiler, en: rent, pos: noun, gender: m}
+      - {es: escasez, en: shortage, pos: noun, gender: f}
+      - {es: obra, en: "building work, work of art", pos: noun, gender: f}
+      - {es: aumentar, en: to increase, pos: verb}
+      - {es: grave, en: serious, pos: adjective}
+
+  - id: relationships
+    name: Relationships
+    cefr_level: B1
+    words:
+      - {es: pareja, en: partner, pos: noun, gender: f}
+      - {es: discutir, en: to argue, pos: verb}
+      - {es: perdonar, en: to forgive, pos: verb}
+      - {es: confianza, en: trust, pos: noun, gender: f}
+      - {es: compromiso, en: commitment, pos: noun, gender: m}
+      - {es: romper, en: to break up, pos: verb, note: "romper con alguien."}
+      - {es: extrañar, en: to miss, pos: verb, note: "Colombian usage; echar de menos in Spain."}
+      - {es: celos, en: jealousy, pos: noun, gender: m, note: "Always plural: tener celos."}
+
+  - id: describing_an_experience
+    name: Describing an experience
+    cefr_level: B1
+    words:
+      - {es: impresionante, en: impressive, pos: adjective}
+      - {es: inolvidable, en: unforgettable, pos: adjective}
+      - {es: decepcionante, en: disappointing, pos: adjective}
+      - {es: merecer la pena, en: to be worth it, pos: chunk, analyzable: false}
+      - {es: atreverse, en: to dare, pos: verb, note: "Reflexive, takes a: me atrevo a."}
+      - {es: lograr, en: to manage to, pos: verb}
+      - {es: superar, en: to overcome, pos: verb}
+      - {es: arrepentirse, en: to regret, pos: verb, note: "Reflexive, takes de: me arrepiento de."}
+
+  - id: talking_about_possibility
+    name: Talking about possibility
+    cefr_level: B1
+    words:
+      - {es: suponer, en: to suppose, pos: verb, note: "Irregular yo form: supongo."}
+      - {es: imaginar, en: to imagine, pos: verb}
+      - {es: en caso de, en: in case of, pos: chunk, analyzable: false}
+      - {es: depender, en: to depend, pos: verb, note: "Takes de: depende del tiempo."}
+      - {es: posibilidad, en: possibility, pos: noun, gender: f}
+      - {es: arriesgar, en: to risk, pos: verb}
+      - {es: probable, en: likely, pos: adjective}
+      - {es: por si acaso, en: just in case, pos: chunk, analyzable: false}
+
+  - id: conceding_a_point
+    name: Conceding a point
+    cefr_level: B1
+    words:
+      - {es: admitir, en: to admit, pos: verb}
+      - {es: reconocer, en: to acknowledge, pos: verb, note: "Irregular yo form: reconozco."}
+      - {es: sin duda, en: without doubt, pos: chunk, analyzable: false}
+      - {es: en cambio, en: on the other hand, pos: chunk, analyzable: false}
+      - {es: por otro lado, en: on the other hand, pos: chunk, analyzable: false}
+      - {es: objetar, en: to object, pos: verb}
+      - {es: a pesar de, en: in spite of, pos: chunk, analyzable: false}
+      - {es: cierto, en: "true, certain", pos: adjective}
+
+  - id: describing_change
+    name: Describing change
+    cefr_level: B1
+    words:
+      - {es: convertirse, en: to become, pos: verb, note: "Reflexive, takes en: se convirtió en."}
+      - {es: volverse, en: to turn (into a state), pos: verb, note: "se volvió loco."}
+      - {es: transformar, en: to transform, pos: verb}
+      - {es: tendencia, en: trend, pos: noun, gender: f}
+      - {es: poco a poco, en: little by little, pos: chunk, analyzable: false}
+      - {es: cada vez más, en: more and more, pos: chunk, analyzable: false}
+      - {es: desarrollo, en: development, pos: noun, gender: m}
+      - {es: mantener, en: to maintain, pos: verb, note: "Irregular like tener: mantengo."}
+
+  - id: studying_at_university
+    name: Studying at university
+    cefr_level: B1
+    words:
+      - {es: carrera, en: "degree, career", pos: noun, gender: f}
+      - {es: matricularse, en: to enrol, pos: verb}
+      - {es: beca, en: scholarship, pos: noun, gender: f}
+      - {es: asignatura, en: subject, pos: noun, gender: f}
+      - {es: aprobar, en: to pass, pos: verb, note: "Stem-changing: apruebo."}
+      - {es: reprobar, en: to fail, pos: verb, note: "Colombian usage; suspender in Spain."}
+      - {es: título, en: degree certificate, pos: noun, gender: m}
+      - {es: investigación, en: research, pos: noun, gender: f}
+
+  - id: arts_and_performance
+    name: Arts and performance
+    cefr_level: B1
+    words:
+      - {es: exposición, en: exhibition, pos: noun, gender: f}
+      - {es: escenario, en: stage, pos: noun, gender: m}
+      - {es: guion, en: script, pos: noun, gender: m}
+      - {es: personaje, en: character, pos: noun, gender: m}
+      - {es: trama, en: plot, pos: noun, gender: f}
+      - {es: público, en: audience, pos: noun, gender: m}
+      - {es: estrenar, en: to premiere, pos: verb}
+      - {es: aficionado, en: fan, pos: noun, gender: m}
+
+  - id: food_culture
+    name: Food culture
+    cefr_level: B1
+    words:
+      - {es: gastronomía, en: cuisine, pos: noun, gender: f}
+      - {es: plato típico, en: traditional dish, pos: chunk, analyzable: false}
+      - {es: temporada, en: season, pos: noun, gender: f}
+      - {es: casero, en: homemade, pos: adjective}
+      - {es: saborear, en: to savour, pos: verb}
+      - {es: aliño, en: dressing, pos: noun, gender: m}
+      - {es: cosecha, en: harvest, pos: noun, gender: f}
+      - {es: probar, en: to taste, pos: verb, note: "Stem-changing: pruebo."}
+
+  - id: travelling_further
+    name: Travelling further
+    cefr_level: B1
+    words:
+      - {es: alojamiento, en: accommodation, pos: noun, gender: m}
+      - {es: itinerario, en: itinerary, pos: noun, gender: m}
+      - {es: recorrer, en: to travel around, pos: verb}
+      - {es: paisaje, en: landscape, pos: noun, gender: m}
+      - {es: frontera, en: border, pos: noun, gender: f}
+      - {es: aduana, en: customs, pos: noun, gender: f}
+      - {es: imprescindible, en: essential, pos: adjective}
+      - {es: alrededores, en: surroundings, pos: noun, gender: m}
+
+  - id: technology_and_us
+    name: Technology and us
+    cefr_level: B1
+    words:
+      - {es: algoritmo, en: algorithm, pos: noun, gender: m}
+      - {es: privacidad, en: privacy, pos: noun, gender: f}
+      - {es: adicción, en: addiction, pos: noun, gender: f}
+      - {es: conectarse, en: to log on, pos: verb}
+      - {es: actualizar, en: to update, pos: verb}
+      - {es: dispositivo, en: device, pos: noun, gender: m}
+      - {es: usuario, en: user, pos: noun, gender: m}
+      - {es: herramienta, en: tool, pos: noun, gender: f}
+
+  - id: harder_feelings
+    name: Harder feelings
+    cefr_level: B1
+    words:
+      - {es: frustración, en: frustration, pos: noun, gender: f}
+      - {es: alivio, en: relief, pos: noun, gender: m}
+      - {es: culpa, en: "guilt, fault", pos: noun, gender: f}
+      - {es: vergüenza, en: embarrassment, pos: noun, gender: f}
+      - {es: entusiasmo, en: enthusiasm, pos: noun, gender: m}
+      - {es: desahogarse, en: to get it off your chest, pos: verb}
+      - {es: soportar, en: to put up with, pos: verb}
+      - {es: dar rabia, en: to make you angry, pos: chunk, analyzable: false}
+
+  - id: giving_advice
+    name: Giving advice
+    cefr_level: B1
+    words:
+      - {es: aconsejar, en: to advise, pos: verb, note: "Triggers the subjunctive: te aconsejo que vayas."}
+      - {es: sugerir, en: to suggest, pos: verb, note: "Stem-changing, triggers the subjunctive: sugiero que."}
+      - {es: convenir, en: to be advisable, pos: verb, note: "conviene que estudies."}
+      - {es: valer la pena, en: to be worthwhile, pos: chunk, analyzable: false}
+      - {es: plantearse, en: to consider, pos: verb}
+      - {es: ojalá, en: "hopefully, I wish", pos: chunk, analyzable: false, note: "Always followed by the subjunctive."}
+      - {es: hacer caso, en: to pay attention, pos: chunk, analyzable: false}
+      - {es: advertir, en: to warn, pos: verb, note: "Stem-changing: advierto."}
+
+  - id: when_things_break
+    name: When things break
+    cefr_level: B1
+    words:
+      - {es: avería, en: breakdown, pos: noun, gender: f}
+      - {es: fallo, en: fault, pos: noun, gender: m}
+      - {es: resolver, en: to resolve, pos: verb, note: "Stem-changing: resuelvo."}
+      - {es: reclamar, en: to make a claim, pos: verb}
+      - {es: garantía, en: warranty, pos: noun, gender: f}
+      - {es: reparar, en: to repair, pos: verb}
+      - {es: arreglar, en: to fix, pos: verb}
+      - {es: repuesto, en: spare part, pos: noun, gender: m}
+
+  - id: talking_about_periods
+    name: Talking about periods of time
+    cefr_level: B1
+    words:
+      - {es: época, en: era, pos: noun, gender: f}
+      - {es: etapa, en: stage, pos: noun, gender: f}
+      - {es: actualmente, en: currently, pos: adverb}
+      - {es: mientras tanto, en: meanwhile, pos: chunk, analyzable: false}
+      - {es: a largo plazo, en: in the long term, pos: chunk, analyzable: false}
+      - {es: desde entonces, en: since then, pos: chunk, analyzable: false}
+      - {es: con el tiempo, en: over time, pos: chunk, analyzable: false}
+      - {es: durar, en: to last, pos: verb}
+
+  - id: how_much_of_it
+    name: How much of it
+    cefr_level: B1
+    words:
+      - {es: bastante, en: quite a lot, pos: adverb}
+      - {es: demasiado, en: too much, pos: adverb}
+      - {es: suficiente, en: enough, pos: adjective}
+      - {es: escaso, en: scarce, pos: adjective}
+      - {es: la mayoría, en: most, pos: chunk, analyzable: false}
+      - {es: un montón, en: loads, pos: chunk, analyzable: false}
+      - {es: apenas nada, en: hardly anything, pos: chunk, analyzable: false}
+      - {es: alguno, en: some, pos: adjective}
+
+  - id: linking_an_argument
+    name: Linking an argument
+    cefr_level: B1
+    words:
+      - {es: por lo tanto, en: therefore, pos: chunk, analyzable: false}
+      - {es: no obstante, en: nevertheless, pos: chunk, analyzable: false}
+      - {es: en resumen, en: in short, pos: chunk, analyzable: false}
+      - {es: es decir, en: that is to say, pos: chunk, analyzable: false}
+      - {es: por ejemplo, en: for example, pos: chunk, analyzable: false}
+      - {es: en cuanto a, en: as for, pos: chunk, analyzable: false}
+      - {es: mientras que, en: whereas, pos: chunk, analyzable: false}
+      - {es: dado que, en: given that, pos: chunk, analyzable: false}
+
+  # ── B2 core floor ───────────────────────────────────────────────────────────
+  - id: difference_and_belonging
+    name: Difference and belonging
+    cefr_level: B2
+    words:
+      - {es: dignidad, en: dignity, pos: noun, gender: f}
+      - {es: prejuicio, en: prejudice, pos: noun, gender: m}
+      - {es: tolerancia, en: tolerance, pos: noun, gender: f}
+      - {es: diversidad, en: diversity, pos: noun, gender: f}
+      - {es: minoría, en: minority, pos: noun, gender: f}
+      - {es: integración, en: integration, pos: noun, gender: f}
+      - {es: exclusión, en: exclusion, pos: noun, gender: f}
+      - {es: privilegio, en: privilege, pos: noun, gender: m}
+
+  - id: the_economy
+    name: The economy
+    cefr_level: B2
+    words:
+      - {es: economía, en: economy, pos: noun, gender: f}
+      - {es: inversión, en: investment, pos: noun, gender: f}
+      - {es: crisis, en: crisis, pos: noun, gender: f, note: "Invariable in the plural: las crisis."}
+      - {es: crecimiento, en: growth, pos: noun, gender: m}
+      - {es: desempleo, en: unemployment, pos: noun, gender: m}
+      - {es: inflación, en: inflation, pos: noun, gender: f}
+      - {es: riqueza, en: wealth, pos: noun, gender: f}
+      - {es: rentable, en: profitable, pos: adjective}
+
+  - id: reading_the_media_critically
+    name: Reading the media critically
+    cefr_level: B2
+    words:
+      - {es: sesgo, en: bias, pos: noun, gender: m}
+      - {es: manipulación, en: manipulation, pos: noun, gender: f}
+      - {es: cobertura, en: coverage, pos: noun, gender: f}
+      - {es: veracidad, en: truthfulness, pos: noun, gender: f}
+      - {es: difundir, en: to spread, pos: verb}
+      - {es: censura, en: censorship, pos: noun, gender: f}
+      - {es: credibilidad, en: credibility, pos: noun, gender: f}
+      - {es: contrastar, en: to cross-check, pos: verb}
+
+  - id: doing_science
+    name: Doing science
+    cefr_level: B2
+    words:
+      - {es: hipótesis, en: hypothesis, pos: noun, gender: f}
+      - {es: experimento, en: experiment, pos: noun, gender: m}
+      - {es: evidencia, en: evidence, pos: noun, gender: f}
+      - {es: descubrimiento, en: discovery, pos: noun, gender: m}
+      - {es: comprobar, en: to verify, pos: verb, note: "Stem-changing: compruebo."}
+      - {es: hallazgo, en: finding, pos: noun, gender: m}
+      - {es: riguroso, en: rigorous, pos: adjective}
+      - {es: muestra, en: sample, pos: noun, gender: f}
+
+  - id: law_and_justice
+    name: Law and justice
+    cefr_level: B2
+    words:
+      - {es: juicio, en: trial, pos: noun, gender: m}
+      - {es: abogado, en: lawyer, pos: noun, gender: m}
+      - {es: culpable, en: guilty, pos: adjective}
+      - {es: inocente, en: innocent, pos: adjective}
+      - {es: delito, en: offence, pos: noun, gender: m}
+      - {es: castigo, en: punishment, pos: noun, gender: m}
+      - {es: sentencia, en: verdict, pos: noun, gender: f}
+      - {es: juzgar, en: to judge, pos: verb}
+
+  - id: how_teams_work
+    name: How teams work
+    cefr_level: B2
+    words:
+      - {es: liderazgo, en: leadership, pos: noun, gender: m}
+      - {es: delegar, en: to delegate, pos: verb}
+      - {es: motivación, en: motivation, pos: noun, gender: f}
+      - {es: conflicto, en: conflict, pos: noun, gender: m}
+      - {es: desempeño, en: performance, pos: noun, gender: m}
+      - {es: colaborar, en: to collaborate, pos: verb}
+      - {es: autonomía, en: autonomy, pos: noun, gender: f}
+      - {es: retroalimentación, en: feedback, pos: noun, gender: f}
+
+  - id: weighing_an_argument
+    name: Weighing an argument
+    cefr_level: B2
+    words:
+      - {es: premisa, en: premise, pos: noun, gender: f}
+      - {es: fundamento, en: basis, pos: noun, gender: m}
+      - {es: refutar, en: to refute, pos: verb}
+      - {es: sostener, en: to maintain (a claim), pos: verb, note: "Irregular like tener: sostengo."}
+      - {es: coherente, en: coherent, pos: adjective}
+      - {es: contundente, en: compelling, pos: adjective}
+      - {es: ambiguo, en: ambiguous, pos: adjective}
+      - {es: rebatir, en: to counter, pos: verb}
+
+  - id: how_minds_work
+    name: How minds work
+    cefr_level: B2
+    words:
+      - {es: comportamiento, en: behaviour, pos: noun, gender: m}
+      - {es: percepción, en: perception, pos: noun, gender: f}
+      - {es: conciencia, en: "awareness, conscience", pos: noun, gender: f}
+      - {es: autoestima, en: self-esteem, pos: noun, gender: f}
+      - {es: empatía, en: empathy, pos: noun, gender: f}
+      - {es: impulso, en: impulse, pos: noun, gender: m}
+      - {es: resiliencia, en: resilience, pos: noun, gender: f}
+      - {es: rasgo, en: trait, pos: noun, gender: m}
+
+  - id: debating_education
+    name: Debating education
+    cefr_level: B2
+    words:
+      - {es: pedagogía, en: pedagogy, pos: noun, gender: f}
+      - {es: currículo, en: curriculum, pos: noun, gender: m}
+      - {es: evaluar, en: to assess, pos: verb}
+      - {es: rendimiento, en: performance, pos: noun, gender: m}
+      - {es: acceso, en: access, pos: noun, gender: m}
+      - {es: formación, en: training, pos: noun, gender: f}
+      - {es: capacitar, en: to train, pos: verb}
+      - {es: abandono, en: drop-out, pos: noun, gender: m}
+
+  - id: how_cities_are_built
+    name: How cities are built
+    cefr_level: B2
+    words:
+      - {es: urbanismo, en: urban planning, pos: noun, gender: m}
+      - {es: infraestructura, en: infrastructure, pos: noun, gender: f}
+      - {es: densidad, en: density, pos: noun, gender: f}
+      - {es: movilidad, en: mobility, pos: noun, gender: f}
+      - {es: planificación, en: planning, pos: noun, gender: f}
+      - {es: periferia, en: outskirts, pos: noun, gender: f}
+      - {es: peatonal, en: pedestrian, pos: adjective}
+      - {es: albergar, en: to house, pos: verb}
+
+  - id: moving_between_countries
+    name: Moving between countries
+    cefr_level: B2
+    words:
+      - {es: globalización, en: globalisation, pos: noun, gender: f}
+      - {es: migración, en: migration, pos: noun, gender: f}
+      - {es: identidad, en: identity, pos: noun, gender: f}
+      - {es: arraigo, en: roots, pos: noun, gender: m}
+      - {es: intercambio, en: exchange, pos: noun, gender: m}
+      - {es: adaptarse, en: to adapt, pos: verb}
+      - {es: desarraigo, en: uprootedness, pos: noun, gender: m}
+      - {es: acoger, en: to take in, pos: verb, note: "Irregular yo form: acojo."}
+
+  - id: health_systems
+    name: Health systems
+    cefr_level: B2
+    words:
+      - {es: prevención, en: prevention, pos: noun, gender: f}
+      - {es: tratamiento, en: treatment, pos: noun, gender: m}
+      - {es: diagnóstico, en: diagnosis, pos: noun, gender: m}
+      - {es: crónico, en: chronic, pos: adjective}
+      - {es: epidemia, en: epidemic, pos: noun, gender: f}
+      - {es: recurso, en: resource, pos: noun, gender: m}
+      - {es: atención, en: care, pos: noun, gender: f}
+      - {es: colapsar, en: to collapse, pos: verb}
+
+  - id: describing_trends
+    name: Describing trends
+    cefr_level: B2
+    words:
+      - {es: auge, en: boom, pos: noun, gender: m}
+      - {es: declive, en: decline, pos: noun, gender: m}
+      - {es: estancamiento, en: stagnation, pos: noun, gender: m}
+      - {es: fluctuar, en: to fluctuate, pos: verb}
+      - {es: predominar, en: to predominate, pos: verb}
+      - {es: moderado, en: moderate, pos: adjective}
+      - {es: drástico, en: drastic, pos: adjective}
+      - {es: sostenido, en: sustained, pos: adjective}
+
+  - id: tone_and_register
+    name: Tone and register
+    cefr_level: B2
+    words:
+      - {es: coloquial, en: colloquial, pos: adjective}
+      - {es: cortés, en: polite, pos: adjective}
+      - {es: brusco, en: abrupt, pos: adjective}
+      - {es: tono, en: tone, pos: noun, gender: m}
+      - {es: dirigirse, en: to address someone, pos: verb, note: "Reflexive, takes a: me dirijo a usted."}
+      - {es: tutear, en: to address as tú, pos: verb}
+      - {es: protocolo, en: protocol, pos: noun, gender: m}
+      - {es: informal, en: informal, pos: adjective}
+
+  - id: shades_of_feeling
+    name: Shades of feeling
+    cefr_level: B2
+    words:
+      - {es: nostalgia, en: nostalgia, pos: noun, gender: f}
+      - {es: indiferencia, en: indifference, pos: noun, gender: f}
+      - {es: resentimiento, en: resentment, pos: noun, gender: m}
+      - {es: anhelo, en: longing, pos: noun, gender: m}
+      - {es: desconcierto, en: bewilderment, pos: noun, gender: m}
+      - {es: sosiego, en: calm, pos: noun, gender: m}
+      - {es: hartazgo, en: weariness, pos: noun, gender: m}
+      - {es: conmovedor, en: moving, pos: adjective}
+
+  - id: cause_and_effect
+    name: Cause and effect
+    cefr_level: B2
+    words:
+      - {es: provocar, en: to cause, pos: verb}
+      - {es: repercusión, en: repercussion, pos: noun, gender: f}
+      - {es: consecuencia, en: consequence, pos: noun, gender: f}
+      - {es: desencadenar, en: to trigger, pos: verb}
+      - {es: contribuir, en: to contribute, pos: verb, note: "Takes a: contribuye a la crisis."}
+      - {es: incidir, en: to have a bearing on, pos: verb, note: "Takes en: incide en el resultado."}
+      - {es: atribuir, en: to attribute, pos: verb}
+      - {es: derivar, en: to derive, pos: verb, note: "Takes de: deriva de una idea previa."}
+
+  - id: careful_claims
+    name: Making careful claims
+    cefr_level: B2
+    words:
+      - {es: presuntamente, en: allegedly, pos: adverb}
+      - {es: al parecer, en: apparently, pos: chunk, analyzable: false}
+      - {es: en principio, en: in principle, pos: chunk, analyzable: false}
+      - {es: en teoría, en: in theory, pos: chunk, analyzable: false}
+      - {es: cabe destacar, en: it is worth noting, pos: chunk, analyzable: false}
+      - {es: se estima, en: it is estimated, pos: chunk, analyzable: false}
+      - {es: tender a, en: to tend to, pos: chunk, analyzable: false}
+      - {es: en gran medida, en: to a large extent, pos: chunk, analyzable: false}
+
+  # ── C1 core floor ───────────────────────────────────────────────────────────
+  - id: rhetorical_moves
+    name: Rhetorical moves
+    cefr_level: C1
+    words:
+      - {es: aducir, en: to cite (as a reason), pos: verb}
+      - {es: esgrimir, en: to wield (an argument), pos: verb}
+      - {es: corroborar, en: to corroborate, pos: verb}
+      - {es: socavar, en: to undermine, pos: verb}
+      - {es: subrayar, en: to underline, pos: verb}
+      - {es: formular, en: to formulate, pos: verb}
+      - {es: cuestionar, en: to call into question, pos: verb}
+      - {es: sostenerse, en: to hold up, pos: verb, note: "El argumento no se sostiene."}
+
+  - id: precision_verbs
+    name: Verbs of precision
+    cefr_level: C1
+    words:
+      - {es: dilucidar, en: to elucidate, pos: verb}
+      - {es: ponderar, en: to weigh up, pos: verb}
+      - {es: acotar, en: to delimit, pos: verb}
+      - {es: entrañar, en: to entail, pos: verb}
+      - {es: conllevar, en: to carry with it, pos: verb}
+      - {es: suscitar, en: to give rise to, pos: verb}
+      - {es: propiciar, en: to favour, pos: verb}
+      - {es: constatar, en: to verify, pos: verb}
+
+  - id: abstract_nouns
+    name: Abstract nouns
+    cefr_level: C1
+    words:
+      - {es: vertiente, en: aspect, pos: noun, gender: f}
+      - {es: cariz, en: complexion, pos: noun, gender: m}
+      - {es: envergadura, en: scale, pos: noun, gender: f}
+      - {es: alcance, en: scope, pos: noun, gender: m}
+      - {es: trasfondo, en: underlying background, pos: noun, gender: m}
+      - {es: connotación, en: connotation, pos: noun, gender: f}
+      - {es: salvedad, en: caveat, pos: noun, gender: f}
+      - {es: consenso, en: consensus, pos: noun, gender: m}
+
+  - id: literary_language
+    name: Literary language
+    cefr_level: C1
+    words:
+      - {es: metáfora, en: metaphor, pos: noun, gender: f}
+      - {es: narrador, en: narrator, pos: noun, gender: m}
+      - {es: verosímil, en: plausible, pos: adjective}
+      - {es: prosa, en: prose, pos: noun, gender: f}
+      - {es: evocar, en: to evoke, pos: verb}
+      - {es: retórica, en: rhetoric, pos: noun, gender: f}
+      - {es: simbolismo, en: symbolism, pos: noun, gender: m}
+      - {es: desenlace, en: denouement, pos: noun, gender: m}
+
+  - id: formal_connectors
+    name: Formal connectors
+    cefr_level: C1
+    words:
+      - {es: habida cuenta de, en: in view of, pos: chunk, analyzable: false}
+      - {es: en aras de, en: for the sake of, pos: chunk, analyzable: false}
+      - {es: por consiguiente, en: consequently, pos: chunk, analyzable: false}
+      - {es: si bien, en: although, pos: chunk, analyzable: false}
+      - {es: a tenor de, en: in accordance with, pos: chunk, analyzable: false}
+      - {es: no en vano, en: not for nothing, pos: chunk, analyzable: false}
+      - {es: salvo que, en: unless, pos: chunk, analyzable: false, note: "Followed by the subjunctive."}
+      - {es: por cuanto, en: inasmuch as, pos: chunk, analyzable: false}
+
+  - id: false_friends
+    name: False friends
+    cefr_level: C1
+    words:
+      - {es: éxito, en: success, pos: noun, gender: m, note: "NOT exit. La salida is the exit."}
+      - {es: sensible, en: sensitive, pos: adjective, note: "NOT sensible. Sensato is sensible."}
+      - {es: embarazada, en: pregnant, pos: adjective, note: "NOT embarrassed. Avergonzado is embarrassed."}
+      - {es: constipado, en: having a cold, pos: adjective, note: "NOT constipated. Estreñido is constipated."}
+      - {es: realizar, en: to carry out, pos: verb, note: "NOT to realise. Darse cuenta is to realise."}
+      - {es: asistir, en: to attend, pos: verb, note: "NOT to assist. Ayudar is to assist."}
+      - {es: pretender, en: to intend, pos: verb, note: "NOT to pretend. Fingir is to pretend."}
+      - {es: actual, en: current, pos: adjective, note: "NOT actual. Real or verdadero is actual."}
+
+  - id: verbs_of_noticing
+    name: Verbs of noticing
+    cefr_level: C1
+    words:
+      - {es: percatarse, en: to notice, pos: verb, note: "Reflexive, takes de: me percaté de."}
+      - {es: vislumbrar, en: to glimpse, pos: verb}
+      - {es: atisbar, en: to make out, pos: verb}
+      - {es: discernir, en: to discern, pos: verb}
+      - {es: entrever, en: to catch sight of, pos: verb}
+      - {es: apreciar, en: "to appreciate, to perceive", pos: verb}
+      - {es: reparar en, en: to take notice of, pos: chunk, analyzable: false}
+      - {es: pasar por alto, en: to overlook, pos: chunk, analyzable: false}
+
+  - id: idiomatic_c1
+    name: Idiomatic phrases
+    cefr_level: C1
+    words:
+      - {es: dar por sentado, en: to take for granted, pos: chunk, analyzable: false}
+      - {es: poner en tela de juicio, en: to call into question, pos: chunk, analyzable: false}
+      - {es: a raíz de, en: as a result of, pos: chunk, analyzable: false}
+      - {es: en la medida en que, en: insofar as, pos: chunk, analyzable: false}
+      - {es: a fin de cuentas, en: at the end of the day, pos: chunk, analyzable: false}
+      - {es: dejar constancia, en: to place on record, pos: chunk, analyzable: false}
+      - {es: hacer hincapié, en: to emphasise, pos: chunk, analyzable: false}
+      - {es: sacar a colación, en: to bring up, pos: chunk, analyzable: false}
+
+  - id: institutions_and_paperwork
+    name: Institutions and paperwork
+    cefr_level: C1
+    words:
+      - {es: normativa, en: regulations, pos: noun, gender: f}
+      - {es: expediente, en: file, pos: noun, gender: m}
+      - {es: trámite, en: procedure, pos: noun, gender: m}
+      - {es: competencia, en: "remit, competition", pos: noun, gender: f}
+      - {es: vigencia, en: validity, pos: noun, gender: f}
+      - {es: derogar, en: to repeal, pos: verb}
+      - {es: promulgar, en: to enact, pos: verb}
+      - {es: resolución, en: ruling, pos: noun, gender: f}

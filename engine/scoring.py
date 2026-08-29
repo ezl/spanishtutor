@@ -155,26 +155,40 @@ async def score_session(session, user) -> list:
             logger.warning("Scoring returned unknown skill_id: %s", skill_id_str)
             continue
 
-        interval_days = SRS_INTERVALS.get(score, 3)
-        next_review = now + timedelta(days=interval_days)
-
         ss, _ = await sync_to_async(SkillScore.objects.get_or_create)(
             user=user, skill=skill, mode=mode,
             defaults={'score': 0},
         )
+
+        # The evidence is asymmetric, so the update is too. Failing is close to
+        # conclusive -- you could not do it, so you do not have it, and recency
+        # wins on the way down. Succeeding once is weak: you might have it, or
+        # guessed, or the question was easy. So a hit advances ONE step and a
+        # miss replaces outright. Mastery is only reachable by repeated
+        # confirmation, which is already how UserWord works.
+        effective = min(ss.score + 1, score) if score > ss.score else score
+
+        interval_days = SRS_INTERVALS.get(effective, 3)
+        next_review = now + timedelta(days=interval_days)
+
         await sync_to_async(
             lambda: SkillScore.objects.filter(pk=ss.pk).update(
-                score=score,
+                score=effective,
                 last_tested_at=now,
                 next_review_at=next_review,
             )
         )()
 
+        # The event log records the JUDGED score, not the effective one. They
+        # mean different things: effective=1 can be "advanced one step from
+        # untested" OR "judged 1 and dropped", and _check_reteach must be able to
+        # tell them apart -- otherwise every newly taught skill looks like a
+        # failure and gets routed straight back to teaching.
         await sync_to_async(SkillScoreEvent.objects.create)(
             user=user, skill=skill, mode=mode, score=score, session=session,
         )
 
-        scored.append({'skill_id': skill_id_str, 'skill_name': skill.name, 'score': score})
+        scored.append({'skill_id': skill_id_str, 'skill_name': skill.name, 'score': effective})
 
     # Check for reteach flags (score 1 any session, or score <=2 on last 2 sessions)
     for item in scored:
@@ -185,7 +199,21 @@ async def score_session(session, user) -> list:
 
 
 async def _check_reteach(user, skill, mode):
-    """Flag skills needing reteach by scheduling them next. No-op for now — decision tree handles priority."""
+    """Route a failed skill back to TEACHING rather than to another test.
+
+    This used to bump next_review_at to now, which surfaced the skill again as
+    REVIEW. That is the wrong operation: retrieval practice only works on
+    something already encoded, so re-testing an item the student just failed is
+    not spaced repetition, it is failing on a schedule. It compounded too --
+    SRS review is the highest-priority branch when 3+ skills are overdue, and
+    bumping manufactured overdue skills, so a few weak ones could pin the
+    student in review and pre-empt new teaching entirely.
+
+    Clearing next_review_at takes the skill out of the review queue. Anything
+    below 4 is eligible for next_new_skill, and a skill already reached in
+    sequence sorts ahead of unseen ones, so the next teaching session picks it
+    up and scoring re-establishes an interval afterwards.
+    """
     from learner.models import SkillScoreEvent
 
     recent = await sync_to_async(
@@ -199,18 +227,17 @@ async def _check_reteach(user, skill, mode):
         return
 
     if recent[0].score == 1:
-        # Score 1 any session — mark next_review to now so it surfaces immediately
-        await _bump_to_now(user, skill, mode)
+        await _route_to_teaching(user, skill, mode)
     elif len(recent) >= 2 and recent[0].score <= 2 and recent[1].score <= 2:
-        # Two consecutive sessions at score 2 or below
-        await _bump_to_now(user, skill, mode)
+        await _route_to_teaching(user, skill, mode)
 
 
-async def _bump_to_now(user, skill, mode):
+async def _route_to_teaching(user, skill, mode):
+    """Take a failed skill out of the review queue so it gets taught instead."""
     from learner.models import SkillScore
     await sync_to_async(
         lambda: SkillScore.objects.filter(user=user, skill=skill, mode=mode).update(
-            next_review_at=timezone.now()
+            next_review_at=None
         )
     )()
 

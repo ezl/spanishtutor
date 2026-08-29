@@ -96,6 +96,44 @@ POST_ASSESSMENT_ES = (
 # Input classification
 # ---------------------------------------------------------------------------
 
+PLACEMENT_MASTERY_MARGIN = 1
+
+
+def cap_placement_mastery(user, placed_level: str) -> int:
+    """Hold placement 4s at 3 near the boundary the quiz just found.
+
+    One question is thin evidence, and a 4 buys the longest review interval, so
+    a lucky answer at the frontier reads as mastery and then goes unchecked for
+    months. But capping everywhere is worse: a genuine B2 would have their A1
+    and A2 rows held at 3 and be retested on material they obviously have.
+
+    So the cap depends on distance from the placed level. A single answer
+    certifies mastery only when the learner is demonstrably two or more levels
+    above the material -- adjacent CEFR levels overlap heavily and partial
+    knowledge is normal there. Above the placed level nothing is needed: the
+    quiz found the boundary by the student getting things WRONG, so those scores
+    are already low.
+
+    Applied at conclusion rather than per question, because the placed level is
+    derived from the answers and does not exist until the quiz ends.
+    """
+    from learner.models import SkillScore
+    from .curriculum import LEVEL_ORDER
+
+    if placed_level not in LEVEL_ORDER:
+        return 0
+    placed_idx = LEVEL_ORDER.index(placed_level)
+    capped = 0
+    for ss in SkillScore.objects.filter(user=user, mode='writing', score=4).select_related('skill'):
+        level = getattr(ss.skill, 'cefr_level', '') or ''
+        if level not in LEVEL_ORDER:
+            continue
+        if placed_idx - LEVEL_ORDER.index(level) <= PLACEMENT_MASTERY_MARGIN:
+            SkillScore.objects.filter(pk=ss.pk).update(score=3)
+            capped += 1
+    return capped
+
+
 def _classify_input(text: str) -> str:
     """Classify user input: 'answer' | 'dont_know' | 'off_topic' | 'rage'"""
     t = text.strip().lower()
@@ -328,6 +366,10 @@ async def _conclude_quiz(user, session, quiz_state: dict, skills: list, uid: str
     results = quiz_derive_results(quiz_state, skills)
     cefr = results['cefr_level']
     skill_scores = results['skill_scores']
+
+    capped = await sync_to_async(cap_placement_mastery)(user, cefr)
+    if capped:
+        log.info('[%s] quiz: capped %d placement 4s to 3 near %s', uid, capped, cefr)
 
     def _skill_label(skill_id):
         parts = skill_id.split('_', 1)

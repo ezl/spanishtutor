@@ -44,11 +44,13 @@ async def test_score_session_writes_skill_score(make_user, make_skill):
 
     assert result, "score_session should return scored items"
     assert result[0]['skill_id'] == 'a1_present_ar'
-    assert result[0]['score'] == 3
+    # A hit advances ONE step rather than adopting the judged value outright:
+    # succeeding once is weak evidence. See docs/grid-accuracy.md.
+    assert result[0]['score'] == 1
 
     ss = await sync_to_async(SkillScore.objects.filter(user=user, skill=skill).first)()
     assert ss is not None
-    assert ss.score == 3
+    assert ss.score == 1
 
 
 @pytest.mark.django_db(transaction=True)
@@ -89,7 +91,10 @@ async def test_score_session_srs_interval_is_correct(make_user, make_skill):
         session=session, event_type='conversation', content='Practice preterite.', user_response='comí',
     )
 
-    score_val = 2  # SRS_INTERVALS[2] = 3 days
+    score_val = 2
+    # An untested skill advances one step, so the interval follows the effective
+    # score of 1 rather than the judged 2.
+    effective = 1
     before = timezone.now()
     with patch('engine.scoring.anthropic.AsyncAnthropic') as MockClient:
         MockClient.return_value.messages.create = AsyncMock(
@@ -98,7 +103,8 @@ async def test_score_session_srs_interval_is_correct(make_user, make_skill):
         await score_session(session, user)
 
     ss = await sync_to_async(SkillScore.objects.filter(user=user, skill=skill).first)()
-    expected_days = SRS_INTERVALS[score_val]
+    assert ss.score == effective
+    expected_days = SRS_INTERVALS[effective]
     delta = ss.next_review_at - before
     assert expected_days - 1 <= delta.days <= expected_days + 1
 
@@ -144,7 +150,11 @@ async def test_score_session_returns_empty_on_no_events(make_user):
 
 @pytest.mark.django_db(transaction=True)
 async def test_check_reteach_score1_bumps_to_now(make_user, make_skill):
-    """score=1 on the latest event → next_review_at is bumped to now immediately."""
+    """score=1 → the skill LEAVES the review queue so it gets taught instead.
+
+    This used to bump next_review_at to now, which re-tested a skill the student
+    had just failed. Retrieval practice only works on something already encoded.
+    """
     from learner.models import Session, SkillScore, SkillScoreEvent
     from engine.scoring import _check_reteach
 
@@ -160,12 +170,11 @@ async def test_check_reteach_score1_bumps_to_now(make_user, make_skill):
         user=user, skill=skill, mode='writing', score=1, session=session,
     )
 
-    before = timezone.now()
     await _check_reteach(user, skill, 'writing')
 
     ss = await sync_to_async(SkillScore.objects.get)(user=user, skill=skill, mode='writing')
-    assert ss.next_review_at <= before + timedelta(seconds=5), (
-        "next_review_at should be bumped to now for score=1"
+    assert ss.next_review_at is None, (
+        "a failed skill should leave the review queue and be re-taught"
     )
 
 
@@ -191,11 +200,10 @@ async def test_check_reteach_two_consecutive_score2_bumps(make_user, make_skill)
         user=user, skill=skill, mode='writing', score=2, session=s2,
     )
 
-    before = timezone.now()
     await _check_reteach(user, skill, 'writing')
 
     ss = await sync_to_async(SkillScore.objects.get)(user=user, skill=skill, mode='writing')
-    assert ss.next_review_at <= before + timedelta(seconds=5)
+    assert ss.next_review_at is None
 
 
 @pytest.mark.django_db(transaction=True)

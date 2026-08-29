@@ -15,6 +15,12 @@ from learner.models import LexItem
 
 FIELDS = ('en', 'pos', 'gender', 'note', 'cefr_level')
 
+_LEVELS = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2']
+
+
+def _level_rank(level: str) -> int:
+    return _LEVELS.index(level) if level in _LEVELS else len(_LEVELS)
+
 
 class Command(BaseCommand):
     help = 'Sync lexicon.yaml into the LexItem table'
@@ -36,7 +42,17 @@ class Command(BaseCommand):
                     entry['packs'].append(pack['id'])
                 for field in FIELDS:
                     value = word.get(field) or (pack.get('cefr_level') if field == 'cefr_level' else '')
-                    if value and not entry.get(field):
+                    if not value:
+                        continue
+                    if field == 'cefr_level':
+                        # A word taught in packs at two levels belongs to the
+                        # EARLIER one -- its level is where a learner first meets
+                        # it, not whichever pack happened to be higher in the
+                        # file. First-seen-wins made that an ordering accident.
+                        current = entry.get(field)
+                        if not current or _level_rank(value) < _level_rank(current):
+                            entry[field] = value
+                    elif not entry.get(field):
                         entry[field] = value
                 if word.get('analyzable') is False:
                     entry['analyzable'] = False

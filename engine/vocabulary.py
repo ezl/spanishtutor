@@ -56,6 +56,18 @@ def pack_for_skill(skill_id: str):
     return None
 
 
+def _level_window(user) -> list:
+    """The student's level plus the one below. Interest words carry no level and
+    are always eligible -- they were generated for this person on purpose."""
+    from .curriculum import LEVEL_ORDER
+    level = user.estimated_cefr_level or 'A1'
+    if level not in LEVEL_ORDER:
+        return [LEVEL_ORDER[0], '']
+    i = LEVEL_ORDER.index(level)
+    window = LEVEL_ORDER[max(0, i - 1):i + 1]
+    return list(window) + ['']          # '' = unlevelled, i.e. generated words
+
+
 def _open_session_skill(user):
     from learner.models import Session
     session = (Session.objects.filter(user=user, ended_at__isnull=True)
@@ -87,8 +99,17 @@ def _select(user, skill_id=None) -> dict:
     # NOT owner__in=[None, user.pk]: SQL `IN (NULL, 5)` never matches NULL, so
     # that silently excludes the entire core catalogue. Same NULL semantics that
     # forced the partial unique constraints on LexItem.
-    candidates = (candidates.filter(packs__contains=pack) if pack
-                  else candidates.filter(Q(owner__isnull=True) | Q(owner=user)))
+    if pack:
+        candidates = candidates.filter(packs__contains=pack)
+    else:
+        # Level window: the student's level and the one below it. Strict
+        # same-level is wrong -- strong grammar with patchy vocabulary is
+        # ordinary, and the grid measures skills, not words, so we have no
+        # per-word evidence about what they already know. One level down catches
+        # genuine gaps without walking a B1 student through "adiós".
+        candidates = candidates.filter(
+            Q(owner__isnull=True) | Q(owner=user)
+        ).filter(cefr_level__in=_level_window(user))
     new = list(candidates.order_by('cefr_level', 'es')[:new_budget])
 
     return {'due': [uw.item for uw in due], 'new': new}

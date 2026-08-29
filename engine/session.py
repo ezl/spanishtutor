@@ -739,8 +739,12 @@ async def _select_session(user):
         if recent_types and 'conversation' not in recent_types:
             return 'conversation', {}, frontier_skills
 
-    # 4. Default: push a new skill
-    scored_ids = {_sid(s) for s in scores}
+    # 4. Default: push a new skill.
+    # Only score 4 counts as "known, do not teach". This used to be every row
+    # regardless of value, and the placement quiz writes score=1 for "I don't
+    # know" -- so answering "I don't know" permanently barred a skill from ever
+    # being taught. A 1 means asked, failed, still needs teaching.
+    scored_ids = {_sid(s) for s in scores if s.score >= 4}
     skill = await sync_to_async(next_new_skill)(level, scored_ids)
     return 'new_skill', {'skill': skill}, frontier_skills
 
@@ -890,6 +894,13 @@ async def handle_session(user, text: str, attachments: list = None) -> dict:
                           and session.current_phase == 'teach_drill')
         if not in_teach_drill:
             return {"text": FEEDBACK_ACK, "audio_url": None, "session_ended": False}
+        # Inside teach_drill the message still goes to the classifier, because a
+        # message can carry BOTH feedback and an answer. But the classifier is
+        # told what the code already determined instead of re-deriving it: it
+        # once read "Feedback: broken..." as a student who did not know, and
+        # supplied the answer.
+        from .teach_drill import note_explicit_feedback
+        note_explicit_feedback(True)
 
     # Skill requests are handled above phase routing, so a request made at the
     # check-in greeting is caught as readily as one made mid-drill. The original
@@ -2019,6 +2030,18 @@ async def _close_session_record(session, user):
         import logging
         logging.getLogger(__name__).error(
             'record_exposure failed for session %s: %s', session.pk, exc)
+
+    # Interest packs are generated here, not at onboarding: onboarding is the
+    # placement quiz and collects no interests, so a one-shot generation would
+    # fire against an empty set and never improve. One topic per close keeps the
+    # cost bounded while interests accumulate.
+    try:
+        from .interest_packs import generate_for
+        await generate_for(user)
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).error(
+            'interest pack generation failed for user %s: %s', user.pk, exc)
 
     # The feedback sweep runs here instead of on a cron: session close batches
     # naturally, scales with usage, needs no scheduler, and costs nothing when

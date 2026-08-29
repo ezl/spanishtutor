@@ -5,6 +5,7 @@ new_skill sessions.
 """
 import json
 import logging
+import contextvars
 import re
 
 from .core import call_llm
@@ -482,6 +483,36 @@ Common traps to AVOID:
 - For saber: use "found out / learned" cues, not just "knew" (preterite meaning shift)."""
 
 
+# Set by session.py when looks_like_explicit_feedback() has ALREADY fired, so the
+# model is told what the code determined rather than asked to re-derive it. On
+# 2026-08-29 the classifier read "Feedback: broken. After logging it didn't keep
+# going" as a student who did not know the answer, and supplied the answer --
+# producing two separate complaints from one misclassification. Deterministic
+# knowledge should never be re-inferred by something that can get it wrong.
+# A ContextVar rather than a module global: concurrent sessions must not see
+# each other's flag.
+_EXPLICIT_FEEDBACK = contextvars.ContextVar('explicit_feedback', default=False)
+
+FEEDBACK_OVERRIDE = """DETERMINISTIC OVERRIDE, applies before the classification below:
+The student's message has ALREADY been detected and logged as META-FEEDBACK by code, before you saw it. It is category (c). Do not re-decide this.
+- Do NOT treat it as a lesson answer. Do NOT evaluate it for correctness.
+- Do NOT supply the answer to the pending question. They did not fail to answer; they said something about the system.
+- Do NOT advance to new material and do NOT end the lesson.
+Acknowledge the feedback in one short line, then re-ask the SAME pending question, unchanged.
+"""
+
+
+def note_explicit_feedback(flag: bool) -> None:
+    _EXPLICIT_FEEDBACK.set(flag)
+
+
+def classify_first_check() -> str:
+    """The classifier preamble, with the deterministic override when it applies."""
+    if _EXPLICIT_FEEDBACK.get():
+        return FEEDBACK_OVERRIDE + "\n\n" + CLASSIFY_FIRST_CHECK
+    return CLASSIFY_FIRST_CHECK
+
+
 CLASSIFY_FIRST_CHECK = """FIRST DECISION (do this BEFORE anything else): classify the student's most recent message. Read what they wrote and pick ONE category:
 
   (a) LESSON ANSWER — a response to the drill question you just asked. Two kinds, both belong here:
@@ -551,7 +582,7 @@ CORRECTNESS EVALUATION (only if you classified as LESSON ANSWER): first, did the
 def build_retrieval_only_instruction(retrieval: dict, person_retrieve: str) -> str:
     """Instruction for a drill-only turn (no new teaching): review a prior unit."""
     return (
-        f"{CLASSIFY_FIRST_CHECK}\n\n"
+        f"{classify_first_check()}\n\n"
         f"— IF classification was LESSON ANSWER + evaluated ✓, OR there was no prior answer, OR you're proceeding after a META-FEEDBACK acknowledgment — continue with the teach/drill steps below: —\n\n"
         f"1) Do NOT teach any new content — this is a review turn.\n\n"
         f"2) Ask ONE production question testing **{retrieval['label']}** in the "
@@ -634,7 +665,7 @@ def build_teach_instruction(unit: dict, person_new: str, is_final: bool) -> str:
     No retrieval on teach turns — retrieval happens on its own alternating turn."""
     parts = []
 
-    parts.append(CLASSIFY_FIRST_CHECK)
+    parts.append(classify_first_check())
 
     parts.append("— IF classification was LESSON ANSWER + evaluated ✓, OR there was no prior answer, OR you're proceeding after a META-FEEDBACK acknowledgment — continue with the teach/drill steps below: —")
 

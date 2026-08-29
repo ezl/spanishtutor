@@ -180,13 +180,6 @@ skills:
     cefr_level: A1
     description: "qué, quién/quiénes, cuándo, dónde, por qué, cómo, cuánto/a/os/as; question word order; accent marks that distinguish qué from que"
 
-  - id: a1_vocab_core_adjectives
-    name: Vocabulary — core adjectives & opposites
-    cefr_level: A1
-    description: "grande/pequeño, bueno/malo, nuevo/viejo, fácil/difícil, rápido/lento, caro/barato, bonito/feo, fuerte/débil; gender agreement with each pair"
-    prerequisites: [a1_nouns_gender]
-
-  # ─── A2 ───────────────────────────────────────────────
   - id: a2_adjective_agreement
     name: Adjective agreement and placement
     cefr_level: A2
