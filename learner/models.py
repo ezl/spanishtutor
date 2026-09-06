@@ -136,6 +136,10 @@ class Session(models.Model):
     summary = models.TextField(blank=True)
     current_phase = models.CharField(max_length=32, blank=True, default='')
     phase_turns_completed = models.IntegerField(default=0)
+    # Comprehension questions actually asked this phase. Distinct from
+    # phase_turns_completed (student replies) because a correction or a
+    # "ready?" turn spends a reply without asking anything.
+    phase_questions_asked = models.IntegerField(default=0)
     target_skill = models.ForeignKey(
         'Skill', null=True, blank=True, on_delete=models.SET_NULL, related_name='targeted_sessions'
     )

@@ -1131,3 +1131,91 @@ class TestMilestonesAreNotTerminal:
         line = build_milestone_line(['A2'], advanced=False)
         assert 'A2' in line
         assert build_milestone_line([], advanced=False) == ''
+
+
+# ── Reading comprehension budget: count questions asked, not student replies ──
+#
+# Session 70 spent its four-question comprehension budget on two questions: a
+# correction turn and a "¿Listo para la última pregunta?" permission turn each
+# consumed a slot, because the counter incremented on every student reply
+# regardless of what Luz's turn contained.
+
+class TestReadingComprehensionBudget:
+    async def _reading_session(self, make_user, make_skill, uid, questions, turns):
+        from learner.models import Session, SessionEvent
+        skill = await sync_to_async(make_skill)(
+            skill_id='a1_introduce_yourself', name='Introduce yourself',
+            cefr_level='A1', description='Me llamo...')
+        user = await sync_to_async(make_user)(discord_id=uid, cefr_level='A1')
+        session = await sync_to_async(Session.objects.create)(
+            user=user, session_type='reading', target_skill=skill,
+            current_phase='comprehension',
+            phase_turns_completed=turns, phase_questions_asked=questions,
+        )
+        await sync_to_async(SessionEvent.objects.create)(
+            session=session, event_type='conversation',
+            content='¿Por qué Marco habla con Diego?', user_response='',
+        )
+        return user, session
+
+    @pytest.mark.django_db(transaction=True)
+    @pytest.mark.asyncio
+    async def test_turn_without_question_does_not_consume_budget(self, make_user, make_skill):
+        """A permission turn ('¿Listo para la última pregunta?') asks nothing, so
+        it must not spend one of the four comprehension questions."""
+        from engine.session import _continue_reading
+        from learner.models import Session
+
+        user, session = await self._reading_session(make_user, make_skill, 'rb_1', 1, 1)
+        no_marker = "Exacto, eso es.\n\n¿Listo para la última pregunta del pasaje?"
+        with patch('engine.session.call_llm', new=AsyncMock(return_value=no_marker)):
+            await _continue_reading(user, session, "Porque no lo conocía")
+
+        reloaded = await sync_to_async(Session.objects.get)(pk=session.pk)
+        assert reloaded.phase_questions_asked == 1, "no question asked — budget must not move"
+        assert reloaded.current_phase == 'comprehension'
+
+    @pytest.mark.django_db(transaction=True)
+    @pytest.mark.asyncio
+    async def test_turn_with_question_marker_consumes_budget_and_strips_marker(
+            self, make_user, make_skill):
+        from engine.session import _continue_reading
+        from learner.models import Session
+
+        user, session = await self._reading_session(make_user, make_skill, 'rb_2', 1, 1)
+        marked = "¿Qué hacen Marco y Diego después de hablar?\n<<QUESTION_ASKED>>"
+        with patch('engine.session.call_llm', new=AsyncMock(return_value=marked)):
+            result = await _continue_reading(user, session, "Porque no lo conocía")
+
+        reloaded = await sync_to_async(Session.objects.get)(pk=session.pk)
+        assert reloaded.phase_questions_asked == 2
+        assert '<<QUESTION_ASKED>>' not in result['text'], "marker must never reach the student"
+
+    @pytest.mark.django_db(transaction=True)
+    @pytest.mark.asyncio
+    async def test_advances_to_production_after_four_questions(self, make_user, make_skill):
+        from engine.session import _continue_reading
+        from learner.models import Session
+
+        user, session = await self._reading_session(make_user, make_skill, 'rb_3', 4, 4)
+        with patch('engine.session.call_llm', new=AsyncMock(return_value="Usa 'me llamo'.")):
+            await _continue_reading(user, session, "Entrenaron juntos")
+
+        reloaded = await sync_to_async(Session.objects.get)(pk=session.pk)
+        assert reloaded.current_phase == 'production'
+
+    @pytest.mark.django_db(transaction=True)
+    @pytest.mark.asyncio
+    async def test_hard_cap_stops_a_comprehension_phase_that_never_asks(
+            self, make_user, make_skill):
+        """If the model never emits the marker the phase must still terminate."""
+        from engine.session import _continue_reading, READING_COMPREHENSION_MAX_TURNS
+        from learner.models import Session
+
+        user, session = await self._reading_session(
+            make_user, make_skill, 'rb_4', 1, READING_COMPREHENSION_MAX_TURNS - 1)
+        with patch('engine.session.call_llm', new=AsyncMock(return_value="Sin pregunta.")):
+            await _continue_reading(user, session, "ok")
+
+        reloaded = await sync_to_async(Session.objects.get)(pk=session.pk)
+        assert reloaded.current_phase == 'production', "hard cap must end the phase"

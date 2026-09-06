@@ -395,6 +395,23 @@ Forbidden on this turn:
 
 READING_PHASE_TURNS = {'comprehension': 4, 'production': 2}
 
+# The comprehension budget is four QUESTIONS. It used to be four student
+# replies, which is not the same thing: in session 70 a correction turn and a
+# "¿Listo para la última pregunta?" turn each ate a slot, so the student was
+# asked two questions out of four. Luz marks the turns that actually ask.
+READING_QUESTION_ASKED_MARKER = '<<QUESTION_ASKED>>'
+
+# Backstop. The marker is emitted by the model, and the model has twice ignored
+# this suffix outright, so the phase must be able to end without it.
+READING_COMPREHENSION_MAX_TURNS = 6
+
+
+def _strip_question_asked_marker(text: str) -> tuple:
+    """Returns (clean_text, question_was_asked)."""
+    if READING_QUESTION_ASKED_MARKER in text:
+        return text.replace(READING_QUESTION_ASKED_MARKER, '').rstrip(), True
+    return text, False
+
 READING_PROMPT = """You are running a reading comprehension session.
 
 Target skill: {skill_name}
@@ -415,7 +432,13 @@ The reading passage is in the conversation above. Ask ONE comprehension question
 
 Rules:
 - ONE question only. No preamble.
-- After student responds: confirm or correct in ONE line only."""
+- After student responds: confirm or correct in ONE line only.
+- Do NOT ask whether the student is ready, and do NOT announce which number the
+  question is. Ask the question itself.
+- End the message with the literal marker on its own line at the very end:
+  <<QUESTION_ASKED>>
+  Emit it ONLY if this message actually asks a comprehension question. If for any
+  reason you did not ask one, omit the marker."""
 
 READING_PRODUCTION_SUFFIX = """CURRENT TASK: Reading Production — turn {turn_num} of 2
 
@@ -578,12 +601,13 @@ def _srs_position(turns, schedule):
     return None
 
 
-async def _set_phase(session, phase: str, turns: int) -> None:
+async def _set_phase(session, phase: str, turns: int, questions: int = None) -> None:
     from learner.models import Session
+    fields = {'current_phase': phase, 'phase_turns_completed': turns}
+    if questions is not None:
+        fields['phase_questions_asked'] = questions
     await sync_to_async(
-        lambda: Session.objects.filter(pk=session.pk).update(
-            current_phase=phase, phase_turns_completed=turns
-        )
+        lambda: Session.objects.filter(pk=session.pk).update(**fields)
     )()
     session.current_phase = phase
     session.phase_turns_completed = turns
@@ -1845,25 +1869,32 @@ async def _continue_reading(user, session, text: str) -> dict:
     history.append({"role": "user", "content": text})
 
     if phase == 'present':
-        await _set_phase(session, 'comprehension', 0)
         suffix = READING_COMPREHENSION_SUFFIX.format(q_num=1)
         response_text = await call_llm(history, user=user, system_suffix=suffix)
+        response_text, asked_now = _strip_question_asked_marker(response_text)
+        await _set_phase(session, 'comprehension', 0, questions=1 if asked_now else 0)
 
     elif phase == 'comprehension':
         new_turns = turns + 1
-        if new_turns >= READING_PHASE_TURNS['comprehension']:
-            await _set_phase(session, 'production', 0)
+        asked = session.phase_questions_asked
+        if (asked >= READING_PHASE_TURNS['comprehension']
+                or new_turns >= READING_COMPREHENSION_MAX_TURNS):
+            await _set_phase(session, 'production', 0, questions=0)
             suffix = READING_PRODUCTION_SUFFIX.format(skill_name=skill_name, turn_num=1)
+            response_text = await call_llm(history, user=user, system_suffix=suffix)
         else:
-            await _set_phase(session, 'comprehension', new_turns)
-            suffix = READING_COMPREHENSION_SUFFIX.format(q_num=new_turns + 1)
-        response_text = await call_llm(history, user=user, system_suffix=suffix)
+            suffix = READING_COMPREHENSION_SUFFIX.format(q_num=asked + 1)
+            response_text = await call_llm(history, user=user, system_suffix=suffix)
+            response_text, asked_now = _strip_question_asked_marker(response_text)
+            await _set_phase(session, 'comprehension', new_turns,
+                             questions=asked + 1 if asked_now else asked)
 
     elif phase == 'production':
         new_turns = turns + 1
         if new_turns >= READING_PHASE_TURNS['production']:
             suffix = READING_CLOSE_SUFFIX.format(skill_name=skill_name)
             response_text = await call_llm(history, user=user, system_suffix=suffix)
+            response_text, _ = _strip_question_asked_marker(response_text)
             await sync_to_async(SessionEvent.objects.create)(
                 session=session, event_type='conversation',
                 content=response_text, user_response='',
@@ -1886,6 +1917,9 @@ async def _continue_reading(user, session, text: str) -> dict:
 
     else:
         response_text = await call_llm(history, user=user)
+
+    # Belt and braces: the marker must never reach a student down any path.
+    response_text, _ = _strip_question_asked_marker(response_text)
 
     await sync_to_async(SessionEvent.objects.create)(
         session=session, event_type='conversation',
